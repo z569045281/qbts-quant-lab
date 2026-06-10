@@ -1070,6 +1070,11 @@ async def refresh_decision():
 
     extras: dict = {}
     try:
+        # Live quote (pre/post) — daily bars lag it; Fable must see the latest print.
+        extras["live_quote"] = await quote_live()
+    except Exception:
+        pass
+    try:
         from data.altdata import fetch_earnings_dates
         dates = await asyncio.to_thread(fetch_earnings_dates)
         extras["earnings_dates"] = [d.strftime("%Y-%m-%d") for d in dates]

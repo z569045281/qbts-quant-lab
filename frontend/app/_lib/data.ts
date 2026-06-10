@@ -144,6 +144,7 @@ export interface Decision {
   risks:              string[];
   upcoming_catalysts: DecisionCatalyst[];
   invalidation:       string;
+  invalidation_price?: number;   // QBTS level that kills the plan (machine-checkable)
 }
 
 /* ── /dashboard/calibration payload ──────────────────────────────────────── */

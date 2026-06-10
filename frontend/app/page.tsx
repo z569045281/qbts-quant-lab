@@ -114,12 +114,52 @@ export default function Dashboard() {
   const todayUp = snap.today_change >= 0;
   const genAt = snap.decision_generated_at?.slice(0, 16).replace("T", " ");
 
+  // ── Plan vitality check: compare LIVE price against the plan's kill level.
+  // A displayed plan whose invalidation has been breached is worse than no
+  // plan — flag it dead in red instead of letting a stale "buy at $26" stand.
+  const liveQbts = live?.quotes?.qbts;
+  const liveFresh = live && (Date.now() / 1000 - live.asof_epoch) < 180;
+  let planBreached = false;
+  if (d && liveFresh && liveQbts) {
+    const kill = d.invalidation_price ?? d.trade_plan?.qbts_stop;
+    if (typeof kill === "number") {
+      if (d.action === "LONG_QBTX"  && liveQbts.price <= kill) planBreached = true;
+      if (d.action === "SHORT_QBTZ" && liveQbts.price >= kill) planBreached = true;
+    }
+  }
+  const decisionAgeH = snap.decision_generated_at
+    ? (Date.now() - new Date(snap.decision_generated_at).getTime()) / 3_600_000
+    : null;
+  const planStale = decisionAgeH !== null && decisionAgeH > 36;
+
   const newsTop = (snap.news?.items ?? [])
     .filter(n => n.ai?.impact !== "low")
     .slice(0, 5);
 
   return (
     <main className="max-w-[1200px] mx-auto px-6 py-6 space-y-4">
+
+      {/* ══ 0. 计划状态警报 ═══════════════════════════════════════════════ */}
+      {planBreached && d && (
+        <div className="bg-red-600 text-white rounded-xl px-5 py-3.5 flex items-start gap-3 shadow-md">
+          <span className="text-xl leading-none mt-0.5">🚨</span>
+          <div className="text-sm leading-relaxed">
+            <span className="font-bold">本交易计划已失效</span> — 实时价
+            ${liveQbts!.price.toFixed(2)} 已
+            {d.action === "LONG_QBTX" ? "跌破" : "涨破"}失效位
+            ${(d.invalidation_price ?? d.trade_plan?.qbts_stop)?.toFixed(2)}。
+            下方计划仅作历史参考，请勿按其执行；在本地运行
+            <code className="mx-1 px-1 rounded bg-white/20 font-mono text-xs">python publish.py</code>
+            生成新决策。
+          </div>
+        </div>
+      )}
+      {!planBreached && planStale && d && (
+        <div className="bg-amber-50 border border-amber-300 text-amber-800 rounded-xl px-5 py-3 text-sm">
+          ⏳ 本决策生成于 {Math.round(decisionAgeH!)} 小时前，市场可能已变化 — 建议重新运行
+          <code className="mx-1 px-1 rounded bg-amber-100 font-mono text-xs">publish.py</code> 更新。
+        </div>
+      )}
 
       {/* ══ 1. HERO：价格 + 行动 ══════════════════════════════════════════ */}
       <section className="bg-white rounded-2xl border border-[#EDEDF0] overflow-hidden shadow-sm">
