@@ -1,0 +1,26 @@
+# AWS Amplify build spec for the read-only QBTS dashboard (static export).
+#
+# In the Amplify console set "App root directory" to `frontend`, and add these
+# environment variables (Hosting → Environment variables):
+#   NEXT_PUBLIC_SUPABASE_URL        https://<project>.supabase.co
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY   <anon public key>
+#   NEXT_PUBLIC_DEPLOY_READONLY     1
+#
+# `next build` with output: "export" emits a static site into `out/`.
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - npm run build
+  artifacts:
+    baseDirectory: out
+    files:
+      - "**/*"
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*
