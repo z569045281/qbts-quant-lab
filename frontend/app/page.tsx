@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { MiniChart } from "./_components/mini-chart";
-import { getSnapshot, type Snapshot, type Decision } from "./_lib/data";
+import { getSnapshot, getLiveQuote, type Snapshot, type Decision, type LiveQuote } from "./_lib/data";
+
+const SESSION_BADGE: Record<LiveQuote["session"], { label: string; cls: string }> = {
+  pre:     { label: "盘前", cls: "bg-amber-100 text-amber-700"   },
+  regular: { label: "盘中", cls: "bg-emerald-100 text-emerald-700" },
+  post:    { label: "盘后", cls: "bg-violet-100 text-violet-700" },
+  closed:  { label: "已收盘", cls: "bg-gray-100 text-gray-500"   },
+};
 
 /* ─────────────────────────────────────────────────────────────────────────
    ONE-SCREEN decision dashboard.
@@ -47,6 +54,7 @@ function fmtPx(n: number | null | undefined): string {
 
 export default function Dashboard() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
+  const [live, setLive] = useState<LiveQuote | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,6 +70,18 @@ export default function Dashboard() {
     }
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
+
+  // Live quote: fetch immediately, then poll every 30s.
+  useEffect(() => {
+    let stop = false;
+    const tick = async () => {
+      const q = await getLiveQuote();
+      if (!stop && q) setLive(q);
+    };
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => { stop = true; clearInterval(id); };
+  }, []);
 
   if (loading && !snap) {
     return (
@@ -104,18 +124,35 @@ export default function Dashboard() {
       {/* ══ 1. HERO：价格 + 行动 ══════════════════════════════════════════ */}
       <section className="bg-white rounded-2xl border border-[#EDEDF0] overflow-hidden shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] items-stretch">
-          {/* 价格区 */}
+          {/* 价格区 — live quote preferred, snapshot fallback */}
           <div className="p-6">
-            <div className="flex items-baseline gap-3 flex-wrap">
-              <span className="text-xs text-[#525461] uppercase tracking-wider">QBTS</span>
-              <span className="text-4xl font-bold text-gray-900">${snap.price.toFixed(2)}</span>
-              <span className={`text-xl font-semibold ${todayUp ? "text-emerald-600" : "text-[#F03A3E]"}`}>
-                {todayUp ? "▲" : "▼"} {Math.abs(snap.today_change * 100).toFixed(2)}%
-              </span>
-              <span className="text-xs text-gray-400 font-mono">
-                QBTX {fmtPx(snap.etf_prices?.qbtx)} · QBTZ {fmtPx(snap.etf_prices?.qbtz)}
-              </span>
-            </div>
+            {(() => {
+              const lq = live?.quotes?.qbts;
+              const fresh = live && (Date.now() / 1000 - live.asof_epoch) < 180; // <3min
+              const price  = fresh && lq ? lq.price : snap.price;
+              const chgPct = fresh && lq && lq.change_pct != null ? lq.change_pct : snap.today_change;
+              const up = chgPct >= 0;
+              const badge = fresh && live ? SESSION_BADGE[live.session] : null;
+              const lqx = fresh ? live?.quotes?.qbtx : null;
+              const lqz = fresh ? live?.quotes?.qbtz : null;
+              return (
+                <div className="flex items-baseline gap-3 flex-wrap">
+                  <span className="text-xs text-[#525461] uppercase tracking-wider">QBTS</span>
+                  <span className="text-4xl font-bold text-gray-900">${price.toFixed(2)}</span>
+                  <span className={`text-xl font-semibold ${up ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+                    {up ? "▲" : "▼"} {Math.abs(chgPct * 100).toFixed(2)}%
+                  </span>
+                  {badge && (
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${badge.cls}`}>
+                      {badge.label} · {live!.asof_et.slice(11, 16)} ET
+                    </span>
+                  )}
+                  <span className="text-xs text-gray-400 font-mono">
+                    QBTX {fmtPx(lqx?.price ?? snap.etf_prices?.qbtx)} · QBTZ {fmtPx(lqz?.price ?? snap.etf_prices?.qbtz)}
+                  </span>
+                </div>
+              );
+            })()}
             {/* 一段话总结 */}
             {d ? (
               <p className="mt-3 text-[15px] leading-relaxed text-gray-800">{d.summary}</p>
@@ -288,9 +325,19 @@ export default function Dashboard() {
                 <div className="flex items-center gap-1.5">
                   {e.nuclear && <span className="text-red-500">🔴</span>}
                   <span className="font-mono font-semibold text-gray-900">
-                    {e.date.slice(5)} {e.time_et}
+                    {e.date.slice(5)} {e.time_et}ET
                   </span>
                   <span className="font-medium text-gray-800">{e.title}</span>
+                  {typeof e.hours_until === "number" && e.hours_until >= 0 && e.hours_until <= 48 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-red-500 text-white">
+                      {e.hours_until < 1 ? "即将发布" : `${Math.round(e.hours_until)}小时后`}
+                    </span>
+                  )}
+                  {typeof e.hours_until === "number" && e.hours_until < 0 && e.hours_until > -24 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-gray-200 text-gray-600">
+                      已公布
+                    </span>
+                  )}
                 </div>
                 {(e.forecast || e.previous) && (
                   <div className="text-[10px] text-gray-500 mt-0.5 font-mono">

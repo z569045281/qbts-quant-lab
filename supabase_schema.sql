@@ -50,3 +50,20 @@ create policy "anon read factors"
   on public.factors for select
   to anon, authenticated
   using (true);
+
+-- ── live_quote ───────────────────────────────────────────────────────────────
+-- Single-row table (id=1) updated by quote_pusher.py every ~60s during US
+-- trading hours (incl. pre/post). The dashboard polls it for a live header.
+create table if not exists public.live_quote (
+  id         int primary key,
+  updated_at timestamptz not null default now(),
+  data       jsonb not null
+);
+
+alter table public.live_quote enable row level security;
+
+drop policy if exists "anon read live_quote" on public.live_quote;
+create policy "anon read live_quote"
+  on public.live_quote for select
+  to anon, authenticated
+  using (true);

@@ -24,7 +24,7 @@ import json
 import logging
 import time
 import urllib.request
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -94,8 +94,12 @@ def get_macro_calendar(force_refresh: bool = False) -> dict:
             pass
 
     raw = _fetch_raw()
-    now = datetime.now()
-    horizon = now + timedelta(days=14)
+    # ALL comparisons in UTC. FF timestamps carry an ET offset
+    # ("2026-06-10T08:30:00-04:00"); the user's machine may be in any
+    # timezone (e.g. AEST, +14h vs ET) — naive local comparison silently
+    # misclassifies "tonight's CPI" as already released.
+    now_utc = datetime.now(timezone.utc)
+    horizon = now_utc + timedelta(days=14)
 
     # Feed failed (rate-limit / outage)? Serve the previous cache rather than
     # overwriting it with a degraded FOMC-only payload.
@@ -107,44 +111,53 @@ def get_macro_calendar(force_refresh: bool = False) -> dict:
         except Exception:
             pass
 
+    def _mk_event(dt_aware: datetime, title: str, impact: str,
+                  forecast: str = "", previous: str = "") -> dict:
+        dt_utc = dt_aware.astimezone(timezone.utc)
+        hours_until = round((dt_utc - now_utc).total_seconds() / 3600, 1)
+        return {
+            "date":        dt_aware.strftime("%Y-%m-%d"),   # ET calendar date
+            "time_et":     dt_aware.strftime("%H:%M"),
+            "title":       title,
+            "impact":      impact,
+            "forecast":    forecast,
+            "previous":    previous,
+            "nuclear":     _is_nuclear(title),
+            "hours_until": hours_until,        # negative = already released
+            "_utc":        dt_utc.isoformat(), # internal, for window math
+        }
+
     events: list[dict] = []
     for e in raw:
         if e.get("country") != "USD":
             continue
         if e.get("impact") not in ("High", "Medium"):
             continue
-        # FF dates look like "2026-06-10T08:30:00-04:00" (ET with offset)
-        date_str = (e.get("date") or "")[:16]
         try:
-            dt = datetime.fromisoformat(date_str)
+            dt = datetime.fromisoformat(e.get("date") or "")  # aware (ET offset)
         except Exception:
             continue
-        if dt < now - timedelta(hours=12) or dt > horizon:
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone(timedelta(hours=-4)))
+        dt_utc = dt.astimezone(timezone.utc)
+        if dt_utc < now_utc - timedelta(hours=12) or dt_utc > horizon:
             continue
-        title = e.get("title", "")
-        events.append({
-            "date":     dt.strftime("%Y-%m-%d"),
-            "time_et":  dt.strftime("%H:%M"),
-            "title":    title,
-            "impact":   e.get("impact"),
-            "forecast": e.get("forecast") or "",
-            "previous": e.get("previous") or "",
-            "nuclear":  _is_nuclear(title),
-        })
+        events.append(_mk_event(dt, e.get("title", ""), e.get("impact"),
+                                e.get("forecast") or "", e.get("previous") or ""))
 
-    # Inject hardcoded FOMC dates within horizon (FF feed only covers this week)
+    # Inject hardcoded FOMC dates within horizon (FF feed only covers this week).
+    # 14:00 ET; ET offset is -4 during DST (Mar-Nov meetings) else -5.
     for d in _FOMC_2026:
         try:
-            dt = datetime.strptime(d, "%Y-%m-%d").replace(hour=14, minute=0)
+            month = int(d[5:7])
+            et_offset = timezone(timedelta(hours=-5 if month in (1, 2, 12) else -4))
+            dt = datetime.strptime(d, "%Y-%m-%d").replace(
+                hour=14, minute=0, tzinfo=et_offset)
         except Exception:
             continue
-        if now - timedelta(hours=12) <= dt <= horizon:
-            events.append({
-                "date": d, "time_et": "14:00",
-                "title": "FOMC 利率决议 + 鲍威尔记者会",
-                "impact": "High", "forecast": "", "previous": "",
-                "nuclear": True,
-            })
+        dt_utc = dt.astimezone(timezone.utc)
+        if now_utc - timedelta(hours=12) <= dt_utc <= horizon:
+            events.append(_mk_event(dt, "FOMC 利率决议 + 鲍威尔记者会", "High"))
 
     # Dedup (overlap between feed and hardcoded FOMC) + sort
     seen = set()
@@ -161,30 +174,32 @@ def get_macro_calendar(force_refresh: bool = False) -> dict:
 
     nuclear = [e for e in deduped if e["nuclear"]]
 
-    # Risk window: any nuclear event in next 48h (including today's not-yet-released)
-    win_end = now + timedelta(hours=48)
-    in_window = []
-    for e in nuclear:
-        try:
-            dt = datetime.strptime(f"{e['date']} {e['time_et']}", "%Y-%m-%d %H:%M")
-        except Exception:
-            continue
-        if now - timedelta(hours=6) <= dt <= win_end:
-            in_window.append(e)
+    # Risk window: any nuclear event still UPCOMING within the next 48h
+    # (hours_until between -2 and 48 — the -2 grace keeps a just-released
+    # print flagged while the market digests it).
+    in_window = [e for e in nuclear if -2 <= e["hours_until"] <= 48]
 
     risk_window = len(in_window) > 0
     if risk_window:
-        names = "、".join(dict.fromkeys(ev["title"] for ev in in_window))
-        risk_note = f"未来48小时内有重磅宏观数据：{names} — 高beta股波动放大，建议降低仓位或等数据落地"
+        descs = []
+        for ev in dict.fromkeys(ev["title"] for ev in in_window):
+            h = next(e["hours_until"] for e in in_window if e["title"] == ev)
+            descs.append(f"{ev}（{abs(h):.0f}小时{'后发布' if h >= 0 else '前已发布'}）")
+        risk_note = ("未来48小时重磅数据：" + "、".join(descs)
+                     + " — 高beta股波动放大，建议降低仓位或等数据落地再确认方向")
     else:
-        nxt = nuclear[0] if nuclear else None
-        risk_note = (f"下一个重磅数据：{nxt['date']} {nxt['title']}" if nxt
-                     else "未来14天无重磅宏观数据")
+        nxt = next((e for e in nuclear if e["hours_until"] > 0), None)
+        risk_note = (f"下一个重磅数据：{nxt['date']} {nxt['title']}（约{nxt['hours_until']/24:.0f}天后）"
+                     if nxt else "未来14天无重磅宏观数据")
+
+    # Strip internal field before persisting/serving
+    for e in deduped:
+        e.pop("_utc", None)
 
     payload = {
-        "as_of":       now.strftime("%Y-%m-%d %H:%M"),
+        "as_of":       now_utc.astimezone().strftime("%Y-%m-%d %H:%M"),
         "events":      deduped,
-        "nuclear":     nuclear,
+        "nuclear":     [e for e in deduped if e["nuclear"]],
         "risk_window": risk_window,
         "risk_note":   risk_note,
     }

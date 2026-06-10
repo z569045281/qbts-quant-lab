@@ -100,13 +100,14 @@ export interface Snapshot {
 }
 
 export interface MacroEvent {
-  date:     string;
-  time_et:  string;
-  title:    string;
-  impact:   "High" | "Medium";
-  forecast: string;
-  previous: string;
-  nuclear:  boolean;
+  date:        string;
+  time_et:     string;
+  title:       string;
+  impact:      "High" | "Medium";
+  forecast:    string;
+  previous:    string;
+  nuclear:     boolean;
+  hours_until?: number;   // negative = already released
 }
 
 /* ── AI trade decision (the user-facing verdict) ─────────────────────────── */
@@ -236,6 +237,37 @@ export async function getSnapshot(): Promise<Snapshot> {
   if (error) throw new Error(error.message);
   if (!data) throw new Error(NO_DATA);
   return data.snapshot as Snapshot;
+}
+
+/* ── live quote (written by quote_pusher.py every ~60s) ──────────────────── */
+export interface LiveQuoteEntry {
+  price:      number;
+  prev_close: number | null;
+  change_pct: number | null;
+  bar_time:   string | null;
+}
+export interface LiveQuote {
+  session:    "closed" | "pre" | "regular" | "post";
+  asof_et:    string;
+  asof_epoch: number;
+  quotes:     Partial<Record<"qbts" | "qbtx" | "qbtz", LiveQuoteEntry>>;
+}
+
+/** Live quote — Supabase row in deployed mode, local backend in dev. Null on failure. */
+export async function getLiveQuote(): Promise<LiveQuote | null> {
+  try {
+    if (!SUPABASE_CONFIGURED) {
+      const r = await fetch(`${API}/quote/live`);
+      if (!r.ok) return null;
+      return (await r.json()) as LiveQuote;
+    }
+    const { data, error } = await supabase
+      .from("live_quote").select("data").eq("id", 1).maybeSingle();
+    if (error || !data) return null;
+    return data.data as LiveQuote;
+  } catch {
+    return null;
+  }
 }
 
 /** Latest published calibration (may be null if it failed to compute). */

@@ -1034,6 +1034,32 @@ async def refresh_brief():
     return {"brief": brief, "generated_at": generated_at}
 
 
+_LIVE_QUOTE_CACHE: dict = {"ts": 0.0, "payload": None}
+
+
+@app.get("/quote/live")
+async def quote_live():
+    """
+    Local-dev live quote (incl. pre/post). The deployed site reads the
+    Supabase `live_quote` row written by quote_pusher.py instead.
+    15s cache so rapid polling doesn't hammer Yahoo.
+    """
+    import time as _time
+    now = _time.time()
+    if _LIVE_QUOTE_CACHE["payload"] and now - _LIVE_QUOTE_CACHE["ts"] < 15:
+        return _LIVE_QUOTE_CACHE["payload"]
+
+    import importlib.util as _ilu
+    spec = _ilu.spec_from_file_location(
+        "quote_pusher", str(Path(__file__).parent.parent / "quote_pusher.py"))
+    qp = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(qp)
+    payload = await asyncio.to_thread(qp.build_payload)
+    _LIVE_QUOTE_CACHE["payload"] = payload
+    _LIVE_QUOTE_CACHE["ts"] = now
+    return payload
+
+
 @app.post("/dashboard/decision/refresh")
 async def refresh_decision():
     """

@@ -239,6 +239,8 @@ def generate_decision(snapshot: dict, extras: dict | None = None) -> dict:
     # Strip accidental fences
     text = re.sub(r"^```(?:json)?\s*", "", text)
     text = re.sub(r"\s*```$", "", text)
+    # Models occasionally emit trailing commas (legal in JS, not JSON) — strip them.
+    text = re.sub(r",(\s*[}\]])", r"\1", text)
     decision = json.loads(text)
 
     # Minimal schema guard
