@@ -112,7 +112,8 @@ def get_macro_calendar(force_refresh: bool = False) -> dict:
             pass
 
     def _mk_event(dt_aware: datetime, title: str, impact: str,
-                  forecast: str = "", previous: str = "") -> dict:
+                  forecast: str = "", previous: str = "",
+                  actual: str = "") -> dict:
         dt_utc = dt_aware.astimezone(timezone.utc)
         hours_until = round((dt_utc - now_utc).total_seconds() / 3600, 1)
         return {
@@ -122,6 +123,7 @@ def get_macro_calendar(force_refresh: bool = False) -> dict:
             "impact":      impact,
             "forecast":    forecast,
             "previous":    previous,
+            "actual":      actual,             # filled by FF after release — 实际值
             "nuclear":     _is_nuclear(title),
             "hours_until": hours_until,        # negative = already released
             "_utc":        dt_utc.isoformat(), # internal, for window math
@@ -140,10 +142,14 @@ def get_macro_calendar(force_refresh: bool = False) -> dict:
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone(timedelta(hours=-4)))
         dt_utc = dt.astimezone(timezone.utc)
-        if dt_utc < now_utc - timedelta(hours=12) or dt_utc > horizon:
+        # Keep 24h of look-back: yesterday's release WITH its actual value is
+        # exactly the context the decision engine needs ("CPI came in hot at
+        # 4.3% and the stock fell 10%" beats not knowing why it fell).
+        if dt_utc < now_utc - timedelta(hours=24) or dt_utc > horizon:
             continue
         events.append(_mk_event(dt, e.get("title", ""), e.get("impact"),
-                                e.get("forecast") or "", e.get("previous") or ""))
+                                e.get("forecast") or "", e.get("previous") or "",
+                                e.get("actual") or ""))
 
     # Inject hardcoded FOMC dates within horizon (FF feed only covers this week).
     # 14:00 ET; ET offset is -4 during DST (Mar-Nov meetings) else -5.

@@ -204,7 +204,12 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
         rows = []
         for e in macro["events"]:
             star = "🔴" if e.get("nuclear") else "·"
-            fc = f"（预测 {e['forecast']} / 前值 {e['previous']}）" if e.get("forecast") else ""
+            if e.get("actual"):
+                fc = f"（✅已公布 实际 {e['actual']} vs 预测 {e['forecast'] or '—'} / 前值 {e['previous'] or '—'}）"
+            elif e.get("forecast"):
+                fc = f"（预测 {e['forecast']} / 前值 {e['previous']}）"
+            else:
+                fc = ""
             rows.append(f"  {star} {e['date']} {e['time_et']}ET [{e['impact']}] {e['title']}{fc}")
         risk_line = f"  ⚠️ {macro['risk_note']}" if macro.get("risk_window") else f"  {macro.get('risk_note','')}"
         parts.append("## 宏观经济日历（未来14天，🔴=重磅）\n" + "\n".join(rows) + "\n" + risk_line)
