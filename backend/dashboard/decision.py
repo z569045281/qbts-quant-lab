@@ -198,6 +198,48 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                      f"  7日提及 {s.get('n_total_7d','?')} 条，24h {s.get('n_last_24h','?')} 条，"
                      f"速度 {s.get('velocity','?')}×")
 
+    # ── SMC 聪明钱结构分析 ───────────────────────────────────
+    smc = snapshot.get("smc")
+    if smc and smc.get("trend"):
+        zone_lines = []
+        for z in (smc.get("demand_zones") or []):
+            zone_lines.append(f"    需求区[{z['kind']}] ${z['low']}–${z['high']}（{z['date']}）")
+        for z in (smc.get("supply_zones") or []):
+            zone_lines.append(f"    供给区[{z['kind']}] ${z['low']}–${z['high']}（{z['date']}）")
+        sweep_lines = [f"    {s['note']}" for s in (smc.get("sweeps") or [])]
+        le = smc.get("last_event")
+        le_s = f"最近结构事件: {le['date']} {le['dir']} {le['kind']} @ ${le['level']:.2f}" if le else ""
+        parts.append(
+            f"## SMC 聪明钱结构（订单块/FVG/流动性）\n"
+            f"  结构趋势: {smc['trend']}  {le_s}\n"
+            f"  价格位置: {smc.get('zone','?')}（区间 ${smc.get('range',{}).get('low','?')}–"
+            f"${smc.get('range',{}).get('high','?')} 的 {smc.get('range_position',0)*100:.0f}%）\n"
+            + ("  关键区域:\n" + "\n".join(zone_lines) + "\n" if zone_lines else "")
+            + ("  流动性事件:\n" + "\n".join(sweep_lines) + "\n" if sweep_lines else "")
+            + f"  SMC 综合: {smc.get('label','HOLD')} — {smc.get('rationale','')}"
+        )
+
+    # ── 历史战绩与教训（系统自我反省）────────────────────────
+    journal = extras.get("journal")
+    if journal and journal.get("records"):
+        rows = []
+        for r in journal["records"][:8]:
+            res = r.get("result")
+            if res and res.get("correct") is not None:
+                mark = "✓" if res["correct"] else "✗"
+                rows.append(f"  {mark} {r['date']} {r['action']}(信心{r['conviction']}) "
+                            f"→ {res['outcome']} {res['ret_pct']*100:+.1f}%")
+            elif res:
+                rows.append(f"  · {r['date']} {r['action']}(信心{r['conviction']}) → 观望期")
+            else:
+                rows.append(f"  ⏳ {r['date']} {r['action']}(信心{r['conviction']}) → 待评判")
+        acc = journal.get("accuracy")
+        acc_s = f"方向准确率 {acc*100:.0f}%（{journal['n_correct']}/{journal['n_graded']}）" if acc is not None else "暂无足够样本"
+        lessons = journal.get("lessons") or []
+        lessons_s = ("\n  ⚠️ 近期错误的教训（认真吸取，避免重蹈覆辙）:\n"
+                     + "\n".join(f"    - {x}" for x in lessons)) if lessons else ""
+        parts.append(f"## 你自己的历史决策战绩\n  {acc_s}\n" + "\n".join(rows) + lessons_s)
+
     # ── 宏观日历（CPI/PPI/FOMC 等）──────────────────────────
     macro = snapshot.get("macro")
     if macro and macro.get("events"):

@@ -97,6 +97,61 @@ export interface Snapshot {
     risk_window: boolean;
     risk_note:   string;
   } | null;
+  smc?: SmcAnalysis | null;
+  journal?: DecisionJournal | null;
+}
+
+/* ── SMC (smart money concepts) structural read ─────────────────────────── */
+export interface SmcZone {
+  kind: "FVG" | "OB";
+  type: "bullish" | "bearish";
+  low:  number;
+  high: number;
+  date: string;
+}
+export interface SmcAnalysis {
+  signal: -1 | 0 | 1;
+  label:  "BUY" | "SELL" | "HOLD";
+  trend:  "bullish" | "bearish" | "neutral";
+  last_event: { date: string; kind: "BOS" | "CHoCH"; dir: "bullish" | "bearish"; level: number } | null;
+  zone:   string;
+  range_position: number;
+  range:  { high: number; low: number };
+  demand_zones: SmcZone[];
+  supply_zones: SmcZone[];
+  sweeps: { dir: "bullish" | "bearish"; level: number; date: string; note: string }[];
+  rationale: string;
+  price_used: number;
+}
+
+/* ── decision journal (past calls, graded) ──────────────────────────────── */
+export interface JournalRecord {
+  id:         string;
+  date:       string;
+  action:     "LONG_QBTX" | "SHORT_QBTZ" | "HOLD";
+  conviction: number;
+  p_up_5d:    number;
+  price:      number;
+  entry:      number | null;
+  stop:       number | null;
+  target:     number | null;
+  summary:    string;
+  status:     "pending" | "graded";
+  result: {
+    graded_at:  string;
+    outcome:    "target_hit" | "stop_hit" | "drift" | "hold";
+    correct:    boolean | null;
+    ret_pct:    number | null;
+    exit_day:   number | null;
+    reflection: string | null;
+  } | null;
+}
+export interface DecisionJournal {
+  records:   JournalRecord[];
+  n_graded:  number;
+  n_correct: number;
+  accuracy:  number | null;
+  lessons:   string[];
 }
 
 export interface MacroEvent {

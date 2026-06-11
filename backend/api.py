@@ -37,6 +37,8 @@ from dashboard.reddit      import fetch_reddit_signal
 from dashboard.holdings    import get_holdings_signal
 from dashboard.decision    import get_or_generate_decision, get_cached_decision
 from dashboard.macro       import get_macro_calendar
+from dashboard.smc         import analyze_smc
+from dashboard.journal     import record as journal_record, grade_pending, load_recent as journal_recent
 from dashboard.calibration import log_prediction, grade_predictions, save_learned_weights
 from factors.generator import generate_and_validate, generate_and_validate_ml
 from factors.ml_factor import run_ml_walk_forward
@@ -965,11 +967,27 @@ async def dashboard_snapshot(force_refresh: bool = False):
         macro_cal = await asyncio.to_thread(get_macro_calendar)
     except Exception:
         macro_cal = None
+    try:
+        # SMC structural read — pass the live price when fresh so zones are
+        # measured against reality, not yesterday's close.
+        _lq = _LIVE_QUOTE_CACHE.get("payload")
+        _live_px = None
+        if _lq and (now - _LIVE_QUOTE_CACHE.get("ts", 0) < 300):
+            _live_px = (_lq.get("quotes", {}).get("qbts") or {}).get("price")
+        smc = await asyncio.to_thread(analyze_smc, df_d, _live_px)
+    except Exception as e:
+        smc = {"signal": 0, "label": "HOLD", "rationale": f"SMC 分析失败: {str(e)[:80]}"}
+    try:
+        journal = await asyncio.to_thread(journal_recent, 12)
+    except Exception:
+        journal = None
     payload["options"]  = opt_sig
     payload["intraday"] = intr_sig
     payload["reddit"]   = reddit_sig
     payload["holdings"] = holdings_sig
     payload["macro"]    = macro_cal
+    payload["smc"]      = smc
+    payload["journal"]  = journal
 
     # ── Source status map: tells the UI which signals are active/inactive/error
     # so the user knows when something needs setup (e.g. Reddit OAuth missing). ─
@@ -1088,12 +1106,25 @@ async def refresh_decision():
     try:
         _, df_d = await asyncio.to_thread(load_or_fetch)
         extras["calibration"] = await asyncio.to_thread(grade_predictions, df_d)
+        # Grade past decisions FIRST so today's prompt includes fresh lessons
+        await asyncio.to_thread(grade_pending, df_d)
+        extras["journal"] = await asyncio.to_thread(journal_recent, 10)
     except Exception:
         pass
 
     decision, gen_at, fresh = await asyncio.to_thread(
         get_or_generate_decision, snap, True, extras
     )
+
+    # Record the fresh decision in the journal (graded in ~5 trading days)
+    if fresh and decision:
+        try:
+            lq = (extras.get("live_quote") or {}).get("quotes", {}).get("qbts") or {}
+            px = lq.get("price") or snap.get("price")
+            journal_record(decision, float(px), snap.get("as_of", ""))
+        except Exception:
+            pass
+
     if _DASHBOARD_CACHE["payload"]:
         _DASHBOARD_CACHE["payload"]["decision"]              = decision
         _DASHBOARD_CACHE["payload"]["decision_generated_at"] = gen_at

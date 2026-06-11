@@ -390,6 +390,123 @@ export default function Dashboard() {
         </section>
       )}
 
+      {/* ══ 4.7 SMC 结构 + 历史战绩 ═══════════════════════════════════════ */}
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {/* SMC 聪明钱结构 */}
+        {snap.smc && (
+          <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+                🧠 SMC 聪明钱结构
+              </span>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                snap.smc.signal > 0 ? "bg-emerald-100 text-emerald-700"
+                : snap.smc.signal < 0 ? "bg-red-100 text-red-700"
+                : "bg-gray-100 text-gray-500"}`}>
+                {snap.smc.signal > 0 ? "偏多" : snap.smc.signal < 0 ? "偏空" : "中性"}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-2 mb-3 text-xs">
+              <span className={`px-2 py-1 rounded-md font-medium ${
+                snap.smc.trend === "bullish" ? "bg-emerald-50 text-emerald-700"
+                : snap.smc.trend === "bearish" ? "bg-red-50 text-red-700"
+                : "bg-gray-50 text-gray-600"}`}>
+                结构 {snap.smc.trend === "bullish" ? "看多" : snap.smc.trend === "bearish" ? "看空" : "中性"}
+              </span>
+              {snap.smc.last_event && (
+                <span className="px-2 py-1 rounded-md bg-violet-50 text-violet-700 font-medium">
+                  {snap.smc.last_event.date} {snap.smc.last_event.dir === "bullish" ? "↗" : "↘"} {snap.smc.last_event.kind} @ ${snap.smc.last_event.level.toFixed(2)}
+                </span>
+              )}
+              <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 font-medium">
+                {snap.smc.zone} {(snap.smc.range_position * 100).toFixed(0)}%
+              </span>
+            </div>
+            {/* 关键区域 */}
+            <div className="space-y-1.5 text-xs">
+              {snap.smc.supply_zones.map((z, i) => (
+                <div key={`s${i}`} className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-red-50/60 border border-red-100">
+                  <span className="text-red-700 font-medium">▼ 供给区 [{z.kind}]</span>
+                  <span className="font-mono text-gray-700">${z.low.toFixed(2)} – ${z.high.toFixed(2)}</span>
+                </div>
+              ))}
+              {snap.smc.demand_zones.map((z, i) => (
+                <div key={`d${i}`} className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-emerald-50/60 border border-emerald-100">
+                  <span className="text-emerald-700 font-medium">▲ 需求区 [{z.kind}]</span>
+                  <span className="font-mono text-gray-700">${z.low.toFixed(2)} – ${z.high.toFixed(2)}</span>
+                </div>
+              ))}
+              {snap.smc.sweeps.slice(-2).map((s, i) => (
+                <div key={`w${i}`} className="text-[11px] text-[#525461] px-2.5 py-1">
+                  💧 {s.note}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 历史战绩 */}
+        <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+              📒 历史决策战绩
+            </span>
+            {snap.journal?.accuracy != null && (
+              <span className={`text-sm font-bold font-mono ${
+                snap.journal.accuracy >= 0.55 ? "text-emerald-600"
+                : snap.journal.accuracy >= 0.45 ? "text-amber-500" : "text-[#F03A3E]"}`}>
+                命中 {(snap.journal.accuracy * 100).toFixed(0)}%
+                <span className="text-[10px] text-gray-400 ml-1">
+                  ({snap.journal.n_correct}/{snap.journal.n_graded})
+                </span>
+              </span>
+            )}
+          </div>
+          {!snap.journal || snap.journal.records.length === 0 ? (
+            <div className="text-xs text-gray-400 py-6 text-center">
+              暂无记录 — 从下一次决策开始，每个判断都会被记录并在 5 个交易日后评判
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {snap.journal.records.slice(0, 6).map(r => {
+                const res = r.result;
+                const actionLabel = r.action === "LONG_QBTX" ? "做多" : r.action === "SHORT_QBTZ" ? "做空" : "观望";
+                return (
+                  <div key={r.id} className="border border-[#F0F0F2] rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-mono text-gray-500">{r.date.slice(5)}</span>
+                      <span className={`font-semibold ${
+                        r.action === "LONG_QBTX" ? "text-emerald-700"
+                        : r.action === "SHORT_QBTZ" ? "text-red-700" : "text-gray-600"}`}>
+                        {actionLabel}
+                      </span>
+                      <span className="text-gray-400">信心{r.conviction} · ${r.price}</span>
+                      <span className="ml-auto">
+                        {r.status === "pending" ? (
+                          <span className="text-[10px] text-gray-400">⏳ 待评判</span>
+                        ) : res?.correct === true ? (
+                          <span className="text-xs font-bold text-emerald-600">✓ {res.ret_pct != null ? `${(res.ret_pct*100).toFixed(1)}%` : ""}</span>
+                        ) : res?.correct === false ? (
+                          <span className="text-xs font-bold text-[#F03A3E]">✗ {res.ret_pct != null ? `${(res.ret_pct*100).toFixed(1)}%` : ""}</span>
+                        ) : (
+                          <span className="text-[10px] text-gray-400">— 观望</span>
+                        )}
+                      </span>
+                    </div>
+                    {res?.reflection && (
+                      <div className="mt-1.5 text-[11px] text-amber-700 bg-amber-50 rounded px-2 py-1 leading-snug">
+                        💡 反思：{res.reflection}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* ══ 5. 今日要闻 + 60日小图 ═══════════════════════════════════════ */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
