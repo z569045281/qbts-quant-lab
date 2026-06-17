@@ -32,8 +32,12 @@ jobs:
         run: sam build -t aws/template.yaml
 
       - name: SAM deploy
+        # No -t here on purpose: after `sam build`, deploy must use the built
+        # template at .aws-sam/build/template.yaml (which references the built
+        # image). Passing -t aws/template.yaml would re-read the source template
+        # and fail with "Image not found for ImageUri parameter".
         run: |
-          sam deploy -t aws/template.yaml \
+          sam deploy \
             --stack-name qbts-jobs \
             --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
             --resolve-s3 --resolve-image-repos \
