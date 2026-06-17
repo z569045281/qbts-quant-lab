@@ -1,0 +1,20 @@
+# Keep the Lambda image lean and secret-free. Build context is the repo root.
+.git
+.github
+.venv
+.venv-1
+frontend
+**/__pycache__
+*.pyc
+# never bake secrets or local state into the image
+.env
+.env.*
+*_secret*
+*credentials*
+backend/data/cache
+*.parquet
+*.jsonl
+leaderboard.json
+favorites.json
+# SAM build output
+aws/.aws-sam

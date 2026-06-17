@@ -42,10 +42,11 @@ _CLIENT = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 _CACHE_PATH = Path(__file__).parent.parent / "data" / "cache" / "daily_decision.json"
 _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-# Fable 5 — the strongest reasoning model available. This is THE call that
-# decides whether real money moves today; everything else (news triage,
-# factor generation) stays on cheaper models.
-_MODEL = "claude-fable-5"
+# Opus 4.8 — the strongest reasoning model available to us. This is THE call
+# that decides whether real money moves today; everything else (news triage,
+# factor generation) stays on cheaper models. (Was claude-fable-5 until that
+# model was disabled for us; Opus 4.8 is the current top-tier replacement.)
+_MODEL = "claude-opus-4-8"
 
 _SYSTEM = """你是一名管理自有资金的资深对冲基金经理，专精高波动小盘股的事件驱动交易。
 你只交易一只股票：QBTS（D-Wave Quantum，量子计算）。执行工具：
@@ -286,11 +287,14 @@ def generate_decision(snapshot: dict, extras: dict | None = None) -> dict:
 
     resp = _CLIENT.messages.create(
         model=_MODEL,
-        max_tokens=4000,   # reasoning models need headroom for thinking + answer
+        max_tokens=8000,   # thinking + JSON answer share the budget — leave headroom
+        # Opus 4.8 has thinking OFF by default; turn it on so this decision gets
+        # the same deliberate reasoning the old always-on model gave it.
+        thinking={"type": "adaptive"},
         system=_SYSTEM,
         messages=[{"role": "user", "content": user_msg}],
     )
-    # Reasoning models (Fable) emit thinking blocks before the text block —
+    # The model emits thinking blocks before the text block —
     # take the first block that actually has text content.
     text = next(
         (b.text for b in resp.content if getattr(b, "type", "") == "text"),

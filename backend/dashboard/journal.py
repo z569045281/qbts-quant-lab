@@ -1,5 +1,5 @@
 """
-Decision Journal — every Fable decision is recorded, graded, and reflected on.
+Decision Journal — every model decision is recorded, graded, and reflected on.
 
 Lifecycle:
   record()        on each fresh decision: append to JSONL with price-at-decision

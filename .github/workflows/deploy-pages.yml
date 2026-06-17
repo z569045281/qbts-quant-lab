@@ -43,6 +43,10 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           NEXT_PUBLIC_DEPLOY_READONLY: "1"
+          # AWS Lambda publish Function URL — set as a repo Actions *variable*
+          # (Settings → Secrets and variables → Actions → Variables). When set,
+          # the "出今天的决策" button POSTs to Lambda; unset → button hidden.
+          NEXT_PUBLIC_PUBLISH_URL: ${{ vars.NEXT_PUBLIC_PUBLISH_URL }}
         run: npm run build
 
       - uses: actions/upload-pages-artifact@v3

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { MiniChart } from "./_components/mini-chart";
+import { ControlPanel } from "./_components/control-panel";
 import { getSnapshot, getLiveQuote, type Snapshot, type Decision, type LiveQuote } from "./_lib/data";
 
 const SESSION_BADGE: Record<LiveQuote["session"], { label: string; cls: string }> = {
@@ -138,6 +139,9 @@ export default function Dashboard() {
 
   return (
     <main className="max-w-[1200px] mx-auto px-6 py-6 space-y-4">
+
+      {/* ══ 控制台：出决策 / 实时报价按钮（仅本地后端可达时显示）═══════════ */}
+      <ControlPanel onPublished={refresh} />
 
       {/* ══ 0. 计划状态警报 ═══════════════════════════════════════════════ */}
       {planBreached && d && (

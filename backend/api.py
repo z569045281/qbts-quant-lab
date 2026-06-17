@@ -9,6 +9,8 @@ import json
 import math
 import random
 import re
+import subprocess
+import threading
 import uuid
 from collections import Counter
 from datetime import timedelta
@@ -848,8 +850,9 @@ async def dashboard_snapshot(force_refresh: bool = False):
     if not force_refresh and _DASHBOARD_CACHE["payload"] and (now - _DASHBOARD_CACHE["ts"] < _DASHBOARD_CACHE_TTL):
         return _DASHBOARD_CACHE["payload"]
 
-    # 1. Latest QBTS data
-    _, df_d = await asyncio.to_thread(load_or_fetch)
+    # 1. Latest QBTS data — propagate force_refresh so a publish/refresh actually
+    # re-downloads bars (otherwise the fetcher's 24h cache TTL leaves as_of stale).
+    _, df_d = await asyncio.to_thread(load_or_fetch, force_refresh=force_refresh)
     df = await asyncio.to_thread(enrich, df_d, "1d")
 
     last_close = float(df["close"].iloc[-1])
@@ -1078,6 +1081,92 @@ async def quote_live():
     return payload
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# Control panel — run publish.py and toggle the quote-pusher daemon straight
+# from the dashboard, so once the backend is up the user never touches the
+# terminal again. These need a LIVE local backend; the deployed static site
+# can't reach them, and the UI hides the panel when /control/status fails.
+# ─────────────────────────────────────────────────────────────────────────
+_REPO_ROOT = Path(__file__).parent.parent
+
+_PUBLISH: dict = {"running": False, "started_at": None,
+                  "finished_at": None, "ok": None, "log": ""}
+_PUBLISH_LOCK = threading.Lock()
+_PUSHER_PROC: subprocess.Popen | None = None
+_PUSHER_LOCK = threading.Lock()
+
+
+def _run_publish_blocking() -> None:
+    import time as _t
+    proc = subprocess.run(
+        [sys.executable, "publish.py"],
+        cwd=str(_REPO_ROOT), capture_output=True, text=True,
+    )
+    out = ((proc.stdout or "") + (proc.stderr or "")).strip()
+    with _PUBLISH_LOCK:
+        _PUBLISH.update(running=False,
+                        finished_at=_t.strftime("%Y-%m-%d %H:%M:%S"),
+                        ok=(proc.returncode == 0), log=out[-4000:])
+
+
+def _pusher_running() -> bool:
+    return _PUSHER_PROC is not None and _PUSHER_PROC.poll() is None
+
+
+@app.post("/control/publish")
+def control_publish():
+    """Start publish.py in the background (full pipeline + Opus 4.8 + Supabase push)."""
+    import time as _t
+    with _PUBLISH_LOCK:
+        if _PUBLISH["running"]:
+            return {"status": "already_running"}
+        _PUBLISH.update(running=True, started_at=_t.strftime("%Y-%m-%d %H:%M:%S"),
+                        finished_at=None, ok=None, log="")
+    threading.Thread(target=_run_publish_blocking, daemon=True).start()
+    return {"status": "started"}
+
+
+@app.post("/control/pusher/start")
+def control_pusher_start():
+    """Launch quote_pusher.py as a daemon (pushes live pre/post quotes → Supabase)."""
+    global _PUSHER_PROC
+    with _PUSHER_LOCK:
+        if _pusher_running():
+            return {"status": "already_running", "pid": _PUSHER_PROC.pid}
+        _PUSHER_PROC = subprocess.Popen(
+            [sys.executable, "quote_pusher.py"], cwd=str(_REPO_ROOT),
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        return {"status": "started", "pid": _PUSHER_PROC.pid}
+
+
+@app.post("/control/pusher/stop")
+def control_pusher_stop():
+    global _PUSHER_PROC
+    with _PUSHER_LOCK:
+        if not _pusher_running():
+            return {"status": "not_running"}
+        _PUSHER_PROC.terminate()
+        try:
+            _PUSHER_PROC.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            _PUSHER_PROC.kill()
+        _PUSHER_PROC = None
+        return {"status": "stopped"}
+
+
+@app.get("/control/status")
+def control_status():
+    """Polled by the dashboard: publish-job state + pusher running state.
+    Whether THIS call succeeds is also how the UI decides to show the panel."""
+    with _PUBLISH_LOCK:
+        pub = dict(_PUBLISH)
+    with _PUSHER_LOCK:
+        running = _pusher_running()
+        pusher = {"running": running, "pid": _PUSHER_PROC.pid if running else None}
+    return {"publish": pub, "pusher": pusher}
+
+
 @app.post("/dashboard/decision/refresh")
 async def refresh_decision():
     """
@@ -1088,7 +1177,7 @@ async def refresh_decision():
 
     extras: dict = {}
     try:
-        # Live quote (pre/post) — daily bars lag it; Fable must see the latest print.
+        # Live quote (pre/post) — daily bars lag it; the model must see the latest print.
         extras["live_quote"] = await quote_live()
     except Exception:
         pass

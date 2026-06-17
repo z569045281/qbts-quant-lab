@@ -1,0 +1,58 @@
+name: Deploy AWS jobs (decision + quotes)
+
+# Builds the Lambda container image and deploys the Route A stack from CI, so you
+# don't need a working local Docker / SAM / AWS CLI. Manual trigger only —
+# deploying creates/updates billable AWS resources.
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install AWS SAM CLI
+        run: pip install aws-sam-cli
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: SAM build
+        run: sam build -t aws/template.yaml
+
+      - name: SAM deploy
+        run: |
+          sam deploy -t aws/template.yaml \
+            --stack-name qbts-jobs \
+            --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+            --resolve-s3 --resolve-image-repos \
+            --no-confirm-changeset --no-fail-on-empty-changeset \
+            --region "${{ vars.AWS_REGION || 'us-east-1' }}" \
+            --parameter-overrides \
+              AnthropicApiKey='${{ secrets.ANTHROPIC_API_KEY }}' \
+              SupabaseUrl='${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}' \
+              SupabaseSecretKey='${{ secrets.SUPABASE_SECRET_KEY }}' \
+              AllowOrigin='${{ vars.PUBLISH_ALLOW_ORIGIN || '*' }}'
+
+      - name: Show Publish Function URL
+        run: |
+          URL=$(aws cloudformation describe-stacks --stack-name qbts-jobs \
+            --region "${{ vars.AWS_REGION || 'us-east-1' }}" \
+            --query "Stacks[0].Outputs[?OutputKey=='PublishUrl'].OutputValue" --output text)
+          echo "### Publish Function URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Set this as the repo Actions variable **NEXT_PUBLIC_PUBLISH_URL**, then re-run the Pages deploy:" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "$URL" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

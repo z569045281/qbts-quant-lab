@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  QBTS dashboard serverless jobs (Route A). Two Lambda functions from one
+  container image: PublishFunction (on-demand button + daily schedule → fresh
+  decision into Supabase) and QuoteFunction (live quotes every minute during
+  US market hours).
+
+Parameters:
+  AnthropicApiKey:
+    Type: String
+    NoEcho: true
+    Description: Anthropic API key — used by the Opus 4.8 decision call.
+  SupabaseUrl:
+    Type: String
+    Description: https://<project>.supabase.co
+  SupabaseSecretKey:
+    Type: String
+    NoEcho: true
+    Description: Supabase secret/service key (write access — keep secret).
+  AllowOrigin:
+    Type: String
+    Default: "*"
+    Description: >
+      Browser origin allowed to call the publish Function URL, e.g.
+      https://z569045281.github.io . "*" works but lets anyone trigger it.
+
+Globals:
+  Function:
+    Environment:
+      Variables:
+        ANTHROPIC_API_KEY: !Ref AnthropicApiKey
+        SUPABASE_URL: !Ref SupabaseUrl
+        SUPABASE_SECRET_KEY: !Ref SupabaseSecretKey
+
+Resources:
+  # ── Decision publish: button (Function URL) + daily auto-run ──────────────
+  PublishFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      DockerContext: ..
+      Dockerfile: aws/Dockerfile
+      DockerTag: qbts-publish
+    Properties:
+      PackageType: Image
+      ImageConfig:
+        Command: ["lambda_handlers.publish_handler"]
+      MemorySize: 2048      # vectorbt/pandas + Opus call need headroom
+      Timeout: 300          # full pipeline + Opus 4.8 ~60–120s
+      FunctionUrlConfig:
+        AuthType: NONE       # public URL; see README "Securing the button"
+        Cors:
+          AllowOrigins:
+            - !Ref AllowOrigin
+          AllowMethods:
+            - POST
+          AllowHeaders:
+            - content-type
+      Events:
+        DailyMarketOpen:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: "cron(0 9 ? * MON-FRI *)"   # 09:00 ET weekdays
+            ScheduleExpressionTimezone: America/New_York
+            Description: Auto-publish a fresh decision at market open.
+
+  # ── Live quotes: one push per minute during US market hours ───────────────
+  QuoteFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      DockerContext: ..
+      Dockerfile: aws/Dockerfile
+      DockerTag: qbts-quote
+    Properties:
+      PackageType: Image
+      ImageConfig:
+        Command: ["lambda_handlers.quote_handler"]
+      MemorySize: 512
+      Timeout: 60
+      Events:
+        MarketHoursEveryMinute:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: "cron(* 4-19 ? * MON-FRI *)"  # 04:00–19:59 ET
+            ScheduleExpressionTimezone: America/New_York
+            Description: Push QBTS/QBTX/QBTZ quotes every minute (pre+regular+post).
+
+Outputs:
+  PublishUrl:
+    Description: Set this as NEXT_PUBLIC_PUBLISH_URL in the frontend build.
+    Value: !GetAtt PublishFunctionUrl.FunctionUrl

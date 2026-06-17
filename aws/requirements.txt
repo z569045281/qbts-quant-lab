@@ -1,0 +1,23 @@
+# Lambda image deps for the QBTS jobs.
+#
+# Superset of the repo's requirements.txt: backend.api imports lightgbm and
+# scipy at module load (not pinned in the top-level file), and publish pulls in
+# the whole backend graph, so they must be here or the image crashes on import.
+# Unpinned so pip resolves wheels compatible with the image's Python (3.12) —
+# the local venv runs 3.14, whose pins may not have 3.12 wheels. Pin later for
+# reproducibility once a known-good set is established.
+#
+# Not included on purpose: uvicorn (only used to RUN the local server, never
+# imported) and alpaca-py (trader.py imports it lazily; publish never calls it).
+
+yfinance
+pandas
+numpy
+pyarrow
+scipy
+vectorbt
+lightgbm
+anthropic
+supabase
+python-dotenv
+fastapi
