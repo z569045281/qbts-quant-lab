@@ -244,36 +244,47 @@ export default function Dashboard() {
               <div className="text-xs text-gray-700 bg-[#F6F6F8] rounded-lg px-3 py-2 mb-3 leading-relaxed">
                 <span className="font-semibold">入场条件：</span>{d.trade_plan.entry_condition}
               </div>
-              <table className="w-full text-sm">
-                <tbody>
-                  <tr className="border-b border-[#F0F0F2]">
-                    <td className="py-1.5 text-[#525461] text-xs">QBTS 入场 / 止损 / 目标</td>
-                    <td className="py-1.5 text-right font-mono">
-                      {fmtPx(d.trade_plan.qbts_entry)} / <span className="text-[#F03A3E]">{fmtPx(d.trade_plan.qbts_stop)}</span> / <span className="text-emerald-600">{fmtPx(d.trade_plan.qbts_target)}</span>
-                    </td>
-                  </tr>
-                  {d.trade_plan.etf_ticker && (
+              {/* HOLD has no single entry/stop/target — show the watch state
+                  instead of an empty price table (which reads as "broken"). */}
+              {d.action === "HOLD" ? (
+                <div className="text-sm text-[#525461] bg-[#F6F6F8] rounded-lg px-3 py-3 leading-relaxed">
+                  📭 <span className="font-semibold text-gray-700">观望中 · 暂不持仓</span>
+                  <div className="mt-1 text-xs">
+                    满足上方入场条件后再按对应方向进场;在此之前没有入场 / 止损 / 目标价,仓位 0%。
+                  </div>
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <tbody>
                     <tr className="border-b border-[#F0F0F2]">
-                      <td className="py-1.5 text-[#525461] text-xs">{d.trade_plan.etf_ticker} 入场 / 止损 / 目标</td>
+                      <td className="py-1.5 text-[#525461] text-xs">QBTS 入场 / 止损 / 目标</td>
                       <td className="py-1.5 text-right font-mono">
-                        {fmtPx(d.trade_plan.etf_entry)} / <span className="text-[#F03A3E]">{fmtPx(d.trade_plan.etf_stop)}</span> / <span className="text-emerald-600">{fmtPx(d.trade_plan.etf_target)}</span>
+                        {fmtPx(d.trade_plan.qbts_entry)} / <span className="text-[#F03A3E]">{fmtPx(d.trade_plan.qbts_stop)}</span> / <span className="text-emerald-600">{fmtPx(d.trade_plan.qbts_target)}</span>
                       </td>
                     </tr>
-                  )}
-                  <tr className="border-b border-[#F0F0F2]">
-                    <td className="py-1.5 text-[#525461] text-xs">盈亏比</td>
-                    <td className="py-1.5 text-right font-mono font-semibold">
-                      1 : {d.trade_plan.rr_ratio?.toFixed(1) ?? "—"}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="py-1.5 text-[#525461] text-xs">建议仓位</td>
-                    <td className="py-1.5 text-right font-mono font-semibold">
-                      {d.trade_plan.suggested_position_pct}% 资金
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+                    {d.trade_plan.etf_ticker && (
+                      <tr className="border-b border-[#F0F0F2]">
+                        <td className="py-1.5 text-[#525461] text-xs">{d.trade_plan.etf_ticker} 入场 / 止损 / 目标</td>
+                        <td className="py-1.5 text-right font-mono">
+                          {fmtPx(d.trade_plan.etf_entry)} / <span className="text-[#F03A3E]">{fmtPx(d.trade_plan.etf_stop)}</span> / <span className="text-emerald-600">{fmtPx(d.trade_plan.etf_target)}</span>
+                        </td>
+                      </tr>
+                    )}
+                    <tr className="border-b border-[#F0F0F2]">
+                      <td className="py-1.5 text-[#525461] text-xs">盈亏比</td>
+                      <td className="py-1.5 text-right font-mono font-semibold">
+                        1 : {d.trade_plan.rr_ratio?.toFixed(1) ?? "—"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="py-1.5 text-[#525461] text-xs">建议仓位</td>
+                      <td className="py-1.5 text-right font-mono font-semibold">
+                        {d.trade_plan.suggested_position_pct}% 资金
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              )}
               {/* 失效条件 */}
               <div className="mt-3 text-xs text-[#B45309] bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
                 ⚠️ <span className="font-semibold">失效条件：</span>{d.invalidation}
