@@ -244,6 +244,19 @@ export default function Dashboard() {
               <div className="text-xs text-gray-700 bg-[#F6F6F8] rounded-lg px-3 py-2 mb-3 leading-relaxed">
                 <span className="font-semibold">入场条件：</span>{d.trade_plan.entry_condition}
               </div>
+              {/* 波动率 regime — 决定止损宽度/仓位档位 */}
+              {snap.regime?.regime && (
+                <div className="text-[11px] text-[#525461] bg-[#F6F6F8] rounded-lg px-3 py-1.5 mb-3 leading-snug flex items-center gap-1.5">
+                  <span className={`px-1.5 py-0.5 rounded font-bold ${
+                    snap.regime.regime === "expansion" ? "bg-amber-100 text-amber-700"
+                    : snap.regime.regime === "contraction" ? "bg-blue-50 text-blue-600"
+                    : "bg-gray-100 text-gray-500"}`}>
+                    🌡️ 波动{snap.regime.regime === "expansion" ? "扩张" : snap.regime.regime === "contraction" ? "收缩" : "正常"}
+                    {snap.regime.atr_pct_percentile != null && ` ${snap.regime.atr_pct_percentile.toFixed(0)}%位`}
+                  </span>
+                  <span className="text-gray-500 truncate">{snap.regime.stop_hint}</span>
+                </div>
+              )}
               {/* HOLD has no single entry/stop/target — show the watch state
                   instead of an empty price table (which reads as "broken"). */}
               {d.action === "HOLD" ? (
@@ -437,7 +450,23 @@ export default function Dashboard() {
               <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 font-medium">
                 {snap.smc.zone} {(snap.smc.range_position * 100).toFixed(0)}%
               </span>
+              {/* 多周期共振 (1h vs 日线) */}
+              {snap.smc.ltf && snap.smc.confluence && (
+                <span className={`px-2 py-1 rounded-md font-medium ${
+                  snap.smc.confluence === "aligned" ? "bg-emerald-50 text-emerald-700"
+                  : snap.smc.confluence === "conflict" ? "bg-amber-50 text-amber-700"
+                  : "bg-gray-50 text-gray-500"}`}>
+                  1h {snap.smc.ltf.trend === "bullish" ? "↗" : snap.smc.ltf.trend === "bearish" ? "↘" : "→"}
+                  {snap.smc.confluence === "aligned" ? " 同向" : snap.smc.confluence === "conflict" ? " 背离" : " 中性"}
+                </span>
+              )}
             </div>
+            {/* 相对强度 — 一行(prompt 已用，此处只给用户一个语境标注) */}
+            {snap.relative_strength?.rationale && (
+              <div className="text-[11px] text-[#525461] bg-[#F6F6F8] rounded-md px-2.5 py-1.5 mb-2 leading-snug">
+                📊 {snap.relative_strength.rationale}
+              </div>
+            )}
             {/* 关键区域 */}
             <div className="space-y-1.5 text-xs">
               {snap.smc.supply_zones.map((z, i) => (
@@ -520,6 +549,96 @@ export default function Dashboard() {
             </div>
           )}
         </div>
+
+        {/* 成交量画像 / POC */}
+        {snap.volume_profile?.poc != null && (
+          <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+                📊 成交量画像 / POC
+              </span>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                snap.volume_profile.price_vs_value === "above" ? "bg-emerald-100 text-emerald-700"
+                : snap.volume_profile.price_vs_value === "below" ? "bg-red-100 text-red-700"
+                : "bg-gray-100 text-gray-500"}`}>
+                现价{snap.volume_profile.price_vs_value === "above" ? "在价值区上方"
+                  : snap.volume_profile.price_vs_value === "below" ? "在价值区下方" : "在价值区内"}
+              </span>
+            </div>
+            {/* 价值区刻度 */}
+            <div className="flex items-center justify-between text-xs mb-3 px-1">
+              <span className="text-red-600 font-mono">VAL ${snap.volume_profile.val.toFixed(2)}</span>
+              <span className="font-mono font-bold text-violet-700">POC ${snap.volume_profile.poc.toFixed(2)}</span>
+              <span className="text-emerald-600 font-mono">VAH ${snap.volume_profile.vah.toFixed(2)}</span>
+            </div>
+            <div className="space-y-1.5 text-xs">
+              {snap.volume_profile.nearest_magnet_up != null && (
+                <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-emerald-50/60 border border-emerald-100">
+                  <span className="text-emerald-700 font-medium">▲ 上方磁吸</span>
+                  <span className="font-mono text-gray-700">${snap.volume_profile.nearest_magnet_up.toFixed(2)}</span>
+                </div>
+              )}
+              {snap.volume_profile.nearest_magnet_down != null && (
+                <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-red-50/60 border border-red-100">
+                  <span className="text-red-700 font-medium">▼ 下方磁吸</span>
+                  <span className="font-mono text-gray-700">${snap.volume_profile.nearest_magnet_down.toFixed(2)}</span>
+                </div>
+              )}
+              {snap.volume_profile.naked_pocs_above.length + snap.volume_profile.naked_pocs_below.length > 0 && (
+                <div className="text-[11px] text-[#525461] px-2.5 py-1 leading-snug">
+                  🧲 未回补 POC：
+                  {[...snap.volume_profile.naked_pocs_above, ...snap.volume_profile.naked_pocs_below]
+                    .map(x => `$${x.toFixed(2)}`).join("、")}
+                </div>
+              )}
+              {snap.volume_profile.lvn.length > 0 && (
+                <div className="text-[11px] text-gray-400 px-2.5 leading-snug">
+                  LVN 真空带(勿设止损)：{snap.volume_profile.lvn.map(x => `$${x.toFixed(2)}`).join("、")}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 挤空燃料 */}
+        {snap.squeeze?.fuel_score != null && (
+          <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+                🔥 挤空燃料
+              </span>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                snap.squeeze.fuel_label === "高" ? "bg-emerald-100 text-emerald-700"
+                : snap.squeeze.fuel_label === "中" ? "bg-amber-100 text-amber-700"
+                : "bg-gray-100 text-gray-500"}`}>
+                燃料{snap.squeeze.fuel_label}
+              </span>
+            </div>
+            {/* 燃料计量条 */}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-lg font-bold font-mono text-gray-800">{snap.squeeze.fuel_score.toFixed(0)}</span>
+              <span className="text-[10px] text-gray-400">/100</span>
+              <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
+                <div className={`h-full rounded-full ${
+                  snap.squeeze.fuel_label === "高" ? "bg-emerald-500"
+                  : snap.squeeze.fuel_label === "中" ? "bg-amber-400" : "bg-gray-300"}`}
+                  style={{ width: `${Math.min(100, snap.squeeze.fuel_score)}%` }} />
+              </div>
+            </div>
+            {/* 三个分量 */}
+            <div className="grid grid-cols-3 gap-2 mb-3 text-center">
+              {([["空仓", snap.squeeze.components.short, 40],
+                 ["期权", snap.squeeze.components.options, 35],
+                 ["13F", snap.squeeze.components.holdings, 25]] as const).map(([lbl, v, max]) => (
+                <div key={lbl} className="bg-[#F6F6F8] rounded-lg py-1.5">
+                  <div className="text-[10px] text-gray-400">{lbl}</div>
+                  <div className="text-xs font-mono font-semibold text-gray-700">{v.toFixed(0)}<span className="text-gray-300">/{max}</span></div>
+                </div>
+              ))}
+            </div>
+            <div className="text-[11px] text-[#525461] leading-snug">{snap.squeeze.rationale}</div>
+          </div>
+        )}
       </section>
 
       {/* ══ 5. 今日要闻 + 60日小图 ═══════════════════════════════════════ */}

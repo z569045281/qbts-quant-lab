@@ -98,6 +98,10 @@ export interface Snapshot {
     risk_note:   string;
   } | null;
   smc?: SmcAnalysis | null;
+  volume_profile?:    VolumeProfile | null;
+  regime?:            VolatilityRegime | null;
+  squeeze?:           SqueezeFuel | null;
+  relative_strength?: RelativeStrength | null;
   journal?: DecisionJournal | null;
 }
 
@@ -122,6 +126,67 @@ export interface SmcAnalysis {
   sweeps: { dir: "bullish" | "bearish"; level: number; date: string; note: string }[];
   rationale: string;
   price_used: number;
+  ltf?: { trend: "bullish" | "bearish" | "neutral"; last_event: SmcAnalysis["last_event"] } | null;
+  confluence?: "aligned" | "conflict" | "neutral";
+}
+
+/* ── volume profile / POC ────────────────────────────────────────────────── */
+export interface VolumeProfile {
+  signal: -1 | 0 | 1;
+  label:  "BUY" | "SELL" | "HOLD";
+  poc:    number;
+  vah:    number;
+  val:    number;
+  price:  number;
+  price_vs_value: "above" | "inside" | "below";
+  hvn: number[];
+  lvn: number[];
+  naked_pocs_above: number[];
+  naked_pocs_below: number[];
+  nearest_magnet_up:   number | null;
+  nearest_magnet_down: number | null;
+  lookback_days: number;
+  rationale: string;
+  note: string;
+}
+
+/* ── volatility regime ───────────────────────────────────────────────────── */
+export interface VolatilityRegime {
+  regime: "expansion" | "contraction" | "normal";
+  atr_pct?: number;
+  atr_pct_percentile?: number;
+  realized_vol_20d?: number;
+  gap_mean_60d?: number;
+  gap_gt5_pct?: number;
+  stop_hint?: string;
+  rationale: string;
+}
+
+/* ── squeeze fuel composite ──────────────────────────────────────────────── */
+export interface SqueezeFuel {
+  signal: 0 | 1;
+  label:  "BUY" | "HOLD";
+  fuel_score: number;
+  fuel_label: "高" | "中" | "低";
+  components: { short: number; options: number; holdings: number };
+  short_ratio: number;
+  short_pressure_z: number | null;
+  rationale: string;
+}
+
+/* ── relative strength vs peer basket ────────────────────────────────────── */
+export interface RelativeStrength {
+  signal: -1 | 0 | 1;
+  label:  "BUY" | "SELL" | "HOLD";
+  leadership: "leader" | "laggard" | "decoupled" | "inline";
+  rel:        { "1d": number; "5d": number; "20d": number };
+  qbts_ret:   { "1d": number; "5d": number; "20d": number };
+  basket_ret: { "1d": number; "5d": number; "20d": number };
+  beta_20d:   number | null;
+  vix:        number | null;
+  vix_chg_5d: number;
+  risk:       "on" | "off" | "neutral";
+  rationale:  string;
 }
 
 /* ── decision journal (past calls, graded) ──────────────────────────────── */

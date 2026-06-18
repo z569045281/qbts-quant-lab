@@ -166,10 +166,29 @@ def find_sweeps(df: pd.DataFrame, swing_highs: list[dict], swing_lows: list[dict
     return out[-3:]
 
 
+# ── lower-timeframe structure (multi-timeframe confluence) ───────────────────
+
+def analyze_ltf_structure(df_h: pd.DataFrame, bars: int = 240, k: int = 3) -> dict | None:
+    """1h structure read — reuses the daily swing/structure machinery.
+
+    Used ONLY for entry timing (HTF defines bias, LTF confirms the trigger). It
+    is deliberately NOT folded into the daily composite score: multiple
+    timeframes of the same price series are not independent evidence, so adding
+    them would double-count and inflate conviction.
+    """
+    if df_h is None or len(df_h) < 2 * k + 5:
+        return None
+    d = df_h.tail(bars)
+    sh, sl = find_swings(d, k=k)
+    st = analyze_structure(d, sh, sl)
+    return {"trend": st["trend"], "last_event": st["last_event"]}
+
+
 # ── composite ────────────────────────────────────────────────────────────────
 
-def analyze_smc(df: pd.DataFrame, live_price: float | None = None) -> dict:
-    """Full SMC read on the last ~120 daily bars."""
+def analyze_smc(df: pd.DataFrame, live_price: float | None = None,
+                df_h: pd.DataFrame | None = None) -> dict:
+    """Full SMC read on the last ~120 daily bars (+ optional 1h confluence)."""
     d = df.tail(120).reset_index().rename(columns=str.lower)
     d = d.set_index(d.columns[0]) if d.columns[0] != "open" else d
     d.index = pd.DatetimeIndex(df.tail(120).index)
@@ -219,12 +238,20 @@ def analyze_smc(df: pd.DataFrame, live_price: float | None = None) -> dict:
     signal = 1 if score >= 2 else (-1 if score <= -2 else 0)
     label = {1: "BUY", -1: "SELL", 0: "HOLD"}[signal]
 
+    # multi-timeframe confluence (1h vs daily) — context only, not scored
+    ltf = analyze_ltf_structure(df_h)
+    confluence = "neutral"
+    if ltf and ltf["trend"] != "neutral" and structure["trend"] != "neutral":
+        confluence = "aligned" if ltf["trend"] == structure["trend"] else "conflict"
+
     return {
         "signal": signal,
         "label":  label,
         "score":  score,
         "trend":  structure["trend"],
         "last_event": structure["last_event"],
+        "ltf":        ltf,
+        "confluence": confluence,
         "zone":   zone,
         "range_position": round(pos, 3),
         "range": {"high": round(rng_hi, 2), "low": round(rng_lo, 2)},
@@ -241,6 +268,6 @@ if __name__ == "__main__":
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
     from data.fetcher import load_or_fetch
-    _, df_d = load_or_fetch()
+    df_h, df_d = load_or_fetch()
     import json
-    print(json.dumps(analyze_smc(df_d), ensure_ascii=False, indent=2, default=str))
+    print(json.dumps(analyze_smc(df_d, df_h=df_h), ensure_ascii=False, indent=2, default=str))

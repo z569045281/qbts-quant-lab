@@ -40,6 +40,10 @@ from dashboard.holdings    import get_holdings_signal
 from dashboard.decision    import get_or_generate_decision, get_cached_decision
 from dashboard.macro       import get_macro_calendar
 from dashboard.smc         import analyze_smc
+from dashboard.volume_profile    import analyze_volume_profile
+from dashboard.regime            import analyze_regime
+from dashboard.squeeze           import analyze_squeeze
+from dashboard.relative_strength import analyze_relative_strength
 from dashboard.journal     import record as journal_record, grade_pending, load_recent as journal_recent
 from dashboard.calibration import log_prediction, grade_predictions, save_learned_weights
 from factors.generator import generate_and_validate, generate_and_validate_ml
@@ -852,7 +856,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
 
     # 1. Latest QBTS data — propagate force_refresh so a publish/refresh actually
     # re-downloads bars (otherwise the fetcher's 24h cache TTL leaves as_of stale).
-    _, df_d = await asyncio.to_thread(load_or_fetch, force_refresh=force_refresh)
+    df_h, df_d = await asyncio.to_thread(load_or_fetch, force_refresh=force_refresh)
     df = await asyncio.to_thread(enrich, df_d, "1d")
 
     last_close = float(df["close"].iloc[-1])
@@ -977,20 +981,42 @@ async def dashboard_snapshot(force_refresh: bool = False):
         _live_px = None
         if _lq and (now - _LIVE_QUOTE_CACHE.get("ts", 0) < 300):
             _live_px = (_lq.get("quotes", {}).get("qbts") or {}).get("price")
-        smc = await asyncio.to_thread(analyze_smc, df_d, _live_px)
+        smc = await asyncio.to_thread(analyze_smc, df_d, _live_px, df_h)
     except Exception as e:
         smc = {"signal": 0, "label": "HOLD", "rationale": f"SMC 分析失败: {str(e)[:80]}"}
+    try:
+        # Volume profile / POC — value & magnet levels from 1h bars.
+        vol_profile = await asyncio.to_thread(analyze_volume_profile, df_h, _live_px)
+    except Exception as e:
+        vol_profile = {"signal": 0, "label": "HOLD", "rationale": f"成交量画像失败: {str(e)[:80]}"}
+    try:
+        regime = await asyncio.to_thread(analyze_regime, df_d)
+    except Exception as e:
+        regime = {"regime": "normal", "rationale": f"波动率 regime 失败: {str(e)[:80]}"}
+    try:
+        rel_strength = await asyncio.to_thread(analyze_relative_strength, df_d)
+    except Exception as e:
+        rel_strength = {"signal": 0, "label": "HOLD", "rationale": f"相对强度失败: {str(e)[:80]}"}
+    try:
+        # Squeeze fuel depends on the options + 13F signals computed above.
+        squeeze = await asyncio.to_thread(analyze_squeeze, opt_sig, holdings_sig)
+    except Exception as e:
+        squeeze = {"signal": 0, "label": "HOLD", "rationale": f"挤空燃料失败: {str(e)[:80]}"}
     try:
         journal = await asyncio.to_thread(journal_recent, 12)
     except Exception:
         journal = None
-    payload["options"]  = opt_sig
-    payload["intraday"] = intr_sig
-    payload["reddit"]   = reddit_sig
-    payload["holdings"] = holdings_sig
-    payload["macro"]    = macro_cal
-    payload["smc"]      = smc
-    payload["journal"]  = journal
+    payload["options"]        = opt_sig
+    payload["intraday"]       = intr_sig
+    payload["reddit"]         = reddit_sig
+    payload["holdings"]       = holdings_sig
+    payload["macro"]          = macro_cal
+    payload["smc"]            = smc
+    payload["volume_profile"] = vol_profile
+    payload["regime"]         = regime
+    payload["relative_strength"] = rel_strength
+    payload["squeeze"]        = squeeze
+    payload["journal"]        = journal
 
     # ── Source status map: tells the UI which signals are active/inactive/error
     # so the user knows when something needs setup (e.g. Reddit OAuth missing). ─
