@@ -7,6 +7,10 @@
 # frontend / node_modules out of the image.
 FROM public.ecr.aws/lambda/python:3.12
 
+# System libs not in the base image: libgomp (OpenMP runtime) is required by
+# lightgbm, which backend.api imports transitively.
+RUN dnf install -y libgomp && dnf clean all
+
 # Python deps first so the (slow) vectorbt/numba/lightgbm layer caches across
 # code-only rebuilds.
 COPY aws/requirements.txt ./
