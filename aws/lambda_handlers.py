@@ -25,6 +25,13 @@ see aws/README.md for the Supabase-backed-journal upgrade.
 import json
 import os
 
+# Lambda's only writable path is /tmp. The image symlinks backend/data/cache →
+# /tmp/cache, but that target doesn't exist at cold start, and Path.mkdir(
+# exist_ok=True) on a *dangling symlink* still raises FileExistsError (it follows
+# the link, finds nothing, and re-raises). Create the target once, up front,
+# before any backend module imports and runs its own mkdir.
+os.makedirs("/tmp/cache", exist_ok=True)
+
 
 def quote_handler(event, context):
     """One live-quote push to Supabase. Stateless — perfect for a 1-min schedule."""
