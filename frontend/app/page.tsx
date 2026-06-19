@@ -49,6 +49,9 @@ function getActionMeta(action: Decision["action"], conviction: number) {
 /* 信心刻度图例 */
 const CONVICTION_LEGEND = "0-4 观望 · 5-6 轻仓试探 · 7-8 标准仓 · 9+ 重仓";
 
+/* 页面版本号 — 右下角显示，发版时手动 bump */
+const APP_VERSION = "1.0";
+
 function fmtPx(n: number | null | undefined): string {
   return typeof n === "number" && isFinite(n) ? `$${n.toFixed(2)}` : "—";
 }
@@ -722,6 +725,11 @@ export default function Dashboard() {
       <footer className="text-center text-[10px] text-gray-400 pb-4">
         QBTS Quant Lab · AI 决策由 Claude 基于 8 类数据源综合生成 · 每日 publish.py 更新 · 仅供研究参考，非投资建议
       </footer>
+
+      {/* 右下角版本号 */}
+      <div className="fixed bottom-2 right-3 z-10 text-[10px] font-mono text-gray-300 select-none pointer-events-none">
+        v{APP_VERSION}
+      </div>
     </main>
   );
 }
