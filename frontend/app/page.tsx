@@ -266,37 +266,54 @@ export default function Dashboard() {
                     满足上方入场条件后再按对应方向进场;在此之前没有入场 / 止损 / 目标价,仓位 0%。
                   </div>
                 </div>
+              ) : d.plan_valid === false ? (
+                /* Geometry check failed (stop/target on the wrong side) — never
+                   show numbers the user might trade on; tell them to regenerate. */
+                <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-3 leading-relaxed">
+                  ⚠️ <span className="font-semibold">计划价位不自洽</span>(止损/目标方向异常),已隐藏以防误用。
+                  <div className="mt-1 text-xs">请重新运行 <code className="font-mono bg-red-100 px-1 rounded">publish.py</code> 生成新计划。</div>
+                </div>
               ) : (
-                <table className="w-full text-sm">
-                  <tbody>
-                    <tr className="border-b border-[#F0F0F2]">
-                      <td className="py-1.5 text-[#525461] text-xs">QBTS 入场 / 止损 / 目标</td>
-                      <td className="py-1.5 text-right font-mono">
-                        {fmtPx(d.trade_plan.qbts_entry)} / <span className="text-[#F03A3E]">{fmtPx(d.trade_plan.qbts_stop)}</span> / <span className="text-emerald-600">{fmtPx(d.trade_plan.qbts_target)}</span>
-                      </td>
-                    </tr>
-                    {d.trade_plan.etf_ticker && (
+                <>
+                  <table className="w-full text-sm">
+                    <tbody>
                       <tr className="border-b border-[#F0F0F2]">
-                        <td className="py-1.5 text-[#525461] text-xs">{d.trade_plan.etf_ticker} 入场 / 止损 / 目标</td>
+                        <td className="py-1.5 text-[#525461] text-xs">QBTS 入场 / 止损 / 目标</td>
                         <td className="py-1.5 text-right font-mono">
-                          {fmtPx(d.trade_plan.etf_entry)} / <span className="text-[#F03A3E]">{fmtPx(d.trade_plan.etf_stop)}</span> / <span className="text-emerald-600">{fmtPx(d.trade_plan.etf_target)}</span>
+                          {fmtPx(d.trade_plan.qbts_entry)} / <span className="text-[#F03A3E]">{fmtPx(d.trade_plan.qbts_stop)}</span> / <span className="text-emerald-600">{fmtPx(d.trade_plan.qbts_target)}</span>
                         </td>
                       </tr>
-                    )}
-                    <tr className="border-b border-[#F0F0F2]">
-                      <td className="py-1.5 text-[#525461] text-xs">盈亏比</td>
-                      <td className="py-1.5 text-right font-mono font-semibold">
-                        1 : {d.trade_plan.rr_ratio?.toFixed(1) ?? "—"}
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="py-1.5 text-[#525461] text-xs">建议仓位</td>
-                      <td className="py-1.5 text-right font-mono font-semibold">
-                        {d.trade_plan.suggested_position_pct}% 资金
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+                      {d.trade_plan.etf_ticker && (
+                        <tr className="border-b border-[#F0F0F2]">
+                          <td className="py-1.5 text-[#525461] text-xs">
+                            <span className="font-semibold text-gray-700">{d.trade_plan.etf_ticker}</span> 入场 / 止损 / 目标
+                          </td>
+                          <td className="py-1.5 text-right font-mono">
+                            {fmtPx(d.trade_plan.etf_entry)} / <span className="text-[#F03A3E]">{fmtPx(d.trade_plan.etf_stop)}</span> / <span className="text-emerald-600">{fmtPx(d.trade_plan.etf_target)}</span>
+                          </td>
+                        </tr>
+                      )}
+                      <tr className="border-b border-[#F0F0F2]">
+                        <td className="py-1.5 text-[#525461] text-xs">盈亏比</td>
+                        <td className="py-1.5 text-right font-mono font-semibold">
+                          1 : {d.trade_plan.rr_ratio?.toFixed(1) ?? "—"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="py-1.5 text-[#525461] text-xs">建议仓位</td>
+                        <td className="py-1.5 text-right font-mono font-semibold">
+                          {d.trade_plan.suggested_position_pct}% 资金
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  {d.trade_plan.etf_ticker && (
+                    <div className="mt-2 text-[10px] text-gray-400 leading-snug">
+                      {d.trade_plan.etf_ticker} 价位由实时报价按 2× 自动换算(入场时刻精确);
+                      杠杆 ETF 每日再平衡,持仓多日有衰减,止损/目标价仅为近似参考。
+                    </div>
+                  )}
+                </>
               )}
               {/* 失效条件 */}
               <div className="mt-3 text-xs text-[#B45309] bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
@@ -496,16 +513,24 @@ export default function Dashboard() {
             <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
               📒 历史决策战绩
             </span>
-            {snap.journal?.accuracy != null && (
-              <span className={`text-sm font-bold font-mono ${
-                snap.journal.accuracy >= 0.55 ? "text-emerald-600"
-                : snap.journal.accuracy >= 0.45 ? "text-amber-500" : "text-[#F03A3E]"}`}>
-                命中 {(snap.journal.accuracy * 100).toFixed(0)}%
-                <span className="text-[10px] text-gray-400 ml-1">
-                  ({snap.journal.n_correct}/{snap.journal.n_graded})
+            <div className="flex flex-col items-end gap-0.5">
+              {snap.journal?.accuracy != null && (
+                <span className={`text-sm font-bold font-mono ${
+                  snap.journal.accuracy >= 0.55 ? "text-emerald-600"
+                  : snap.journal.accuracy >= 0.45 ? "text-amber-500" : "text-[#F03A3E]"}`}>
+                  实盘命中 {(snap.journal.accuracy * 100).toFixed(0)}%
+                  <span className="text-[10px] text-gray-400 ml-1">
+                    ({snap.journal.n_correct}/{snap.journal.n_graded})
+                  </span>
                 </span>
-              </span>
-            )}
+              )}
+              {snap.journal?.shadow_accuracy != null && (
+                <span className="text-[10px] text-gray-400 font-mono" title="含观望日的方向影子判断 — 即使空仓也评判当时的多空倾向是否正确">
+                  含观望影子 {(snap.journal.shadow_accuracy * 100).toFixed(0)}%
+                  ({snap.journal.n_shadow_correct}/{snap.journal.n_shadow})
+                </span>
+              )}
+            </div>
           </div>
           {!snap.journal || snap.journal.records.length === 0 ? (
             <div className="text-xs text-gray-400 py-6 text-center">

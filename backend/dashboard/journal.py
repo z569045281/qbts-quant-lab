@@ -197,6 +197,16 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
             else:  # HOLD — informational
                 outcome, correct = "hold", None
 
+        # Shadow grade for HOLD: even when we sat out, was the model's lean
+        # (p_up_5d ≷ 0.5) directionally right? Builds a falsifiable record while
+        # the system is HOLD-heavy, WITHOUT polluting real-trade accuracy.
+        shadow_dir = shadow_correct = None
+        if action == "HOLD" and ret_pct is not None:
+            p_up = r.get("p_up_5d")
+            if p_up is not None:
+                shadow_dir = 1 if p_up >= 0.5 else -1
+                shadow_correct = (shadow_dir > 0) == (ret_pct > 0)
+
         r["status"] = "graded"
         r["result"] = {
             "graded_at": datetime.now().strftime("%Y-%m-%d"),
@@ -205,6 +215,8 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
             "ret_pct":   round(ret_pct, 4) if ret_pct is not None else None,
             "exit_day":  exit_day,
             "reflection": None,
+            "shadow_dir":     shadow_dir,
+            "shadow_correct": shadow_correct,
         }
         newly_graded.append(r)
 
@@ -247,11 +259,26 @@ def load_recent(n: int = 12) -> dict:
     graded = [r for r in records if r.get("status") == "graded"
               and r["result"] and r["result"]["correct"] is not None]
     n_correct = sum(1 for r in graded if r["result"]["correct"])
+
+    # Shadow accuracy = directional lean correct across BOTH real trades and
+    # HOLDs (uses correct for trades, shadow_correct for HOLDs). A falsifiable
+    # signal of edge even when the system mostly sits out.
+    def _lean(r: dict):
+        res = r.get("result") or {}
+        if res.get("correct") is not None:
+            return res["correct"]
+        return res.get("shadow_correct")
+    shadow = [r for r in records if r.get("status") == "graded" and _lean(r) is not None]
+    n_shadow_correct = sum(1 for r in shadow if _lean(r))
+
     return {
         "records":   records,
         "n_graded":  len(graded),
         "n_correct": n_correct,
         "accuracy":  round(n_correct / len(graded), 3) if graded else None,
+        "n_shadow":         len(shadow),
+        "n_shadow_correct": n_shadow_correct,
+        "shadow_accuracy":  round(n_shadow_correct / len(shadow), 3) if shadow else None,
         "lessons":   [r["result"]["reflection"] for r in records
                       if r.get("result") and r["result"].get("reflection")][:5],
     }

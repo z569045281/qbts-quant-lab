@@ -211,6 +211,8 @@ export interface JournalRecord {
     ret_pct:    number | null;
     exit_day:   number | null;
     reflection: string | null;
+    shadow_dir?:     -1 | 1 | null;   // HOLD: lean implied by p_up_5d
+    shadow_correct?: boolean | null;  // HOLD: was that lean directionally right
   } | null;
 }
 export interface DecisionJournal {
@@ -218,6 +220,9 @@ export interface DecisionJournal {
   n_graded:  number;
   n_correct: number;
   accuracy:  number | null;
+  n_shadow?:         number;          // graded calls incl. HOLD shadow leans
+  n_shadow_correct?: number;
+  shadow_accuracy?:  number | null;   // directional accuracy incl. observed HOLDs
   lessons:   string[];
 }
 
@@ -267,6 +272,7 @@ export interface Decision {
   upcoming_catalysts: DecisionCatalyst[];
   invalidation:       string;
   invalidation_price?: number;   // QBTS level that kills the plan (machine-checkable)
+  plan_valid?:        boolean;   // false = stop/target geometry was inconsistent
 }
 
 /* ── /dashboard/calibration payload ──────────────────────────────────────── */

@@ -71,6 +71,31 @@ create policy "anon read decision_journal"
   to anon, authenticated
   using (true);
 
+-- ── predictions ──────────────────────────────────────────────────────────────
+-- One row per day's meta-model prediction (was data/cache/predictions.jsonl).
+-- Persisted in Supabase so the self-learning calibration survives stateless
+-- cloud (Lambda) runs — /tmp is wiped each cold start, which would otherwise
+-- reset the learned weights to nothing forever. Backend-only: written AND read
+-- with the secret key (bypasses RLS); NOT exposed to the anon frontend.
+-- `id` = the prediction's as_of date (YYYY-MM-DD); `data` = full record.
+create table if not exists public.predictions (
+  id         text primary key,
+  updated_at timestamptz not null default now(),
+  data       jsonb not null
+);
+alter table public.predictions enable row level security;
+-- No anon policy on purpose: only the secret-key backend touches this table.
+
+-- ── source_weights ───────────────────────────────────────────────────────────
+-- Single row (id='current') holding the learned per-source weight multipliers
+-- (was data/cache/source_weights.json). Same backend-only, secret-key model.
+create table if not exists public.source_weights (
+  id         text primary key,
+  updated_at timestamptz not null default now(),
+  data       jsonb not null
+);
+alter table public.source_weights enable row level security;
+
 -- ── live_quote ───────────────────────────────────────────────────────────────
 -- Single-row table (id=1) updated by quote_pusher.py every ~60s during US
 -- trading hours (incl. pre/post). The dashboard polls it for a live header.

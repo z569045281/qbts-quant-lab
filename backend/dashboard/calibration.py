@@ -21,7 +21,9 @@ Self-learning principle:
 from __future__ import annotations
 
 import json
+import logging
 import math
+import os
 import time
 from collections import defaultdict
 from datetime import datetime
@@ -29,6 +31,7 @@ from pathlib import Path
 
 import pandas as pd
 
+logger = logging.getLogger(__name__)
 
 _PREDICTION_LOG = Path(__file__).parent.parent / "data" / "cache" / "predictions.jsonl"
 _CALIBRATION_OUT = Path(__file__).parent.parent / "data" / "cache" / "source_weights.json"
@@ -38,9 +41,39 @@ _HORIZON_DAYS = 5      # grade predictions vs 5-day forward return
 _GRACE_BARS   = 2      # need ≥ 2 bars elapsed AFTER prediction to grade
 _SHRINKAGE_K  = 10     # Bayesian prior strength (10 = needs ~10 samples to fully trust)
 
+# Storage: Supabase tables when credentials are present (so calibration survives
+# the stateless cloud — Lambda's /tmp is wiped on every cold start, which would
+# otherwise reset the self-learning weights to nothing forever), else the local
+# files. Mirrors backend/dashboard/journal.py.
+#   predictions    one row per day {id: as_of_date, data: <prediction record>}
+#   source_weights one row {id: 'current', data: <learned-weights payload>}
+_PRED_TABLE    = "predictions"
+_WEIGHTS_TABLE = "source_weights"
+_WEIGHTS_ID    = "current"
+_SB = None
+_SB_INIT = False
+
+
+def _supabase():
+    """Cached Supabase client, or None to fall back to the local files."""
+    global _SB, _SB_INIT
+    if _SB_INIT:
+        return _SB
+    _SB_INIT = True
+    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+    key = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
+    if url and key:
+        try:
+            from supabase import create_client
+            _SB = create_client(url, key)
+        except Exception as e:
+            logger.warning(f"calibration: Supabase init failed, using files — {e}")
+            _SB = None
+    return _SB
+
 
 def log_prediction(price: float, as_of: str, edge: dict) -> None:
-    """Append one prediction record (idempotent by as_of date — only one per day)."""
+    """Record one prediction (idempotent by as_of date — only one per day)."""
     if not edge or edge.get("error"):
         return
     record = {
@@ -57,15 +90,30 @@ def log_prediction(price: float, as_of: str, edge: dict) -> None:
             for c in (edge.get("contributions") or [])
         ],
     }
+    day = (as_of or "")[:10]
     # Idempotency: skip if we've already logged today's as_of date
-    existing_dates = _list_logged_as_of_dates()
-    if as_of and as_of[:10] in existing_dates:
+    if day and day in _list_logged_as_of_dates():
         return
+
+    sb = _supabase()
+    if sb is not None and day:
+        try:
+            sb.table(_PRED_TABLE).upsert({"id": day, "data": record}).execute()
+            return
+        except Exception as e:
+            logger.warning(f"calibration: Supabase log failed, using file — {e}")
     with _PREDICTION_LOG.open("a") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
 def _list_logged_as_of_dates() -> set:
+    sb = _supabase()
+    if sb is not None:
+        try:
+            rows = sb.table(_PRED_TABLE).select("id").execute().data
+            return {r["id"] for r in rows if r.get("id")}
+        except Exception as e:
+            logger.warning(f"calibration: Supabase date-list failed, using file — {e}")
     if not _PREDICTION_LOG.exists():
         return set()
     dates = set()
@@ -82,6 +130,13 @@ def _list_logged_as_of_dates() -> set:
 
 
 def _load_predictions() -> list[dict]:
+    sb = _supabase()
+    if sb is not None:
+        try:
+            rows = sb.table(_PRED_TABLE).select("data").execute().data
+            return [r["data"] for r in rows if r.get("data")]
+        except Exception as e:
+            logger.warning(f"calibration: Supabase load failed, using file — {e}")
     if not _PREDICTION_LOG.exists():
         return []
     out = []
@@ -224,11 +279,29 @@ def save_learned_weights(grade_result: dict) -> None:
         "n_total": grade_result.get("n_total", 0),
         "overall_hit_rate": grade_result.get("overall_hit_rate", 0.5),
     }
+    sb = _supabase()
+    if sb is not None:
+        try:
+            sb.table(_WEIGHTS_TABLE).upsert(
+                {"id": _WEIGHTS_ID, "data": payload}
+            ).execute()
+            return
+        except Exception as e:
+            logger.warning(f"calibration: Supabase weights save failed, using file — {e}")
     _CALIBRATION_OUT.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
 
 
 def load_learned_weights() -> dict[str, float]:
     """Return per-source weight multipliers (or empty dict if not yet calibrated)."""
+    sb = _supabase()
+    if sb is not None:
+        try:
+            rows = sb.table(_WEIGHTS_TABLE).select("data").eq("id", _WEIGHTS_ID).execute().data
+            if rows and rows[0].get("data"):
+                return rows[0]["data"].get("weights", {})
+            return {}
+        except Exception as e:
+            logger.warning(f"calibration: Supabase weights load failed, using file — {e}")
     if not _CALIBRATION_OUT.exists():
         return {}
     try:

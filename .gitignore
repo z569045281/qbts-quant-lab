@@ -37,5 +37,6 @@ aws/samconfig.toml
 .idea/
 *.swp
 
-# one-off journal migration (generated, contains local seed data)
+# one-off migrations (generated, contain local seed data)
 decision_journal_migration.sql
+calibration_migration.sql
