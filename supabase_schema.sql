@@ -51,6 +51,26 @@ create policy "anon read factors"
   to anon, authenticated
   using (true);
 
+-- ── decision_journal ─────────────────────────────────────────────────────────
+-- One row per recorded daily decision — the persisted track record + reflections.
+-- Replaces the old local JSONL file so the journal survives across stateless
+-- cloud (Lambda) runs, whose /tmp is wiped on every cold start. Written by
+-- publish/refresh with the secret key (bypasses RLS); `data` holds the full
+-- record (date, action, conviction, price, result/reflection, ...).
+create table if not exists public.decision_journal (
+  id         text primary key,
+  updated_at timestamptz not null default now(),
+  data       jsonb not null
+);
+
+alter table public.decision_journal enable row level security;
+
+drop policy if exists "anon read decision_journal" on public.decision_journal;
+create policy "anon read decision_journal"
+  on public.decision_journal for select
+  to anon, authenticated
+  using (true);
+
 -- ── live_quote ───────────────────────────────────────────────────────────────
 -- Single-row table (id=1) updated by quote_pusher.py every ~60s during US
 -- trading hours (incl. pre/post). The dashboard polls it for a live header.

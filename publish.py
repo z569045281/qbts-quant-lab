@@ -58,6 +58,7 @@ def main() -> None:
         get_leaderboard,
         get_factor_chart,
         leaderboard,
+        journal_recent,
         _Encoder,
     )
 
@@ -91,6 +92,13 @@ def main() -> None:
                 print(f"  ✓ {d['action']} · 信心 {d['conviction']}/10 · {d['summary'][:60]}…")
         except Exception as e:  # decision is critical but not fatal to publish
             print(f"  ! decision skipped: {e}")
+
+        # refresh_decision() records today's call after the snapshot captured the
+        # journal — re-read so today's decision shows in the published track record.
+        try:
+            snap["journal"] = journal_recent(12)
+        except Exception:
+            pass
 
         # 3. Calibration -----------------------------------------------------
         try:

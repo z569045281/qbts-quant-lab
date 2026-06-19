@@ -35,8 +35,42 @@ _JOURNAL.parent.mkdir(parents=True, exist_ok=True)
 
 _GRADE_AFTER_BARS = 5     # final grade horizon (trading days)
 
+# Storage: a Supabase `decision_journal` table when credentials are present
+# (so the journal persists across stateless cloud runs — Lambda's /tmp is wiped
+# on every cold start), otherwise the local JSONL file. Each record is one row:
+# {id, data: <full record dict>}. record()/grade_pending()/load_recent() are
+# unchanged — they operate on the list returned by _load() and persist via _save().
+_TABLE = "decision_journal"
+_SB = None
+_SB_INIT = False
+
+
+def _supabase():
+    """Cached Supabase client, or None to fall back to the local file."""
+    global _SB, _SB_INIT
+    if _SB_INIT:
+        return _SB
+    _SB_INIT = True
+    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+    key = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
+    if url and key:
+        try:
+            from supabase import create_client
+            _SB = create_client(url, key)
+        except Exception as e:
+            logger.warning(f"journal: Supabase init failed, using file — {e}")
+            _SB = None
+    return _SB
+
 
 def _load() -> list[dict]:
+    sb = _supabase()
+    if sb is not None:
+        try:
+            rows = sb.table(_TABLE).select("data").execute().data
+            return [r["data"] for r in rows if r.get("data")]
+        except Exception as e:
+            logger.warning(f"journal: Supabase load failed, using file — {e}")
     if not _JOURNAL.exists():
         return []
     out = []
@@ -50,6 +84,22 @@ def _load() -> list[dict]:
 
 
 def _save(records: list[dict]) -> None:
+    sb = _supabase()
+    if sb is not None:
+        try:
+            if records:
+                sb.table(_TABLE).upsert(
+                    [{"id": r["id"], "data": r} for r in records]
+                ).execute()
+            # Drop rows no longer in the desired set (e.g. a same-day pending
+            # record that record() replaced). Usually 0–1 rows.
+            keep = {r["id"] for r in records}
+            for row in sb.table(_TABLE).select("id").execute().data:
+                if row["id"] not in keep:
+                    sb.table(_TABLE).delete().eq("id", row["id"]).execute()
+            return
+        except Exception as e:
+            logger.warning(f"journal: Supabase save failed, using file — {e}")
     tmp = _JOURNAL.with_suffix(".tmp")
     with tmp.open("w") as f:
         for r in records:

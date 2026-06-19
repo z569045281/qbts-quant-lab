@@ -36,3 +36,6 @@ aws/samconfig.toml
 .vscode/
 .idea/
 *.swp
+
+# one-off journal migration (generated, contains local seed data)
+decision_journal_migration.sql

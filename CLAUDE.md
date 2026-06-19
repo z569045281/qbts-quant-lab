@@ -1,0 +1,81 @@
+# CLAUDE.md — QBTS Quant Lab
+
+Instructions for any Claude session working in this repo. Auto-loaded every session.
+
+## ⚠️ Multi-session coordination (READ FIRST)
+
+Several Claude sessions may run at once. Sessions are isolated — they do **not**
+see each other's context. Coordinate through files + git:
+
+1. **Before starting work, read [COORDINATION.md](COORDINATION.md)** to see what other
+   sessions are doing and which files they've claimed.
+2. **Append an entry** to COORDINATION.md: timestamp, a one-line task description, and the
+   files/areas you're about to touch. Mark it `[done]` when finished.
+3. **Never edit a file another active session has claimed.** If you need it, pick a
+   different slice or note the handoff in COORDINATION.md.
+4. **Two sessions must never edit the same working directory at the same time** — disk is
+   last-write-wins, and git state will collide. For genuine parallel work, give each
+   session its own git worktree + branch:
+   ```bash
+   git worktree add ../qbts-<task> -b <task>
+   ```
+   Then coordinate via commits / `git log` / PRs, not the shared tree.
+5. **Commit small and often** so other sessions/worktrees can see your work. Push to
+   `main` **only when the user asks** — `main` triggers the deploy workflows.
+
+## What this is
+
+Personal one-screen trading dashboard for **QBTS** (D-Wave Quantum), traded via leveraged
+ETFs **QBTX** (2× long) / **QBTZ** (2× short). Daily it answers: buy QBTX / buy QBTZ / hold,
+with an executable trade plan (entry/stop/target/RR/size), key drivers, and catalysts.
+
+## Architecture
+
+- **backend/** — FastAPI (`backend/api.py`): builds the dashboard snapshot, runs classic +
+  mined factor strategies, SMC, macro, journal, and the AI decision.
+- **backend/dashboard/decision.py** — THE brain: one **Opus 4.8** (`claude-opus-4-8`) call →
+  trade-plan JSON. (Was `claude-fable-5` until Fable was disabled.)
+- **publish.py** — full pipeline + fresh decision → writes Supabase (`dashboard_state` +
+  `factors`). The deployed site reads Supabase, so the site only updates when this runs.
+- **quote_pusher.py** — live pre/post quotes → Supabase `live_quote` (`--once` = single push).
+- **frontend/** — Next.js 16 static export on GitHub Pages, reads Supabase.
+  **Read [frontend/AGENTS.md](frontend/AGENTS.md) — Next 16 has breaking changes.**
+- **Supabase** — the data store the deployed site reads (`dashboard_state`, `factors`, `live_quote`).
+- **aws/** — Route A serverless: container-image Lambdas. `PublishFunction` (Function URL +
+  daily 09:00 ET schedule) and `QuoteFunction` (every minute, market hours). See `aws/README.md`.
+
+## Run locally
+
+- `./start.sh` → backend :8000 + frontend :3000. `./stop.sh` to stop.
+- The dashboard reads **Supabase** when `NEXT_PUBLIC_SUPABASE_URL` is set (it is, in
+  `frontend/.env.local`). So to change what the site shows, run `publish.py` — the local
+  backend's own data is only the fallback.
+- The dashboard's **控制台** buttons (local mode) run publish / toggle the quote pusher
+  against the local backend (`/control/*` endpoints in `api.py`).
+
+## Deploy (all from `main`)
+
+- **Frontend**: push touching `frontend/**` → Pages workflow auto-deploys.
+- **AWS**: push touching `backend/**` / `publish.py` / `quote_pusher.py` / `aws/**` →
+  "Deploy AWS jobs" auto-runs (also manual). Backend/prompt changes need this redeploy to
+  reach the cloud image.
+- End commit messages with the `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>` line.
+
+## Gotchas
+
+- **Lambda FS is read-only except `/tmp`** — the image symlinks `backend/data/cache` →
+  `/tmp/cache` and the handler pre-creates it (dangling-symlink `mkdir` raises otherwise).
+- **`aws/requirements.txt` is the full dep set** for the image (repo `requirements.txt` is
+  incomplete — `lightgbm` needs `libgomp`, installed via `dnf` in the Dockerfile).
+- **`dashboard_snapshot(force_refresh=True)` propagates to `load_or_fetch`** so `as_of`
+  stays current. Daily bars max out at the last *closed* US session (user is in AEST, ahead of US).
+- **Secrets**: `ANTHROPIC_API_KEY` / `SUPABASE_SECRET_KEY` / `ALPACA_*` live in root `.env`
+  (gitignored). Supabase **secret** key (`sb_secret_…`) is write-capable — local/CI only;
+  the **publishable** key is safe-public read-only. Repo is public.
+- **Models**: Opus 4.8 (decision) · Sonnet 4.6 (factor gen) · Haiku 4.5 (news / reflections).
+- **Big image push to ECR occasionally times out** in CI — just re-run "Deploy AWS jobs".
+
+## Durable facts vs this file
+
+`CLAUDE.md` = conventions/orientation. Cross-session **durable facts** go in the project
+memory (`memory/MEMORY.md`), which every session loads at startup.

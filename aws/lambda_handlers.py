@@ -52,6 +52,7 @@ def _publish_decision_only() -> dict:
     from supabase import create_client
     from backend.api import (
         dashboard_snapshot, dashboard_calibration, refresh_decision, _Encoder,
+        journal_recent,
     )
 
     url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
@@ -79,6 +80,13 @@ def _publish_decision_only() -> dict:
                 summary = f"{d['action']} · 信心 {d['conviction']}/10"
         except Exception as e:               # decision is important but not fatal
             print(f"! decision skipped: {e}")
+
+        # refresh_decision() recorded today's call AFTER dashboard_snapshot
+        # captured the journal — re-read so today's decision shows immediately.
+        try:
+            snap["journal"] = journal_recent(12)
+        except Exception:
+            pass
 
         try:
             cal = loop.run_until_complete(dashboard_calibration())
