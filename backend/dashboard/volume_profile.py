@@ -112,6 +112,42 @@ def _hvn_lvn(centers: np.ndarray, vol_at: np.ndarray) -> tuple[list[float], list
     return hvn, lvn
 
 
+def _action_hint(where: str, val: float, vah: float,
+                 mag_up: float | None, mag_down: float | None,
+                 naked_above: list[float], naked_below: list[float],
+                 lvn: list[float]) -> tuple[str, str]:
+    """Translate the levels into an explicit breakout/breakdown playbook.
+
+    Single source of truth shared by the dashboard card and the decision prompt,
+    so the user and the model read the same plain-language plan.
+    """
+    up_targets   = [p for p in naked_above if mag_up   and p > mag_up][:2]
+    down_targets = [p for p in naked_below if mag_down and p < mag_down][:2]
+    up_t = " → ".join(f"${p}" for p in up_targets)   or f"${vah}(VAH)"
+    dn_t = " → ".join(f"${p}" for p in down_targets) or f"${val}(VAL)"
+
+    parts: list[str] = []
+    if mag_up:
+        parts.append(f"站上 ${mag_up} 上看 {up_t}")
+    if mag_down:
+        parts.append(f"跌破 ${mag_down} 下看 {dn_t}")
+    if where == "inside":
+        stance = "观望"
+        if mag_up and mag_down:
+            parts.append(f"${mag_down}–${mag_up} 区间内观望（价值区均衡，无 edge）")
+    elif where == "above":
+        stance = "偏多"
+        parts.append(f"现价已破价值区上沿，偏多；跌回 ${vah}(VAH) 下方转弱")
+    else:
+        stance = "偏空"
+        parts.append(f"现价已破价值区下沿，偏空；收复 ${val}(VAL) 上方转强")
+
+    hint = "；".join(parts)
+    if lvn:
+        hint += f"。止损勿放 LVN（{'、'.join(f'${x}' for x in lvn[:3])}）"
+    return hint, stance
+
+
 def analyze_volume_profile(df_h: pd.DataFrame, live_price: float | None = None,
                            lookback_days: int = _LOOKBACK_DAYS,
                            n_bins: int = _N_BINS) -> dict:
@@ -154,6 +190,9 @@ def analyze_volume_profile(df_h: pd.DataFrame, live_price: float | None = None,
         notes.append(f"下方磁吸 ${nearest_down}" + ("（naked POC）" if nearest_down in naked_below else "（HVN）"))
 
     signal = score
+    action_hint, stance = _action_hint(
+        where, round(val, 2), round(vah, 2), nearest_up, nearest_down,
+        naked_above, naked_below, lvn)
     return {
         "signal":          signal,
         "label":           {1: "BUY", -1: "SELL", 0: "HOLD"}[signal],
@@ -169,6 +208,8 @@ def analyze_volume_profile(df_h: pd.DataFrame, live_price: float | None = None,
         "nearest_magnet_up":   nearest_up,
         "nearest_magnet_down": nearest_down,
         "lookback_days":   lookback_days,
+        "stance":          stance,
+        "action_hint":     action_hint,
         "rationale":       "；".join(notes),
         "note":            "基于 1h bar 的成交量画像（近似，无 tick 数据）",
     }

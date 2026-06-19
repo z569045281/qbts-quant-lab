@@ -571,6 +571,18 @@ export default function Dashboard() {
               <span className="font-mono font-bold text-violet-700">POC ${snap.volume_profile.poc.toFixed(2)}</span>
               <span className="text-emerald-600 font-mono">VAH ${snap.volume_profile.vah.toFixed(2)}</span>
             </div>
+            {/* 操作提示 — 把磁吸位翻译成明确的突破/跌破触发 */}
+            {snap.volume_profile.action_hint && (
+              <div className="flex items-start gap-2 text-xs bg-indigo-50/70 border border-indigo-100 rounded-lg px-3 py-2 mb-3 leading-snug">
+                <span className={`shrink-0 px-1.5 py-0.5 rounded font-bold ${
+                  snap.volume_profile.stance === "偏多" ? "bg-emerald-100 text-emerald-700"
+                  : snap.volume_profile.stance === "偏空" ? "bg-red-100 text-red-700"
+                  : "bg-gray-100 text-gray-500"}`}>
+                  👉 {snap.volume_profile.stance}
+                </span>
+                <span className="text-gray-700">{snap.volume_profile.action_hint}</span>
+              </div>
+            )}
             <div className="space-y-1.5 text-xs">
               {snap.volume_profile.nearest_magnet_up != null && (
                 <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-emerald-50/60 border border-emerald-100">

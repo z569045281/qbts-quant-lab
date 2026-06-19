@@ -1,10 +1,22 @@
 name: Deploy AWS jobs (decision + quotes)
 
 # Builds the Lambda container image and deploys the Route A stack from CI, so you
-# don't need a working local Docker / SAM / AWS CLI. Manual trigger only —
-# deploying creates/updates billable AWS resources.
+# don't need a working local Docker / SAM / AWS CLI. Deploying creates/updates
+# billable AWS resources.
+#
+# Auto-runs on push to main when backend code the Lambda image bundles changes
+# (aws/Dockerfile COPYs backend/, publish.py, quote_pusher.py, aws/*), so the
+# scheduled publish never silently runs stale code. Still manually triggerable.
 on:
   workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'publish.py'
+      - 'quote_pusher.py'
+      - 'aws/**'
+      - '.github/workflows/deploy-aws.yml'
 
 permissions:
   contents: read

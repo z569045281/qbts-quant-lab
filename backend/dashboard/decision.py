@@ -252,6 +252,7 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
             f"  POC(价值中枢) ${vp['poc']}，价值区 VAL ${vp['val']} – VAH ${vp['vah']}，现价在价值区{where_cn}\n"
             f"  高成交节点 HVN(支撑/阻力): {hvn_s}；低成交真空 LVN(价格穿越快，勿设止损): {lvn_s}\n"
             f"  上方 naked POC(未回补磁吸): {nk_up}；下方 naked POC: {nk_dn}\n"
+            f"  操作含义({vp.get('stance','?')}): {vp.get('action_hint','')}\n"
             f"  → 设目标优先用 naked POC / 邻近 HVN；止损放在 LVN 之外；入场参考价值区边缘"
         )
 

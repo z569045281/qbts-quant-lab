@@ -146,6 +146,8 @@ export interface VolumeProfile {
   nearest_magnet_up:   number | null;
   nearest_magnet_down: number | null;
   lookback_days: number;
+  stance:        "观望" | "偏多" | "偏空";
+  action_hint:   string;
   rationale: string;
   note: string;
 }
