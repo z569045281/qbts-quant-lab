@@ -56,6 +56,21 @@ function fmtPx(n: number | null | undefined): string {
   return typeof n === "number" && isFinite(n) ? `$${n.toFixed(2)}` : "—";
 }
 
+/* 给 Vivienne（完全不懂术语）看的极简动作 + 万一模型没生成 note 时的兜底文案 */
+function vivienneAction(action: Decision["action"] | undefined) {
+  switch (action) {
+    case "LONG_QBTX":
+      return { emoji: "📈", line: "今天买一点点（我们押它会涨）",
+        fallback: "今天我打算用一点点钱买进，赌它接下来会涨～只用很少的钱试试，就算看错了也亏不到哪去，别担心。" };
+    case "SHORT_QBTZ":
+      return { emoji: "📉", line: "今天买一点点（我们押它会跌）",
+        fallback: "今天我打算押它会跌来赚一点，一样只动用很少的钱。放心，万一猜错亏的也有限，不会伤到我们。" };
+    default:
+      return { emoji: "☕", line: "今天先不买也不卖，安心等等",
+        fallback: "今天行情看不太清楚，我们就先按兵不动，钱稳稳放着最安心。等出现好机会我再出手，不急的～" };
+  }
+}
+
 export default function Dashboard() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [live, setLive] = useState<LiveQuote | null>(null);
@@ -167,6 +182,30 @@ export default function Dashboard() {
           <code className="mx-1 px-1 rounded bg-amber-100 font-mono text-xs">publish.py</code> 更新。
         </div>
       )}
+
+      {/* ══ 💌 给 Vivienne 的（大白话，无术语）══════════════════════════════ */}
+      <section className="rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50/40 p-5 shadow-sm">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-base">💌</span>
+          <span className="text-sm font-semibold text-rose-700">给 Vivienne 的</span>
+          <span className="ml-auto text-[10px] text-rose-300 font-mono">{snap.as_of?.slice(0, 10)}</span>
+        </div>
+        {(() => {
+          const v = vivienneAction(d?.action);
+          return (
+            <>
+              <div className="flex items-center gap-2.5 mb-2.5">
+                <span className="text-2xl leading-none">{v.emoji}</span>
+                <span className="text-lg font-bold text-gray-800">{v.line}</span>
+              </div>
+              <p className="text-[15px] leading-relaxed text-gray-700 whitespace-pre-line">
+                {d?.vivienne_note ?? v.fallback}
+              </p>
+              <div className="mt-3 text-[10px] text-rose-300">💕 这是 Vivienne 专属的解释卡，下面是给我看的技术细节</div>
+            </>
+          );
+        })()}
+      </section>
 
       {/* ══ 1. HERO：价格 + 行动 ══════════════════════════════════════════ */}
       <section className="bg-white rounded-2xl border border-[#EDEDF0] overflow-hidden shadow-sm">

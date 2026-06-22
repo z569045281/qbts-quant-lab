@@ -273,6 +273,7 @@ export interface Decision {
   invalidation:       string;
   invalidation_price?: number;   // QBTS level that kills the plan (machine-checkable)
   plan_valid?:        boolean;   // false = stop/target geometry was inconsistent
+  vivienne_note?:     string;    // plain-language, no-jargon note for a non-expert reader
 }
 
 /* ── /dashboard/calibration payload ──────────────────────────────────────── */
