@@ -249,15 +249,15 @@ export default function Dashboard() {
               </div>
               {/* 波动率 regime — 决定止损宽度/仓位档位 */}
               {snap.regime?.regime && (
-                <div className="text-[11px] text-[#525461] bg-[#F6F6F8] rounded-lg px-3 py-1.5 mb-3 leading-snug flex items-center gap-1.5">
-                  <span className={`px-1.5 py-0.5 rounded font-bold ${
+                <div className="text-[11px] text-[#525461] bg-[#F6F6F8] rounded-lg px-3 py-1.5 mb-3 leading-snug flex items-start gap-1.5">
+                  <span className={`shrink-0 px-1.5 py-0.5 rounded font-bold ${
                     snap.regime.regime === "expansion" ? "bg-amber-100 text-amber-700"
                     : snap.regime.regime === "contraction" ? "bg-blue-50 text-blue-600"
                     : "bg-gray-100 text-gray-500"}`}>
                     🌡️ 波动{snap.regime.regime === "expansion" ? "扩张" : snap.regime.regime === "contraction" ? "收缩" : "正常"}
                     {snap.regime.atr_pct_percentile != null && ` ${snap.regime.atr_pct_percentile.toFixed(0)}%位`}
                   </span>
-                  <span className="text-gray-500 truncate">{snap.regime.stop_hint}</span>
+                  <span className="text-gray-500">{snap.regime.stop_hint}</span>
                 </div>
               )}
               {/* HOLD has no single entry/stop/target — show the watch state
