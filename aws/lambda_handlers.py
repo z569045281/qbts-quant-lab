@@ -97,6 +97,17 @@ def _publish_decision_only() -> dict:
         sb.table("dashboard_state").insert(
             {"snapshot": clean(snap), "calibration": clean(cal)}
         ).execute()
+
+        # Watchlist scan (diversified buy-setup scan → 🔭 自选扫描 tab). Best-effort:
+        # a scan failure must never block the daily decision publish.
+        try:
+            from dashboard.scan import scan_watchlist
+            scan = scan_watchlist()
+            sb.table("watchlist_scan").upsert(
+                {"id": "current", "data": clean(scan)}
+            ).execute()
+        except Exception as e:
+            print(f"! watchlist scan skipped: {e}")
     finally:
         loop.close()
     return {"ok": True, "decision": summary}

@@ -114,6 +114,18 @@ def main() -> None:
             {"snapshot": clean(snap), "calibration": clean(cal)}
         ).execute()
 
+        # 4.5 Watchlist scan (diversified buy-setup scan, drives the 🔭 tab) --
+        try:
+            from dashboard.scan import scan_watchlist
+            print("→ scanning watchlist…")
+            scan = scan_watchlist()
+            sb.table("watchlist_scan").upsert(
+                {"id": "current", "data": clean(scan)}
+            ).execute()
+            print(f"  ✓ scanned {len(scan['results'])} tickers")
+        except Exception as e:
+            print(f"  ! watchlist scan skipped: {e}")
+
         # 5. Factors: metrics + code + chart ---------------------------------
         lb = get_leaderboard()                       # code/signal stripped, favorited added
         code_by_id = {e["id"]: e.get("code") for e in leaderboard}

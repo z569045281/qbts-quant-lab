@@ -421,3 +421,36 @@ export async function getFactors(): Promise<FactorRow[]> {
   if (error) throw new Error(error.message);
   return (data ?? []) as FactorRow[];
 }
+
+/* ── 🔭 自选扫描 (watchlist scan) ─────────────────────────────────────────── */
+export interface ScanResult {
+  ticker:        string;
+  theme:         string;
+  price?:        number;
+  today_change?: number;
+  vol_annual?:   number | null;
+  score:         number;        // 0-100 buy-setup proximity
+  points?:       number;
+  stance:        string;        // 买入区 / 接近买点 / 观望 / 偏空回避 / —
+  stance_emoji:  string;
+  trend?:        "bullish" | "bearish" | "neutral" | null;
+  regime?:       string | null;
+  rsi?:          number | null;
+  trigger?:      string;        // plain-language one-liner
+  levels?:       { buy_zone: string | null; target: string | null; stop_hint: string | null };
+  notes?:        string[];
+  error?:        string | null;
+}
+export interface WatchScan {
+  generated_at: string;
+  tickers:      string[];
+  results:      ScanResult[];
+}
+
+/** Latest watchlist scan (single 'current' row; null if not generated yet). */
+export async function getWatchScan(): Promise<WatchScan | null> {
+  const { data, error } = await supabase
+    .from("watchlist_scan").select("data").eq("id", "current").maybeSingle();
+  if (error || !data) return null;
+  return data.data as WatchScan;
+}

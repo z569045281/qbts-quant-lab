@@ -6,6 +6,7 @@ import { READONLY } from "../_lib/supabase";
 
 const tabs = [
   { href: "/",        label: "🎯 决策仪表盘", desc: "Today's verdict" },
+  { href: "/watch",   label: "🔭 自选扫描",   desc: "Watchlist scan"  },
   { href: "/factors", label: "🏆 因子排行榜", desc: "Mined factors"   },
   // The mining console only works against the local backend — hide it on the
   // read-only public deployment.

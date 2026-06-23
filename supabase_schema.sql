@@ -96,6 +96,26 @@ create table if not exists public.source_weights (
 );
 alter table public.source_weights enable row level security;
 
+-- ── watchlist_scan ───────────────────────────────────────────────────────────
+-- Single row (id='current') holding the daily multi-ticker buy-setup scan of the
+-- diversified watchlist (see backend/dashboard/scan.py). Written by the publish
+-- job with the secret key; READ by the anon frontend (the 🔭 自选扫描 tab), so it
+-- needs an anon SELECT policy (unlike predictions/source_weights which are
+-- backend-only). `data` = {generated_at, tickers, results:[...]}.
+create table if not exists public.watchlist_scan (
+  id         text primary key,
+  updated_at timestamptz not null default now(),
+  data       jsonb not null
+);
+
+alter table public.watchlist_scan enable row level security;
+
+drop policy if exists "anon read watchlist_scan" on public.watchlist_scan;
+create policy "anon read watchlist_scan"
+  on public.watchlist_scan for select
+  to anon, authenticated
+  using (true);
+
 -- ── live_quote ───────────────────────────────────────────────────────────────
 -- Single-row table (id=1) updated by quote_pusher.py every ~60s during US
 -- trading hours (incl. pre/post). The dashboard polls it for a live header.

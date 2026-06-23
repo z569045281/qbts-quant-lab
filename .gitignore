@@ -40,3 +40,4 @@ aws/samconfig.toml
 # one-off migrations (generated, contain local seed data)
 decision_journal_migration.sql
 calibration_migration.sql
+watchlist_migration.sql
