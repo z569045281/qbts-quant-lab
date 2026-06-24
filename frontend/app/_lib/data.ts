@@ -439,6 +439,12 @@ export interface ScanResult {
   trigger?:      string;        // plain-language one-liner
   levels?:       { buy_zone: string | null; target: string | null; stop_hint: string | null };
   exit_hint?:    { kind: "profit" | "risk" | "warn"; tag: string; text: string } | null;  // 如有持仓的轻量出场提示
+  lockup?:       {                                  // 解禁倒计时(事件叠加层,仅展示)
+    next_date?: string; days?: number; label?: string; approx?: boolean; big?: boolean;
+    note?: string | null; ipo_price?: number | null;
+    upcoming?: { date: string; label: string; days: number }[];
+    next?: null;
+  } | null;
   notes?:        string[];
   record?:       { n: number; correct: number; hit_rate: number | null } | null;  // this ticker's track record
   error?:        string | null;

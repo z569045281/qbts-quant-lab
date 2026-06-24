@@ -16,13 +16,18 @@ any given day some theme is usually moving:
 
 Each ticker → a compact card: a buy-setup score, a plain-language trigger, and the
 key levels to act on. Ranked best-setup-first.
+
+The one per-name exception is a small static *lockup-event overlay* (informational
+countdown for fresh IPOs like SPCX, dates from live research). It never feeds the
+buy-setup score — it's there precisely because the mechanical signals are blind to
+supply events. See CLAUDE.md "lead with WebSearch for stock topics".
 """
 
 from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime
+from datetime import date, datetime
 
 import numpy as np
 import pandas as pd
@@ -43,6 +48,49 @@ THEME = {
     # personal-interest adds
     "NVDA": "芯片", "SPCX": "SpaceX",
 }
+
+# ── Lockup-event overlay (informational only; does NOT feed the score) ────────────
+# Static, hand-verified IPO lockup schedules for event-driven fresh listings — the
+# mechanical scan cannot see supply unlocks, so we surface a countdown. Dates from
+# live research (WebSearch 2026-06-24); re-verify before trusting near a date.
+LOCKUPS: dict[str, dict] = {
+    "SPCX": {
+        "ipo_date": "2026-06-12", "ipo_price": 135.0,
+        "note": "IPO 价 $135 是关键参考线 · 马斯克+大股东锁定至 2027-06-13",
+        "events": [
+            {"date": "2026-08-01", "label": "首次大解禁 ≈20%（早期机构/VC，≈2倍流通盘）", "approx": True, "big": True},
+            {"date": "2026-08-21", "label": "解禁 7%（IPO+70天）"},
+            {"date": "2026-09-10", "label": "解禁 7%（IPO+90天）"},
+            {"date": "2026-09-25", "label": "解禁 7%（IPO+105天）"},
+            {"date": "2026-10-10", "label": "解禁 7%（IPO+120天）"},
+            {"date": "2026-10-25", "label": "解禁 7%（IPO+135天）"},
+            {"date": "2026-12-08", "label": "180天主锁定期到期", "big": True},
+            {"date": "2027-06-13", "label": "马斯克+大股东解禁（366天）", "big": True},
+        ],
+    },
+}
+
+
+def _lockup_info(ticker: str) -> dict | None:
+    """Next upcoming lockup unlock for `ticker` + a days-remaining countdown.
+    Returns None for names with no known schedule; informational only."""
+    spec = LOCKUPS.get(ticker)
+    if not spec:
+        return None
+    today = date.today()
+    upcoming = [
+        {**e, "days": (date.fromisoformat(e["date"]) - today).days}
+        for e in spec["events"] if date.fromisoformat(e["date"]) >= today
+    ]
+    if not upcoming:
+        return {"note": spec.get("note"), "next": None}
+    nxt = upcoming[0]
+    return {
+        "next_date": nxt["date"], "days": nxt["days"], "label": nxt["label"],
+        "approx": nxt.get("approx", False), "big": nxt.get("big", False),
+        "note": spec.get("note"), "ipo_price": spec.get("ipo_price"),
+        "upcoming": [{"date": u["date"], "label": u["label"], "days": u["days"]} for u in upcoming[:3]],
+    }
 
 
 def _fetch(ticker: str) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -103,7 +151,8 @@ def _exit_hint(close: float, target_num, sma20, sma50, buy_zone) -> dict | None:
 def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
     """Scan one ticker → (card, daily_df). Never raises; errors are captured.
     The daily df is returned so the caller can grade past calls without re-fetching."""
-    base = {"ticker": ticker, "theme": THEME.get(ticker, "其他")}
+    base = {"ticker": ticker, "theme": THEME.get(ticker, "其他"),
+            "lockup": _lockup_info(ticker)}
     df_d = None
     try:
         df_d, df_h = _fetch(ticker)

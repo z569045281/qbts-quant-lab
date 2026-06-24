@@ -97,6 +97,24 @@ function ScanCard({ r, editable, onRemove }: {
         </div>
       )}
 
+      {/* 解禁倒计时（事件叠加层 — 机械信号看不见的供给冲击）*/}
+      {r.lockup && typeof r.lockup.days === "number" && (
+        <div className={`mt-2 text-[11px] leading-relaxed rounded-lg px-2.5 py-1.5 border ${
+          r.lockup.big ? "bg-orange-50 text-orange-700 border-orange-200"
+          : "bg-amber-50/60 text-amber-700 border-amber-100"}`}
+          title={r.lockup.upcoming?.map(u => `${u.date}（${u.days}天）· ${u.label}`).join("\n")}>
+          <div className="flex items-start gap-1.5">
+            <span className="shrink-0">⏳</span>
+            <span>
+              <b>距下次解禁还有 {r.lockup.days} 天</b>
+              （{r.lockup.approx ? "约 " : ""}{r.lockup.next_date}）{r.lockup.big && " 🔴"}
+              <span className="block">{r.lockup.label}</span>
+              {r.lockup.note && <span className="block text-orange-600/70 mt-0.5">{r.lockup.note}</span>}
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="mt-2.5 flex flex-wrap gap-1.5 text-[10px]">
         {r.trend && (
           <span className={`px-1.5 py-0.5 rounded ${
