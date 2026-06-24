@@ -40,6 +40,8 @@ WATCHLIST = ["QBTS", "POET", "EOSE", "RUN", "LUNR", "MARA", "AG"]
 THEME = {
     "QBTS": "量子", "POET": "光电", "EOSE": "储能", "RUN": "太阳能",
     "LUNR": "航天", "MARA": "比特币", "AG": "白银",
+    # personal-interest adds
+    "NVDA": "芯片", "SPCX": "SpaceX",
 }
 
 
