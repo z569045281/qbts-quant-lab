@@ -438,6 +438,7 @@ export interface ScanResult {
   rsi?:          number | null;
   trigger?:      string;        // plain-language one-liner
   levels?:       { buy_zone: string | null; target: string | null; stop_hint: string | null };
+  exit_hint?:    { kind: "profit" | "risk" | "warn"; tag: string; text: string } | null;  // 如有持仓的轻量出场提示
   notes?:        string[];
   record?:       { n: number; correct: number; hit_rate: number | null } | null;  // this ticker's track record
   error?:        string | null;

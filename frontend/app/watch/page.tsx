@@ -86,6 +86,17 @@ function ScanCard({ r, editable, onRemove }: {
         </div>
       )}
 
+      {/* 出场提示（如有持仓）— 纯按今日价 vs 目标/均线判定，不追踪你的成本 */}
+      {r.exit_hint && (
+        <div className={`mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed rounded-lg px-2.5 py-1.5 ${
+          r.exit_hint.kind === "profit" ? "bg-blue-50 text-blue-700"
+          : r.exit_hint.kind === "risk" ? "bg-red-50 text-red-600"
+          : "bg-amber-50 text-amber-700"}`}>
+          <span className="font-semibold shrink-0">{r.exit_hint.tag}</span>
+          <span>{r.exit_hint.text}</span>
+        </div>
+      )}
+
       <div className="mt-2.5 flex flex-wrap gap-1.5 text-[10px]">
         {r.trend && (
           <span className={`px-1.5 py-0.5 rounded ${

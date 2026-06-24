@@ -71,6 +71,35 @@ def _money(x) -> str | None:
     return f"${x:.2f}" if isinstance(x, (int, float)) and pd.notna(x) else None
 
 
+def _exit_hint(close: float, target_num, sma20, sma50, buy_zone) -> dict | None:
+    """Lightweight, position-aware exit cue judged purely from *today's* price vs the
+    printed upside target and the 20/50-day moving averages. Stateless — we don't track
+    the user's entry — so it's framed as "如有持仓" and only fires on events that are
+    visible the day of the scan (at/near target, or already below an MA). Returns
+    {kind, tag, text} or None when a holder has nothing obvious to do (just hold)."""
+    # 止盈侧:接近或越过上方目标
+    if isinstance(target_num, (int, float)) and pd.notna(target_num) and target_num > 0:
+        if close >= target_num:
+            return {"kind": "profit", "tag": "🎯 已到目标",
+                    "text": f"已到/越过上方目标 {_money(target_num)} —— 如有持仓可分批止盈、落袋为安"}
+        if close >= target_num * 0.97:
+            return {"kind": "profit", "tag": "🎯 接近目标",
+                    "text": f"接近上方目标 {_money(target_num)} —— 如有持仓可考虑分批减"}
+    # 止损侧:失守均线 = 结构走弱(扫描当天即可判定)
+    if isinstance(sma50, (int, float)) and pd.notna(sma50) and close < sma50:
+        return {"kind": "risk", "tag": "⚠️ 跌破50日线",
+                "text": f"已失守 50 日线 {_money(sma50)} —— 中期结构走弱,如有持仓注意止损"}
+    if isinstance(sma20, (int, float)) and pd.notna(sma20) and close < sma20:
+        return {"kind": "risk", "tag": "⚠️ 跌破20日线",
+                "text": f"已失守 20 日线 {_money(sma20)} —— 短线转弱,如有持仓收紧止损"}
+    # 警戒侧:正贴着下方需求区上沿,跌破则走弱
+    edge = buy_zone.get("high") if isinstance(buy_zone, dict) else None
+    if isinstance(edge, (int, float)) and pd.notna(edge) and edge < close <= edge * 1.02:
+        return {"kind": "warn", "tag": "👀 测试支撑",
+                "text": f"正贴着支撑 {_money(edge)},跌破则走弱 —— 如有持仓收紧止损"}
+    return None
+
+
 def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
     """Scan one ticker → (card, daily_df). Never raises; errors are captured.
     The daily df is returned so the caller can grade past calls without re-fetching."""
@@ -165,6 +194,7 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
             "rsi": round(rsi, 0) if rsi is not None else None,
             "trigger": trig,
             "levels": {"buy_zone": bz, "target": _money(target), "stop_hint": reg.get("stop_hint")},
+            "exit_hint": _exit_hint(close, target, sma20, sma50, buy_zone),
             "notes": notes,
             "error": None,
         })
