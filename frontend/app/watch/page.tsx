@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   getWatchScan, postWatchAction, WATCH_EDITABLE,
-  type WatchScan, type ScanResult,
+  type WatchScan, type ScanResult, type PaperSim,
 } from "../_lib/data";
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -131,6 +131,89 @@ function ScanCard({ r, editable, onRemove }: {
   );
 }
 
+function money(n: number): string {
+  const s = n >= 0 ? "+" : "−";
+  return `${s}$${Math.abs(n).toFixed(2)}`;
+}
+function pctSigned(n: number): string {
+  return `${n >= 0 ? "+" : ""}${(n * 100).toFixed(1)}%`;
+}
+
+function PaperPanel({ p }: { p: PaperSim }) {
+  const t = p.totals;
+  const tone = (n: number) => (n > 0 ? "text-emerald-600" : n < 0 ? "text-[#F03A3E]" : "text-gray-500");
+  return (
+    <section className="rounded-2xl border border-[#E6E6EA] bg-white p-4 shadow-sm">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm">📊</span>
+        <span className="text-xs font-semibold text-gray-800">模拟战绩 · 每个买入信号投 ${p.trade_usd.toFixed(0)}</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-400">模拟 · 非真实交易</span>
+      </div>
+
+      {/* 总览 */}
+      <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+        <div className="bg-[#FAFAFC] rounded-xl px-2 py-2">
+          <div className="text-[10px] text-gray-400">总盈亏</div>
+          <div className={`text-lg font-bold font-mono ${tone(t.total)}`}>{money(t.total)}</div>
+        </div>
+        <div className="bg-[#FAFAFC] rounded-xl px-2 py-2">
+          <div className="text-[10px] text-gray-400">已平仓(落袋)</div>
+          <div className={`text-sm font-semibold font-mono ${tone(t.realized)}`}>{money(t.realized)}</div>
+        </div>
+        <div className="bg-[#FAFAFC] rounded-xl px-2 py-2">
+          <div className="text-[10px] text-gray-400">持仓浮动</div>
+          <div className={`text-sm font-semibold font-mono ${tone(t.unrealized)}`}>{money(t.unrealized)}</div>
+        </div>
+        <div className="bg-[#FAFAFC] rounded-xl px-2 py-2">
+          <div className="text-[10px] text-gray-400">平仓胜率</div>
+          <div className="text-sm font-semibold font-mono text-gray-700">
+            {t.win_rate != null ? `${(t.win_rate * 100).toFixed(0)}% (${t.n_win}/${t.n_closed})` : "—"}
+          </div>
+        </div>
+      </div>
+
+      {/* 当前持仓 */}
+      {p.open.length > 0 && (
+        <div className="mt-3">
+          <div className="text-[11px] text-gray-500 mb-1">当前持仓 {p.open.length} 笔</div>
+          <div className="space-y-1">
+            {p.open.map(o => (
+              <div key={o.ticker} className="flex items-center gap-2 text-[12px] bg-emerald-50/40 rounded-lg px-2.5 py-1.5">
+                <span className="font-bold text-gray-800 w-12">{o.ticker}</span>
+                <span className="text-gray-400 text-[11px]">{o.entry_date.slice(5)} 买 ${o.entry_price.toFixed(2)}</span>
+                <span className="text-gray-400 text-[11px]">→ ${o.current_price.toFixed(2)}</span>
+                <span className="text-gray-300 text-[10px]">{o.days}天</span>
+                <span className={`ml-auto font-mono font-semibold ${tone(o.pnl)}`}>{money(o.pnl)} ({pctSigned(o.pnl_pct)})</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 已平仓 */}
+      {p.closed.length > 0 && (
+        <div className="mt-3">
+          <div className="text-[11px] text-gray-500 mb-1">已平仓(最近 {p.closed.length} 笔)</div>
+          <div className="space-y-1">
+            {p.closed.map((c, i) => (
+              <div key={`${c.ticker}-${c.exit_date}-${i}`} className="flex items-center gap-2 text-[12px] bg-[#FAFAFC] rounded-lg px-2.5 py-1.5">
+                <span className="font-bold text-gray-800 w-12">{c.ticker}</span>
+                <span className="text-gray-400 text-[11px]">{c.entry_date.slice(5)}→{c.exit_date.slice(5)} · {c.days}天</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{c.reason}</span>
+                <span className={`ml-auto font-mono font-semibold ${tone(c.pnl)}`}>{money(c.pnl)} ({pctSigned(c.pnl_pct)})</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {p.open.length === 0 && p.closed.length === 0 && (
+        <p className="mt-3 text-[11px] text-gray-400">还没有触发任何买入信号 — 出现 🟢买入区 时会自动模拟买入 ${p.trade_usd.toFixed(0)}。</p>
+      )}
+    </section>
+  );
+}
+
 function RemoveBtn({ t, onRemove }: { t: string; onRemove: (t: string) => void }) {
   return (
     <button onClick={() => onRemove(t)} title={`从自选移除 ${t}`}
@@ -236,6 +319,9 @@ export default function WatchScanPage() {
           <p className="text-[13px] leading-relaxed text-gray-700 whitespace-pre-line">{scan.commentary}</p>
         </section>
       )}
+
+      {/* 📊 模拟战绩 */}
+      {scan?.paper && <PaperPanel p={scan.paper} />}
 
       {/* 状态 / 卡片 */}
       {loading ? (

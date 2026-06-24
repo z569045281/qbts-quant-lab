@@ -4,11 +4,13 @@ Storage for the watchlist scan (Supabase when creds present, local-file fallback
   watchlist     the editable list of tickers the scan covers (single row 'current')
   scan_journal  a track record — every day's per-ticker call, graded after N trading
                 days, so the scan is FALSIFIABLE ("when it says 买入区, does it work?")
+  scan_paper    a $1000-per-signal PAPER-TRADING ledger — buy on 买入区, hold until a
+                sell signal, record realized P&L, so we can show "would the signals
+                have made money?" in actual dollars.
 
-Both are single-row jsonb tables (small: ~7 tickers × ~60 days), mirroring the
-journal/calibration pattern so they survive stateless cloud (Lambda /tmp) runs.
-Backend-only — never read by the anon frontend (the scan payload carries the
-summary the UI needs).
+All single-row jsonb tables (small), mirroring the journal/calibration pattern so
+they survive stateless cloud (Lambda /tmp) runs. Backend-only — never read by the
+anon frontend (the scan payload carries the summary the UI needs).
 """
 
 from __future__ import annotations
@@ -27,11 +29,15 @@ _DIR = Path(__file__).parent.parent / "data" / "cache"
 _DIR.mkdir(parents=True, exist_ok=True)
 _WATCH_FILE    = _DIR / "watchlist.json"
 _JOURNAL_FILE  = _DIR / "scan_journal.json"
+_PAPER_FILE    = _DIR / "scan_paper.json"
 
 _WATCH_TABLE   = "watchlist"
 _JOURNAL_TABLE = "scan_journal"
+_PAPER_TABLE   = "scan_paper"
 _GRADE_AFTER   = 5      # grade a scan call after this many trading days
 _MAX_RECORDS   = 800    # cap journal size (rolling)
+_TRADE_USD     = 1000.0 # paper-trade size per buy signal
+_MAX_CLOSED    = 200    # cap closed-trade ledger (rolling)
 
 _SB = None
 _SB_INIT = False
@@ -195,6 +201,105 @@ def grade_and_record(results: list[dict], dfs: dict[str, pd.DataFrame]) -> None:
             "result": None,
         })
     _save_journal(recs)
+
+
+# ── paper-trading sim ($1000 per buy signal → does the scan make money?) ─────────
+def _load_paper() -> dict:
+    row = _load_row(_PAPER_TABLE, _PAPER_FILE)
+    return {"positions": (row or {}).get("positions", {}),
+            "closed":    (row or {}).get("closed", [])}
+
+
+def _save_paper(state: dict) -> None:
+    _save_row(_PAPER_TABLE, _PAPER_FILE, {
+        "positions": state.get("positions", {}),
+        "closed":    state.get("closed", [])[-_MAX_CLOSED:],
+    })
+
+
+def _bdays(d0: str, d1: str) -> int:
+    try:
+        return max(int(pd.bdate_range(d0, d1).size) - 1, 0)
+    except Exception:
+        return 0
+
+
+def run_paper_trades(results: list[dict]) -> dict:
+    """$1000 paper trade per buy signal, held until a sell signal; records realized P&L.
+
+      Buy  = stance 买入区 (and not already holding).
+      Sell = 偏空回避(转空) | exit_hint profit(到目标止盈) | exit_hint risk(跌破均线止损).
+
+    One position per ticker at a time; entry/exit at the scan-day close. Persists the
+    ledger to scan_paper and returns a display summary with live unrealized P&L."""
+    state = _load_paper()
+    positions: dict = state["positions"]
+    closed: list = state["closed"]
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    for r in results:
+        if r.get("error"):
+            continue
+        t, price = r.get("ticker"), r.get("price")
+        if not t or not isinstance(price, (int, float)) or price <= 0:
+            continue
+        stance = r.get("stance")
+        kind = (r.get("exit_hint") or {}).get("kind")
+
+        if t in positions:                                   # holding → maybe exit
+            pos = positions[t]
+            if pos.get("entry_date") == today:               # just entered; no same-day flip
+                continue
+            reason = ("转空"         if stance == "偏空回避"
+                      else "到目标止盈"  if kind == "profit"
+                      else "跌破均线止损" if kind == "risk"
+                      else None)
+            if reason:
+                positions.pop(t)
+                pnl = pos["shares"] * price - pos["cost"]
+                closed.append({
+                    "ticker": t, "theme": r.get("theme"),
+                    "entry_date": pos["entry_date"], "entry_price": pos["entry_price"],
+                    "exit_date": today, "exit_price": round(price, 2),
+                    "shares": pos["shares"], "cost": pos["cost"],
+                    "pnl": round(pnl, 2), "pnl_pct": round(pnl / pos["cost"], 4),
+                    "reason": reason, "days": _bdays(pos["entry_date"], today),
+                })
+        elif stance == "买入区":                              # flat → enter
+            positions[t] = {"entry_date": today, "entry_price": round(price, 2),
+                            "shares": round(_TRADE_USD / price, 4), "cost": _TRADE_USD}
+
+    _save_paper({"positions": positions, "closed": closed})
+
+    # ── display summary with live unrealized P&L (today's prices) ──
+    px = {r["ticker"]: r.get("price") for r in results if not r.get("error")}
+    open_rows, unreal = [], 0.0
+    for t, pos in positions.items():
+        cur = px.get(t) or pos["entry_price"]
+        u = pos["shares"] * cur - pos["cost"]
+        unreal += u
+        open_rows.append({
+            "ticker": t, "theme": next((r.get("theme") for r in results if r.get("ticker") == t), None),
+            "entry_date": pos["entry_date"], "entry_price": pos["entry_price"],
+            "current_price": round(cur, 2), "pnl": round(u, 2),
+            "pnl_pct": round(u / pos["cost"], 4), "days": _bdays(pos["entry_date"], today),
+        })
+    open_rows.sort(key=lambda x: -x["pnl"])
+    realized = sum(c["pnl"] for c in closed)
+    n_win = sum(1 for c in closed if c["pnl"] > 0)
+    return {
+        "trade_usd": _TRADE_USD,
+        "open": open_rows,
+        "closed": list(reversed(closed))[:30],          # newest first
+        "totals": {
+            "realized": round(realized, 2), "unrealized": round(unreal, 2),
+            "total": round(realized + unreal, 2),
+            "n_open": len(open_rows),
+            "invested_open": round(sum(p["cost"] for p in positions.values()), 2),
+            "n_closed": len(closed), "n_win": n_win,
+            "win_rate": round(n_win / len(closed), 3) if closed else None,
+        },
+    }
 
 
 def publish_scan() -> dict:

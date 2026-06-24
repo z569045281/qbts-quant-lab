@@ -449,11 +449,32 @@ export interface ScanResult {
   record?:       { n: number; correct: number; hit_rate: number | null } | null;  // this ticker's track record
   error?:        string | null;
 }
+export interface PaperOpen {
+  ticker: string; theme?: string | null;
+  entry_date: string; entry_price: number; current_price: number;
+  pnl: number; pnl_pct: number; days: number;
+}
+export interface PaperClosed {
+  ticker: string; theme?: string | null;
+  entry_date: string; entry_price: number; exit_date: string; exit_price: number;
+  pnl: number; pnl_pct: number; reason: string; days: number;
+}
+export interface PaperSim {
+  trade_usd: number;
+  open: PaperOpen[];
+  closed: PaperClosed[];
+  totals: {
+    realized: number; unrealized: number; total: number;
+    n_open: number; invested_open: number;
+    n_closed: number; n_win: number; win_rate: number | null;
+  };
+}
 export interface WatchScan {
   generated_at:    string;
   tickers:         string[];
   results:         ScanResult[];
   record_overall?: { n: number; correct: number; hit_rate: number | null };
+  paper?:          PaperSim | null;
   commentary?:     string;
 }
 

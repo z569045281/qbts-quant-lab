@@ -313,11 +313,19 @@ def scan_watchlist(tickers: list[str] | None = None) -> dict:
     except Exception as e:
         logger.warning(f"scan track-record failed: {e}")
 
+    # paper trades: $1000 per buy signal, held to a sell signal → realized/unrealized P&L
+    paper = None
+    try:
+        paper = store.run_paper_trades(results)
+    except Exception as e:
+        logger.warning(f"scan paper-trades failed: {e}")
+
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "tickers": tickers,
         "results": results,
         "record_overall": overall,
+        "paper": paper,
         "commentary": _commentary(results),
     }
 

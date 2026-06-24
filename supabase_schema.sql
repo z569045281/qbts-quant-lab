@@ -148,6 +148,15 @@ create table if not exists public.scan_journal (
 );
 alter table public.scan_journal enable row level security;
 
+-- scan_paper: single row 'current', data={positions:{...}, closed:[...]} — a
+-- $1000-per-buy-signal paper-trading ledger (backend/dashboard/scan_store.py),
+-- held until a sell signal so we can show realized P&L. Backend-only (secret key);
+-- the anon frontend gets the summary from the watchlist_scan payload.
+create table if not exists public.scan_paper (
+  id text primary key, updated_at timestamptz not null default now(), data jsonb not null
+);
+alter table public.scan_paper enable row level security;
+
 -- ── dca_state (📥 定投专区) ───────────────────────────────────────────────────
 -- Single row 'current' holding the DCA seasonality read for the broad ETFs
 -- (backend/dashboard/dca.py). Written by the publish job (secret key), READ by the

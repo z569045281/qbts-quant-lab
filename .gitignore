@@ -44,3 +44,4 @@ watchlist_migration.sql
 finra_short_migration.sql
 scan_v11_migration.sql
 dca_migration.sql
+scan_paper_migration.sql
