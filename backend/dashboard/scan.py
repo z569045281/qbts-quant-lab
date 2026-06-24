@@ -47,6 +47,8 @@ THEME = {
     "LUNR": "航天", "MARA": "比特币", "AG": "白银",
     # personal-interest adds
     "NVDA": "芯片", "SPCX": "SpaceX",
+    # diversifying drivers (low corr to basket, verified 2026-06-24)
+    "MP": "稀土", "SYM": "机器人",
 }
 
 # ── Lockup-event overlay (informational only; does NOT feed the score) ────────────

@@ -15,6 +15,8 @@ Format (newest at top):
 
 <!-- add yours above this line -->
 
+- [done] 2026-06-24 · scan-add-mp-sym · 自选扫描新增 MP(稀土)+ SYM(机器人): 联网核实后选的两个低相关(0.45/0.41)高波动新驱动,补地缘/实体AI两条线;THEME 标签 + 加入 Supabase watchlist + 重扫(现 11 只) · files: backend/dashboard/scan.py(THEME) · 注: watchlist 存 Supabase,云端需 push 重部署才有 THEME 标签
+
 - [done] 2026-06-24 · scan-lockup · SPCX 卡片加「下次解禁倒计时」: 静态解禁事件叠加层(LOCKUPS dict,日期来自联网核实),只展示不参与打分——补机械扫描看不见供给冲击的盲区;首次大解禁≈8/1(20%≈2倍流通盘) · files: backend/dashboard/scan.py, frontend/app/watch/page.tsx, frontend/app/_lib/data.ts
 
 - [done] 2026-06-24 · scan-exit-hint · 自选扫描卡片加「轻量出场提示」(如有持仓): 按今日价 vs 上方目标/20·50日均线判定 → 🎯接近/已到目标(止盈) / ⚠️跌破均线(止损) / 👀测试支撑;无状态、不追踪成本 · files: backend/dashboard/scan.py, frontend/app/watch/page.tsx, frontend/app/_lib/data.ts
