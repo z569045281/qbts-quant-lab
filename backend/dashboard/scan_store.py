@@ -37,6 +37,7 @@ _PAPER_TABLE   = "scan_paper"
 _GRADE_AFTER   = 5      # grade a scan call after this many trading days
 _MAX_RECORDS   = 800    # cap journal size (rolling)
 _TRADE_USD     = 1000.0 # paper-trade size per buy signal
+_COST_PER_SIDE = 0.002  # ~0.2%/side (spread+commission) on these high-vol names
 _MAX_CLOSED    = 200    # cap closed-trade ledger (rolling)
 
 _SB = None
@@ -227,11 +228,12 @@ def _bdays(d0: str, d1: str) -> int:
 def run_paper_trades(results: list[dict]) -> dict:
     """$1000 paper trade per buy signal, held until a sell signal; records realized P&L.
 
-      Buy  = stance 买入区 (and not already holding).
+      Buy  = stance 买入区 (and not already holding, and not thin-data noise).
       Sell = 偏空回避(转空) | exit_hint profit(到目标止盈) | exit_hint risk(跌破均线止损).
 
-    One position per ticker at a time; entry/exit at the scan-day close. Persists the
-    ledger to scan_paper and returns a display summary with live unrealized P&L."""
+    One position per ticker at a time; entry/exit at the scan-day close with ~0.2%/side
+    cost so the P&L isn't fantasy. Persists the ledger to scan_paper and returns a
+    display summary with live unrealized P&L."""
     state = _load_paper()
     positions: dict = state["positions"]
     closed: list = state["closed"]
@@ -256,7 +258,8 @@ def run_paper_trades(results: list[dict]) -> dict:
                       else None)
             if reason:
                 positions.pop(t)
-                pnl = pos["shares"] * price - pos["cost"]
+                proceeds = pos["shares"] * price * (1 - _COST_PER_SIDE)   # sell-side cost
+                pnl = proceeds - pos["cost"]
                 closed.append({
                     "ticker": t, "theme": r.get("theme"),
                     "entry_date": pos["entry_date"], "entry_price": pos["entry_price"],
@@ -265,9 +268,10 @@ def run_paper_trades(results: list[dict]) -> dict:
                     "pnl": round(pnl, 2), "pnl_pct": round(pnl / pos["cost"], 4),
                     "reason": reason, "days": _bdays(pos["entry_date"], today),
                 })
-        elif stance == "买入区":                              # flat → enter
+        elif stance == "买入区" and not r.get("thin_data"):   # flat → enter (skip noise)
+            shares = _TRADE_USD * (1 - _COST_PER_SIDE) / price   # buy-side cost baked in
             positions[t] = {"entry_date": today, "entry_price": round(price, 2),
-                            "shares": round(_TRADE_USD / price, 4), "cost": _TRADE_USD}
+                            "shares": round(shares, 4), "cost": _TRADE_USD}
 
     _save_paper({"positions": positions, "closed": closed})
 

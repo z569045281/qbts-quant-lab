@@ -60,6 +60,13 @@ function ScanCard({ r, editable, onRemove }: {
         </span>
       </div>
 
+      {/* 数据不足警告（新 IPO 等，技术信号不可靠）*/}
+      {r.thin_data && (
+        <div className="mt-2 text-[11px] leading-relaxed rounded-lg px-2.5 py-1.5 bg-red-50 text-red-600 border border-red-100">
+          ⚠️ 仅 {r.bars ?? "<60"} 天历史 —— 技术信号是噪声、不可靠,已排除出模拟交易
+        </div>
+      )}
+
       {/* 评分条 + 历史命中 */}
       <div className="flex items-center gap-2 mt-2.5">
         <span className="text-[10px] text-gray-400 w-12">买点分</span>
@@ -112,6 +119,15 @@ function ScanCard({ r, editable, onRemove }: {
               {r.lockup.note && <span className="block text-orange-600/70 mt-0.5">{r.lockup.note}</span>}
             </span>
           </div>
+        </div>
+      )}
+
+      {/* 财报倒计时（机械信号看不见的跳空风险）*/}
+      {r.earnings && (
+        <div className={`mt-2 text-[11px] leading-relaxed rounded-lg px-2.5 py-1.5 border ${
+          r.earnings.soon ? "bg-purple-50 text-purple-700 border-purple-200"
+          : "bg-gray-50 text-gray-500 border-gray-100"}`}>
+          📅 财报 <b>{r.earnings.days} 天后</b>（{r.earnings.date}）{r.earnings.soon && " 🔴 临近,持仓注意跳空风险"}
         </div>
       )}
 
@@ -308,6 +324,45 @@ export default function WatchScanPage() {
           </div>
         )}
       </section>
+
+      {/* ⚠️ P0 信号未验证门 — 已评判样本不足时,警告勿据此加仓 */}
+      {scan && (ov?.n ?? 0) < 30 && (
+        <section className="rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
+          <p className="text-[13px] leading-relaxed text-amber-800">
+            ⚠️ <b>信号仍在验证期</b>:迄今只评判了 <b>{ov?.n ?? 0}/30</b> 笔方向判断,样本太小、
+            还<b>无法证明这套信号能赚钱</b>。请把它当观察工具,<b>不要据此加仓或重仓</b>——
+            等已评判 ≥30 笔且胜率/模拟收益稳定为正,再谈放大。
+          </p>
+        </section>
+      )}
+
+      {/* 🌐 大盘环境（机械信号看不见的大盘风向）*/}
+      {scan?.market && (
+        <section className={`rounded-2xl border p-3.5 shadow-sm ${
+          scan.market.regime === "risk_on" ? "border-emerald-200 bg-emerald-50/50"
+          : scan.market.regime === "risk_off" ? "border-red-200 bg-red-50/50"
+          : "border-amber-200 bg-amber-50/40"}`}>
+          <div className="flex items-center gap-2 flex-wrap text-[13px]">
+            <span>🌐</span>
+            <span className="font-semibold text-gray-800">
+              {scan.market.regime === "risk_on" ? "大盘顺风" : scan.market.regime === "risk_off" ? "大盘逆风" : "大盘中性"}
+            </span>
+            <span className="text-[11px] font-mono text-gray-500">
+              VIX {scan.market.vix} · SPY {(scan.market.spy_vs_50dma * 100).toFixed(1)}% · QQQ {(scan.market.qqq_vs_50dma * 100).toFixed(1)}% vs 50日线
+            </span>
+          </div>
+          <p className="mt-1 text-[12px] leading-relaxed text-gray-600">{scan.market.note}</p>
+        </section>
+      )}
+
+      {/* 🧺 多买入信号的组合相关性提醒 */}
+      {scan?.concurrent_buys?.note && (
+        <section className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-3.5 shadow-sm">
+          <p className="text-[12px] leading-relaxed text-indigo-800">
+            🧺 <b>组合提醒</b>:{scan.concurrent_buys.note}
+          </p>
+        </section>
+      )}
 
       {/* 📣 今日看点（AI 大白话点评）*/}
       {scan?.commentary && (

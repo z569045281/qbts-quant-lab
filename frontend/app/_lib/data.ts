@@ -431,6 +431,9 @@ export interface ScanResult {
   vol_annual?:   number | null;
   score:         number;        // 0-100 buy-setup proximity
   points?:       number;
+  bars?:         number;        // daily bars available
+  thin_data?:    boolean;       // <60 bars → technicals unreliable (e.g. fresh IPO)
+  earnings?:     { date: string; days: number; soon: boolean } | null;  // 财报跳空风险
   stance:        string;        // 买入区 / 接近买点 / 观望 / 偏空回避 / —
   stance_emoji:  string;
   trend?:        "bullish" | "bearish" | "neutral" | null;
@@ -469,12 +472,21 @@ export interface PaperSim {
     n_closed: number; n_win: number; win_rate: number | null;
   };
 }
+export interface MarketContext {
+  regime: "risk_on" | "caution" | "risk_off";
+  note: string; vix: number; spy_vs_50dma: number; qqq_vs_50dma: number;
+}
+export interface ConcurrentBuys {
+  tickers: string[]; avg_corr: number | null; note: string | null;
+}
 export interface WatchScan {
   generated_at:    string;
   tickers:         string[];
   results:         ScanResult[];
   record_overall?: { n: number; correct: number; hit_rate: number | null };
   paper?:          PaperSim | null;
+  market?:         MarketContext | null;
+  concurrent_buys?: ConcurrentBuys | null;
   commentary?:     string;
 }
 

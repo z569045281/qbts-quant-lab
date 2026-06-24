@@ -15,6 +15,8 @@ Format (newest at top):
 
 <!-- add yours above this line -->
 
+- [done] 2026-06-24 · scan-hardening · 体检后修 P0/P1/P2: 数据不足守卫(<60天 thin_data,排除出纸面交易)、纸面交易扣0.2%/边成本、财报日历叠加(yfinance calendar,每卡倒计时)、大盘环境过滤(SPY/QQQ/VIX risk-on/off banner)、信号未验证门(已评判<30笔警告勿加仓)、组合相关性提醒(多买入信号合计相关性) · files: backend/dashboard/scan.py, backend/dashboard/scan_store.py, frontend/app/watch/page.tsx, frontend/app/_lib/data.ts
+
 - [done] 2026-06-24 · scan-paper · 自选扫描加「模拟战绩」: 每个买入区信号模拟买入 $1000,持有到卖出信号(转空/到目标/跌破均线)平仓,记录已实现+浮动盈亏、胜率,前端面板展示 · 账本存 scan_paper 表(后端写,摘要随 watchlist_scan 给前端) · files: backend/dashboard/scan_store.py, backend/dashboard/scan.py, frontend/app/watch/page.tsx, frontend/app/_lib/data.ts, supabase_schema.sql · 待用户跑 scan_paper_migration.sql
 
 - [done] 2026-06-24 · scan-add-mp-sym · 自选扫描新增 MP(稀土)+ SYM(机器人): 联网核实后选的两个低相关(0.45/0.41)高波动新驱动,补地缘/实体AI两条线;THEME 标签 + 加入 Supabase watchlist + 重扫(现 11 只) · files: backend/dashboard/scan.py(THEME) · 注: watchlist 存 Supabase,云端需 push 重部署才有 THEME 标签

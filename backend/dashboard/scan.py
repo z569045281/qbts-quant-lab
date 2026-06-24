@@ -95,6 +95,63 @@ def _lockup_info(ticker: str) -> dict | None:
     }
 
 
+_MIN_BARS = 60   # below this many daily bars, technicals are noise (e.g. fresh IPO)
+
+
+def _earnings_info(ticker: str) -> dict | None:
+    """Next earnings date + countdown, best-effort from yfinance. Earnings = gap risk
+    the mechanical signals can't see. None when unknown / >120 days out / already past."""
+    try:
+        cal = yf.Ticker(ticker).calendar
+    except Exception:
+        return None
+    ed = None
+    try:
+        if isinstance(cal, dict):
+            v = cal.get("Earnings Date")
+            ed = v[0] if isinstance(v, (list, tuple)) and v else v
+        elif cal is not None and hasattr(cal, "loc"):
+            ed = cal.loc["Earnings Date"][0]
+    except Exception:
+        ed = None
+    if ed is None:
+        return None
+    try:
+        d = pd.Timestamp(ed).date()
+    except Exception:
+        return None
+    days = (d - date.today()).days
+    if days < 0 or days > 120:
+        return None
+    return {"date": d.isoformat(), "days": days, "soon": days <= 14}
+
+
+def _market_context() -> dict | None:
+    """Risk-on/off gate from SPY/QQQ vs their 50-day MA + VIX, computed once per scan.
+    The per-name scan is otherwise blind to the broad tape — a buy signal in a market-
+    wide selloff is not the same as one in an uptrend."""
+    try:
+        px = yf.download(["SPY", "QQQ", "^VIX"], period="6mo", interval="1d",
+                         auto_adjust=True, progress=False)["Close"]
+        def vs50(sym: str) -> float:
+            s = px[sym].dropna()
+            return round(float(s.iloc[-1] / s.rolling(50).mean().iloc[-1] - 1), 4)
+        spy, qqq = vs50("SPY"), vs50("QQQ")
+        vix = float(px["^VIX"].dropna().iloc[-1])
+        ups = (spy >= 0) + (qqq >= 0)
+        if ups == 2 and vix < 20:
+            regime, note = "risk_on", "大盘在 50 日线上方、VIX 偏低 —— 顺风,买入信号更可信。"
+        elif ups == 0 or vix >= 28:
+            regime, note = "risk_off", "大盘走弱 / VIX 偏高 —— 逆风,买入信号打折扣,宁可空仓等。"
+        else:
+            regime, note = "caution", "大盘中性偏震荡 —— 买入信号谨慎对待、小仓位为宜。"
+        return {"regime": regime, "note": note, "vix": round(vix, 1),
+                "spy_vs_50dma": spy, "qqq_vs_50dma": qqq}
+    except Exception as e:
+        logger.warning(f"market context failed: {e}")
+        return None
+
+
 def _fetch(ticker: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Light fetch: ~1y daily + ~60d hourly, cleaned to the same lowercase OHLCV
     format the signal modules expect. Single yf.download per resolution (no 730-day
@@ -154,10 +211,11 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
     """Scan one ticker → (card, daily_df). Never raises; errors are captured.
     The daily df is returned so the caller can grade past calls without re-fetching."""
     base = {"ticker": ticker, "theme": THEME.get(ticker, "其他"),
-            "lockup": _lockup_info(ticker)}
+            "lockup": _lockup_info(ticker), "earnings": _earnings_info(ticker)}
     df_d = None
     try:
         df_d, df_h = _fetch(ticker)
+        n_bars = len(df_d)
         close = float(df_d["close"].iloc[-1])
         prev = float(df_d["close"].iloc[-2])
         today_change = (close / prev - 1) if prev > 0 else 0.0
@@ -235,10 +293,18 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
         if vp.get("action_hint"):
             notes.append(vp["action_hint"][:60])
 
+        thin = n_bars < _MIN_BARS
+        if thin:
+            notes.insert(0, f"⚠️ 仅 {n_bars} 天历史,技术信号不可靠(已排除出模拟交易)")
+        # extreme single-day move = possible bad/stale data
+        if abs(today_change) > 0.5:
+            notes.insert(0, f"⚠️ 单日 {today_change*100:+.0f}% 异常,核对数据")
+
         base.update({
             "price": round(close, 2),
             "today_change": round(today_change, 4),
             "vol_annual": round(vol_annual, 3) if vol_annual is not None else None,
+            "bars": n_bars, "thin_data": thin,
             "score": score, "points": pts,
             "stance": stance, "stance_emoji": emoji,
             "trend": trend, "regime": reg.get("regime"),
@@ -320,12 +386,38 @@ def scan_watchlist(tickers: list[str] | None = None) -> dict:
     except Exception as e:
         logger.warning(f"scan paper-trades failed: {e}")
 
+    # broad-tape context (the per-name scan is otherwise blind to it)
+    market = _market_context()
+
+    # portfolio-level risk: if >1 clean buy signal, how correlated are they?
+    concurrent = None
+    buys = [r["ticker"] for r in results if r.get("stance") == "买入区" and not r.get("thin_data")]
+    if len(buys) >= 2:
+        try:
+            import itertools
+            rmat = pd.DataFrame({t: dfs[t]["close"].pct_change()
+                                 for t in buys if t in dfs}).dropna().tail(120)
+            cm = rmat.corr()
+            pairs = [cm.loc[a, b] for a, b in itertools.combinations(rmat.columns, 2)]
+            avg = round(float(np.mean(pairs)), 2) if pairs else None
+            if avg is not None and avg >= 0.6:
+                note = f"今天 {len(buys)} 个买入信号彼此相关性高({avg})——同涨同跌,全买≈加杠杆,控制总仓位、别等额铺开。"
+            elif avg is not None:
+                note = f"今天 {len(buys)} 个买入信号相关性 {avg},分散尚可,但合计仓位仍要设上限。"
+            else:
+                note = None
+            concurrent = {"tickers": buys, "avg_corr": avg, "note": note}
+        except Exception as e:
+            logger.warning(f"concurrent-buys corr failed: {e}")
+
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "tickers": tickers,
         "results": results,
         "record_overall": overall,
         "paper": paper,
+        "market": market,
+        "concurrent_buys": concurrent,
         "commentary": _commentary(results),
     }
 
