@@ -77,6 +77,15 @@ def main() -> None:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
+        # 0. Refresh FINRA short cache (Supabase-backed, survives cloud cold
+        # starts) BEFORE the snapshot, so the squeeze's short component has data.
+        try:
+            from data.altdata import sync_short_volume
+            print("→ syncing FINRA short volume…")
+            sync_short_volume(sb)
+        except Exception as e:
+            print(f"  ! FINRA short sync skipped: {e}")
+
         # 1. Dashboard snapshot (force a fresh compute) ----------------------
         print("→ computing dashboard snapshot…")
         snap = loop.run_until_complete(dashboard_snapshot(force_refresh=True))

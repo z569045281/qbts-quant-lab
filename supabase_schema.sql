@@ -116,6 +116,22 @@ create policy "anon read watchlist_scan"
   to anon, authenticated
   using (true);
 
+-- ── finra_short ──────────────────────────────────────────────────────────────
+-- Single row (id='current') holding the FINRA daily short-volume cache (was the
+-- local-only data/cache/finra_short_qbts.parquet). Persisted so the squeeze
+-- "short" component survives stateless cloud (Lambda) runs — /tmp is wiped each
+-- cold start and the cache was only ever refreshed in the local mining path, so
+-- without this the cloud shows "短仓数据缺失". Backend-only: restored/refreshed/
+-- pushed with the secret key by the publish job; NOT exposed to the anon frontend.
+-- `data` = [{date, short_vol, total_vol, short_ratio}, ...].
+create table if not exists public.finra_short (
+  id         text primary key,
+  updated_at timestamptz not null default now(),
+  data       jsonb not null
+);
+alter table public.finra_short enable row level security;
+-- No anon policy: only the secret-key backend touches this table.
+
 -- ── live_quote ───────────────────────────────────────────────────────────────
 -- Single-row table (id=1) updated by quote_pusher.py every ~60s during US
 -- trading hours (incl. pre/post). The dashboard polls it for a live header.

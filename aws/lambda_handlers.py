@@ -68,6 +68,14 @@ def _publish_decision_only() -> dict:
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
+        # Refresh FINRA short cache (Supabase-backed, survives cold starts) BEFORE
+        # the snapshot, so the squeeze's short component has data on cloud runs.
+        try:
+            from data.altdata import sync_short_volume
+            sync_short_volume(sb)
+        except Exception as e:
+            print(f"! FINRA short sync skipped: {e}")
+
         snap = loop.run_until_complete(dashboard_snapshot(force_refresh=True))
 
         summary = None

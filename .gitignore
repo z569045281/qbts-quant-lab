@@ -41,3 +41,4 @@ aws/samconfig.toml
 decision_journal_migration.sql
 calibration_migration.sql
 watchlist_migration.sql
+finra_short_migration.sql

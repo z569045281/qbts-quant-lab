@@ -318,6 +318,65 @@ def refresh_short_volume() -> int:
     return len(df)
 
 
+# ── Supabase persistence (so the FINRA cache survives stateless cloud runs) ───
+# Lambda's /tmp is wiped on every cold start, and the cache is only ever
+# network-refreshed in the local mining path — so without this the cloud has NO
+# FINRA data and the squeeze's short component shows "短仓数据缺失". We mirror the
+# journal/calibration pattern: keep the cache in a `finra_short` table, restore it
+# at publish, refresh only the missing recent days, push the result back.
+
+def short_cache_records() -> list[dict]:
+    """Dump the FINRA short cache to JSON-safe records for Supabase."""
+    df = _read_short_cache()
+    if df.empty:
+        return []
+    out = df.copy()
+    out.index = pd.DatetimeIndex(out.index).strftime("%Y-%m-%d")
+    out = out.reset_index()
+    out.columns = ["date"] + list(out.columns[1:])
+    return [{"date": str(r["date"]),
+             "short_vol":   float(r.get("short_vol", 0) or 0),
+             "total_vol":   float(r.get("total_vol", 0) or 0),
+             "short_ratio": float(r.get("short_ratio", 0) or 0)}
+            for r in out.to_dict("records")]
+
+
+def seed_short_cache(records: list[dict]) -> None:
+    """Restore the cache file from Supabase records IF there's no local cache yet
+    (e.g. a fresh Lambda /tmp). Never clobbers an existing/fresher local cache."""
+    if not records or _SHORT_CACHE.exists():
+        return
+    try:
+        df = pd.DataFrame(records)
+        df["datetime"] = pd.DatetimeIndex(df["date"]).normalize()
+        df = df.drop(columns=["date"]).set_index("datetime").sort_index()
+        _SHORT_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        df.to_parquet(_SHORT_CACHE)
+    except Exception as e:
+        logger.warning(f"seed_short_cache failed: {e}")
+
+
+def sync_short_volume(sb, n_days: int = 150) -> int:
+    """Cloud-safe FINRA refresh: restore cache from Supabase → incrementally fetch
+    only the missing recent days → push the result back. `sb` is a Supabase client
+    (passed in so this module stays supabase-free). Returns total cached rows."""
+    table = "finra_short"
+    try:
+        rows = sb.table(table).select("data").eq("id", "current").execute().data
+        if rows and rows[0].get("data"):
+            seed_short_cache(rows[0]["data"])
+    except Exception as e:
+        logger.warning(f"finra restore from supabase failed: {e}")
+    # force_refresh bypasses the 12h TTL (the seeded file looks fresh) but the
+    # to_fetch logic still only grabs dates not already cached → incremental.
+    df = fetch_short_volume(allow_network=True, force_refresh=True, n_days=n_days)
+    try:
+        sb.table(table).upsert({"id": "current", "data": short_cache_records()}).execute()
+    except Exception as e:
+        logger.warning(f"finra push to supabase failed: {e}")
+    return len(df)
+
+
 def add_short_interest_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Adds:
