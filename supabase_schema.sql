@@ -132,6 +132,22 @@ create table if not exists public.finra_short (
 alter table public.finra_short enable row level security;
 -- No anon policy: only the secret-key backend touches this table.
 
+-- ── watchlist + scan_journal (🔭 自选扫描 v1.1) ───────────────────────────────
+-- watchlist:     single row 'current', data={tickers:[...]} — the editable list the
+--                scan covers. scan_journal: single row 'current', data={records:[...]}
+--                — every day's per-ticker call, graded after 5 trading days so the
+--                scan is falsifiable. Both backend-only (secret key); the anon
+--                frontend gets what it needs from the watchlist_scan payload.
+create table if not exists public.watchlist (
+  id text primary key, updated_at timestamptz not null default now(), data jsonb not null
+);
+alter table public.watchlist enable row level security;
+
+create table if not exists public.scan_journal (
+  id text primary key, updated_at timestamptz not null default now(), data jsonb not null
+);
+alter table public.scan_journal enable row level security;
+
 -- ── live_quote ───────────────────────────────────────────────────────────────
 -- Single-row table (id=1) updated by quote_pusher.py every ~60s during US
 -- trading hours (incl. pre/post). The dashboard polls it for a live header.

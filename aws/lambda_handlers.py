@@ -109,11 +109,8 @@ def _publish_decision_only() -> dict:
         # Watchlist scan (diversified buy-setup scan → 🔭 自选扫描 tab). Best-effort:
         # a scan failure must never block the daily decision publish.
         try:
-            from dashboard.scan import scan_watchlist
-            scan = scan_watchlist()
-            sb.table("watchlist_scan").upsert(
-                {"id": "current", "data": clean(scan)}
-            ).execute()
+            from dashboard import scan_store
+            scan_store.publish_scan()
         except Exception as e:
             print(f"! watchlist scan skipped: {e}")
     finally:
@@ -121,9 +118,51 @@ def _publish_decision_only() -> dict:
     return {"ok": True, "decision": summary}
 
 
-def publish_handler(event, context):
-    """Function URL / scheduled entrypoint. Returns API-Gateway-v2 response shape."""
+def _parse_body(event) -> dict:
+    """Parse the Function URL POST body (may be base64-encoded) into a dict."""
+    import base64
+    body = event.get("body") if isinstance(event, dict) else None
+    if not body:
+        return {}
+    if event.get("isBase64Encoded"):
+        try:
+            body = base64.b64decode(body).decode()
+        except Exception:
+            return {}
     try:
+        return json.loads(body)
+    except Exception:
+        return {}
+
+
+def publish_handler(event, context):
+    """Function URL / scheduled entrypoint. Routes by POST body `action`:
+      (none)        → full daily decision publish (button / schedule)
+      watch_add     → add a ticker to the watchlist, then re-scan
+      watch_remove  → remove a ticker, then re-scan
+      rescan        → just re-run the watchlist scan
+    Returns API-Gateway-v2 response shape."""
+    body = _parse_body(event)
+    action = body.get("action")
+    try:
+        if action in ("watch_add", "watch_remove"):
+            from dashboard.scan import WATCHLIST
+            from dashboard import scan_store
+            ticker = (body.get("ticker") or "").strip().upper()
+            if not ticker:
+                return {"statusCode": 400, "body": json.dumps({"ok": False, "error": "missing ticker"})}
+            wl = (scan_store.add_ticker(ticker, WATCHLIST) if action == "watch_add"
+                  else scan_store.remove_ticker(ticker, WATCHLIST))
+            scan = scan_store.publish_scan()       # re-scan with the new list
+            return {"statusCode": 200, "body": json.dumps(
+                {"ok": True, "watchlist": wl, "n": len(scan.get("results", []))})}
+
+        if action == "rescan":
+            from dashboard import scan_store
+            scan = scan_store.publish_scan()
+            return {"statusCode": 200, "body": json.dumps(
+                {"ok": True, "n": len(scan.get("results", []))})}
+
         result = _publish_decision_only()
         return {"statusCode": 200, "body": json.dumps(result)}
     except Exception as e:

@@ -439,12 +439,15 @@ export interface ScanResult {
   trigger?:      string;        // plain-language one-liner
   levels?:       { buy_zone: string | null; target: string | null; stop_hint: string | null };
   notes?:        string[];
+  record?:       { n: number; correct: number; hit_rate: number | null } | null;  // this ticker's track record
   error?:        string | null;
 }
 export interface WatchScan {
-  generated_at: string;
-  tickers:      string[];
-  results:      ScanResult[];
+  generated_at:    string;
+  tickers:         string[];
+  results:         ScanResult[];
+  record_overall?: { n: number; correct: number; hit_rate: number | null };
+  commentary?:     string;
 }
 
 /** Latest watchlist scan (single 'current' row; null if not generated yet). */
@@ -453,4 +456,26 @@ export async function getWatchScan(): Promise<WatchScan | null> {
     .from("watchlist_scan").select("data").eq("id", "current").maybeSingle();
   if (error || !data) return null;
   return data.data as WatchScan;
+}
+
+/** Whether watchlist editing is available (cloud Lambda URL or a local backend). */
+export const WATCH_EDITABLE = !!(process.env.NEXT_PUBLIC_PUBLISH_URL) || !SUPABASE_CONFIGURED;
+
+/** Edit the watchlist + re-scan. Cloud → Lambda Function URL; local → FastAPI.
+ *  action: "watch_add" | "watch_remove" | "rescan". Re-scan can take ~30s. */
+export async function postWatchAction(
+  action: string, ticker?: string,
+): Promise<{ ok: boolean; watchlist?: string[]; error?: string }> {
+  const url = process.env.NEXT_PUBLIC_PUBLISH_URL || `${API}/scan/watch`;
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...(ticker ? { ticker } : {}) }),
+    });
+    if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+    return await r.json();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "请求失败" };
+  }
 }

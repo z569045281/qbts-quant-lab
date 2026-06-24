@@ -21,6 +21,7 @@ key levels to act on. Ranked best-setup-first.
 from __future__ import annotations
 
 import logging
+import os
 from datetime import datetime
 
 import numpy as np
@@ -68,9 +69,11 @@ def _money(x) -> str | None:
     return f"${x:.2f}" if isinstance(x, (int, float)) and pd.notna(x) else None
 
 
-def scan_ticker(ticker: str) -> dict:
-    """Scan one ticker → a compact buy-setup card. Never raises; errors are captured."""
-    base = {"ticker": ticker, "theme": THEME.get(ticker, "?")}
+def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
+    """Scan one ticker → (card, daily_df). Never raises; errors are captured.
+    The daily df is returned so the caller can grade past calls without re-fetching."""
+    base = {"ticker": ticker, "theme": THEME.get(ticker, "其他")}
+    df_d = None
     try:
         df_d, df_h = _fetch(ticker)
         close = float(df_d["close"].iloc[-1])
@@ -167,19 +170,72 @@ def scan_ticker(ticker: str) -> dict:
         logger.warning(f"scan {ticker} failed: {e}")
         base.update({"error": f"{type(e).__name__}: {str(e)[:80]}",
                      "stance": "—", "stance_emoji": "⚠️", "score": 0})
-    return base
+    return base, df_d
+
+
+def _commentary_fallback(buys: list[dict]) -> str:
+    names = "、".join(r["ticker"] for r in buys[:3])
+    return f"今天比较接近买点的是 {names}——可以重点盯着,等它们到上面写的价位再考虑,不急。"
+
+
+def _commentary(results: list[dict]) -> str:
+    """A cheap, plain-language one-liner on the top buy-leaning picks (Haiku, ~$0.001)."""
+    buys = [r for r in results if r.get("stance") in ("买入区", "接近买点")]
+    if not buys:
+        return "今天篮子里没有明显买点——多数在观望或结构偏空,适合空仓等待。"
+    try:
+        import anthropic
+        top = buys[:3]
+        facts = "\n".join(
+            f"- {r['ticker']}（{r['theme']}）：{r['stance']}，{r.get('trigger','')}" for r in top)
+        prompt = (
+            "你是个把行情讲给完全不懂股票的朋友听的人。下面是今天扫描里最接近买点的几只股票,"
+            "用最朴实的大白话两三句话点评:别用任何术语(不要说 止损/盈亏比/结构/RSI/区间 等),"
+            "说说今天可以重点看哪只、为什么,并提醒这只是观察、不是必须买。只输出这几句话。\n\n" + facts)
+        client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001", max_tokens=300,
+            messages=[{"role": "user", "content": prompt}])
+        txt = next((b.text for b in resp.content if getattr(b, "type", "") == "text"), "").strip()
+        return txt or _commentary_fallback(buys)
+    except Exception as e:
+        logger.warning(f"scan commentary failed: {e}")
+        return _commentary_fallback(buys)
 
 
 def scan_watchlist(tickers: list[str] | None = None) -> dict:
-    """Scan the whole basket, ranked best-setup-first. Returns the publishable payload."""
-    tickers = tickers or WATCHLIST
-    results = [scan_ticker(t) for t in tickers]
-    # rank: errored last, then by score desc
+    """Scan the watchlist, ranked best-setup-first. Grades past calls, records today's,
+    attaches each ticker's track record, and adds a plain-language commentary.
+    Returns the publishable payload."""
+    from dashboard import scan_store as store
+    tickers = tickers or store.load_watchlist(WATCHLIST)
+
+    results: list[dict] = []
+    dfs: dict[str, "pd.DataFrame"] = {}
+    for t in tickers:
+        r, df_d = scan_ticker(t)
+        results.append(r)
+        if df_d is not None:
+            dfs[t] = df_d
     results.sort(key=lambda r: (r.get("error") is not None, -(r.get("score") or 0)))
+
+    # track record: grade old calls + record today's, then attach per-ticker hit rate
+    overall = {"n": 0, "correct": 0, "hit_rate": None}
+    try:
+        store.grade_and_record(results, dfs)
+        summary = store.scan_summary()
+        overall = summary["overall"]
+        for r in results:
+            r["record"] = summary["by_ticker"].get(r["ticker"])
+    except Exception as e:
+        logger.warning(f"scan track-record failed: {e}")
+
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "tickers": tickers,
         "results": results,
+        "record_overall": overall,
+        "commentary": _commentary(results),
     }
 
 

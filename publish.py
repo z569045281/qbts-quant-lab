@@ -125,12 +125,9 @@ def main() -> None:
 
         # 4.5 Watchlist scan (diversified buy-setup scan, drives the 🔭 tab) --
         try:
-            from dashboard.scan import scan_watchlist
+            from dashboard import scan_store
             print("→ scanning watchlist…")
-            scan = scan_watchlist()
-            sb.table("watchlist_scan").upsert(
-                {"id": "current", "data": clean(scan)}
-            ).execute()
+            scan = scan_store.publish_scan()
             print(f"  ✓ scanned {len(scan['results'])} tickers")
         except Exception as e:
             print(f"  ! watchlist scan skipped: {e}")

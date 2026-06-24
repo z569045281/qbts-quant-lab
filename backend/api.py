@@ -21,7 +21,7 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -1191,6 +1191,26 @@ def control_status():
         running = _pusher_running()
         pusher = {"running": running, "pid": _PUSHER_PROC.pid if running else None}
     return {"publish": pub, "pusher": pusher}
+
+
+@app.post("/scan/watch")
+async def scan_watch(req: Request):
+    """Local-mode watchlist edit (cloud mode POSTs to the Lambda Function URL).
+    Body: {action: 'watch_add'|'watch_remove'|'rescan', ticker?}. Edits the list,
+    re-runs the scan, and writes it to Supabase so the dashboard refreshes."""
+    body = await req.json()
+    action = body.get("action")
+    ticker = (body.get("ticker") or "").strip().upper()
+    from dashboard.scan import WATCHLIST
+    from dashboard import scan_store
+    if action == "watch_add" and ticker:
+        wl = await asyncio.to_thread(scan_store.add_ticker, ticker, WATCHLIST)
+    elif action == "watch_remove" and ticker:
+        wl = await asyncio.to_thread(scan_store.remove_ticker, ticker, WATCHLIST)
+    else:
+        wl = await asyncio.to_thread(scan_store.load_watchlist, WATCHLIST)
+    scan = await asyncio.to_thread(scan_store.publish_scan)
+    return {"ok": True, "watchlist": wl, "n": len(scan.get("results", []))}
 
 
 @app.post("/dashboard/decision/refresh")
