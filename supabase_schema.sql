@@ -148,6 +148,18 @@ create table if not exists public.scan_journal (
 );
 alter table public.scan_journal enable row level security;
 
+-- ── dca_state (📥 定投专区) ───────────────────────────────────────────────────
+-- Single row 'current' holding the DCA seasonality read for the broad ETFs
+-- (backend/dashboard/dca.py). Written by the publish job (secret key), READ by the
+-- anon frontend (the 定投专区 tab) → needs an anon SELECT policy.
+create table if not exists public.dca_state (
+  id text primary key, updated_at timestamptz not null default now(), data jsonb not null
+);
+alter table public.dca_state enable row level security;
+drop policy if exists "anon read dca_state" on public.dca_state;
+create policy "anon read dca_state" on public.dca_state
+  for select to anon, authenticated using (true);
+
 -- ── live_quote ───────────────────────────────────────────────────────────────
 -- Single-row table (id=1) updated by quote_pusher.py every ~60s during US
 -- trading hours (incl. pre/post). The dashboard polls it for a live header.

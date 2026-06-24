@@ -461,6 +461,40 @@ export async function getWatchScan(): Promise<WatchScan | null> {
 /** Whether watchlist editing is available (cloud Lambda URL or a local backend). */
 export const WATCH_EDITABLE = !!(process.env.NEXT_PUBLIC_PUBLISH_URL) || !SUPABASE_CONFIGURED;
 
+/* ── 📥 定投专区 (DCA seasonality) ─────────────────────────────────────────── */
+export interface DcaResult {
+  ticker:         string;
+  name:           string;
+  price?:         number;
+  today_change?:  number;
+  drawdown_pct?:  number;        // from 52w high (≤ 0)
+  vs_200dma_pct?: number;
+  below_200?:     boolean;
+  stance:         string;        // 逢低加码 / 正常定投 / 偏高·照投或少投 / —
+  stance_emoji:   string;
+  hint?:          string;
+  best_month?:    number;  best_month_avg?:  number;
+  worst_month?:   number;  worst_month_avg?: number;
+  cur_month?:     number;  cur_month_avg?:   number | null;
+  winter_avg?:    number;  summer_avg?:      number;
+  error?:         string | null;
+}
+export interface DcaState {
+  generated_at: string;
+  etfs:         string[];
+  season:       { month: number; in_strong_window: boolean; note: string };
+  results:      DcaResult[];
+  principle:    string;
+}
+
+/** Latest DCA seasonality read (single 'current' row; null if not generated yet). */
+export async function getDcaState(): Promise<DcaState | null> {
+  const { data, error } = await supabase
+    .from("dca_state").select("data").eq("id", "current").maybeSingle();
+  if (error || !data) return null;
+  return data.data as DcaState;
+}
+
 /** Edit the watchlist + re-scan. Cloud → Lambda Function URL; local → FastAPI.
  *  action: "watch_add" | "watch_remove" | "rescan". Re-scan can take ~30s. */
 export async function postWatchAction(

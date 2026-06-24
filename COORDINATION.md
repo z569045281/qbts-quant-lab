@@ -15,6 +15,8 @@ Format (newest at top):
 
 <!-- add yours above this line -->
 
+- [done] 2026-06-24 · dca-zone · 新「📥 定投专区」tab: 宽基 ETF(VOO/QQQ/VTI/IOO)定投季节性(万圣节/9月效应)+ 回调/200日均线 → 温和的加码/正常/偏高提示 · 另: CLAUDE.md 加「Lessons learned」段(verify-market-facts-live) · files: backend/dashboard/dca.py(new), publish.py, aws/lambda_handlers.py, supabase_schema.sql, frontend/app/dca/page.tsx(new), frontend/app/_components/nav.tsx, frontend/app/_lib/data.ts, CLAUDE.md · 待用户跑 dca_migration.sql
+
 - [done] 2026-06-24 · scan-v1.1 · 自选扫描 A+B+C: A 网页加/删自选(Lambda action + 本地 /scan/watch) · B 扫描战绩(scan_journal,5日后评判命中率) · C AI 大白话点评(Haiku) · files: backend/dashboard/scan.py, backend/dashboard/scan_store.py(new), backend/api.py, aws/lambda_handlers.py, publish.py, supabase_schema.sql, frontend/app/watch/page.tsx, frontend/app/_lib/data.ts · 待用户在 Supabase 跑 scan_v11_migration.sql
 
 - [done] 2026-06-24 · finra-short-fix · 修复挤空燃料"短仓数据缺失"(云端 /tmp 冷启动擦除+只在本地挖矿刷新): FINRA 短量缓存改 Supabase 持久化(finra_short 表),publish 前增量同步 · files: backend/data/altdata.py, publish.py, aws/lambda_handlers.py, supabase_schema.sql · 待用户在 Supabase 跑 finra_short_migration.sql

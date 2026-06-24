@@ -113,6 +113,11 @@ def _publish_decision_only() -> dict:
             scan_store.publish_scan()
         except Exception as e:
             print(f"! watchlist scan skipped: {e}")
+        try:
+            from dashboard import dca
+            dca.publish_dca()
+        except Exception as e:
+            print(f"! DCA skipped: {e}")
     finally:
         loop.close()
     return {"ok": True, "decision": summary}

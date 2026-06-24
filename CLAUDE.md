@@ -75,6 +75,18 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
 - **Models**: Opus 4.8 (decision) · Sonnet 4.6 (factor gen) · Haiku 4.5 (news / reflections).
 - **Big image push to ECR occasionally times out** in CI — just re-run "Deploy AWS jobs".
 
+## Lessons learned (append new ones here)
+
+Mistakes worth not repeating — when you learn one, add a dated bullet here.
+
+- **2026-06-24 · Verify market facts live, never from training memory.** I claimed
+  "SpaceX is private / can't be bought"; it had IPO'd as **NASDAQ: SPCX** after my
+  knowledge cutoff. For ANY current market fact (is X listed? its ticker / price /
+  sector? a recent IPO / rename / split — e.g. Marathon→MARA Holdings?), verify with
+  a tool first (repo `yfinance`: `yf.Ticker(t).info` for longName/price; or WebSearch).
+  The dashboard's numbers are already computed from live fetched data — only off-hand
+  factual claims I make from memory risk being stale.
+
 ## Durable facts vs this file
 
 `CLAUDE.md` = conventions/orientation. Cross-session **durable facts** go in the project

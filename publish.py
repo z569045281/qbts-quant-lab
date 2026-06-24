@@ -132,6 +132,14 @@ def main() -> None:
         except Exception as e:
             print(f"  ! watchlist scan skipped: {e}")
 
+        # 4.6 DCA seasonality (定投专区) ------------------------------------
+        try:
+            from dashboard import dca
+            print("→ computing DCA seasonality…")
+            dca.publish_dca()
+        except Exception as e:
+            print(f"  ! DCA skipped: {e}")
+
         # 5. Factors: metrics + code + chart ---------------------------------
         lb = get_leaderboard()                       # code/signal stripped, favorited added
         code_by_id = {e["id"]: e.get("code") for e in leaderboard}
