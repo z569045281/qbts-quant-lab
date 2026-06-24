@@ -87,6 +87,21 @@ Mistakes worth not repeating — when you learn one, add a dated bullet here.
   The dashboard's numbers are already computed from live fetched data — only off-hand
   factual claims I make from memory risk being stale.
 
+- **2026-06-24 · For ANY stock/market topic, lead with WebSearch (+ `yfinance`), never
+  memory** *(user's standing instruction)*. When a question touches a specific stock —
+  lockups / IPO terms / float / catalysts / earnings dates / valuation / "how low can it
+  go" / "is X a buy" — do live research **first** (WebSearch for events, schedules, news;
+  repo `yfinance` for price / float / fundamentals), then answer. Never give a number or a
+  fundamental claim from training memory; cite sources. Two corollaries:
+  - **Don't name a precise top/bottom** — give anchored *scenarios* (IPO price, 52w
+    range, valuation comps), and say plainly that exact levels aren't knowable.
+  - **The watchlist scan is purely mechanical (SMC / volume / regime) and BLIND to
+    events** (lockup unlocks, earnings, dilution). Never present a scan "buy level" as
+    safe without the event/supply backdrop — e.g. it flagged SPCX "回踩 $148 可买" off
+    only ~7 days of post-IPO data, right at the all-time low and right before a ~2×-float
+    lockup unlock. Mechanical levels need a live-research sanity check for fresh IPOs /
+    event-driven names.
+
 ## Durable facts vs this file
 
 `CLAUDE.md` = conventions/orientation. Cross-session **durable facts** go in the project
