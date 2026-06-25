@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-06-25 · et-melb-annot · 决策页 ET 时间旁加注墨尔本时间(保留ET): 实时报价(asof_epoch)+经济事件(ET挂钟 date+time_et) 显示「(墨 HH:MM)」,跨日补 MM-DD。format.ts 加 etMelbSuffix/epochMelbTime,经 IANA America/New_York→Australia/Melbourne 换算(自动处理两地夏令时)。AI 简报正文里的 ET 是自由文本,无法结构化转换,保持原样 · files: frontend/app/_lib/format.ts, frontend/app/page.tsx
+
 - [done] 2026-06-25 · tz-local-render · 决策/简报/扫描时间戳显示成本地时区: 后端改输出带时区 UTC(datetime.now(timezone.utc)),前端新增 _lib/format.ts(parseUtc 把裸时间当 UTC + fmtLocalDateTime 用本地 getter 渲染),page.tsx/watch/page.tsx/brief-panel.tsx 改用之。顺带修了「决策时效」年龄被裸时间算错~10h 的 bug · files: backend/dashboard/{decision,brief,scan}.py, frontend/app/_lib/format.ts(new), frontend/app/page.tsx, frontend/app/watch/page.tsx, frontend/app/_components/brief-panel.tsx
 
 - [done] 2026-06-25 · scan-paper-fix · 修模拟战绩把亏损单误标「到目标止盈」: ①_exit_hint 止损判定挪到止盈前(否则下跌后浮动目标塌到现价头顶,破位被误判止盈) ②scan 结果暴露 target_num ③run_paper_trades 止盈锚定入场当天目标(pos["target"]),不再用浮动目标 · files: backend/dashboard/scan.py, backend/dashboard/scan_store.py

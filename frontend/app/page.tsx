@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { MiniChart } from "./_components/mini-chart";
 import { ControlPanel } from "./_components/control-panel";
 import { getSnapshot, getLiveQuote, type Snapshot, type Decision, type LiveQuote } from "./_lib/data";
-import { fmtLocalDateTime, parseUtc } from "./_lib/format";
+import { fmtLocalDateTime, parseUtc, etMelbSuffix, epochMelbTime } from "./_lib/format";
 
 const SESSION_BADGE: Record<LiveQuote["session"], { label: string; cls: string }> = {
   pre:     { label: "盘前", cls: "bg-amber-100 text-amber-700"   },
@@ -233,6 +233,7 @@ export default function Dashboard() {
                   {badge && (
                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${badge.cls}`}>
                       {badge.label} · {live!.asof_et.slice(11, 16)} ET
+                      {epochMelbTime(live!.asof_epoch) ? ` (墨 ${epochMelbTime(live!.asof_epoch)})` : ""}
                     </span>
                   )}
                   <span className="text-xs text-gray-400 font-mono">
@@ -454,7 +455,7 @@ export default function Dashboard() {
                 <div className="flex items-center gap-1.5">
                   {e.nuclear && <span className="text-red-500">🔴</span>}
                   <span className="font-mono font-semibold text-gray-900">
-                    {e.date.slice(5)} {e.time_et}ET
+                    {e.date.slice(5)} {e.time_et}ET{etMelbSuffix(e.date, e.time_et)}
                   </span>
                   <span className="font-medium text-gray-800">{e.title}</span>
                   {typeof e.hours_until === "number" && e.hours_until >= 0 && e.hours_until <= 48 && (
