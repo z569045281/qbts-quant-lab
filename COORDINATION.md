@@ -13,6 +13,10 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-06-25 · tz-local-render · 决策/简报/扫描时间戳显示成本地时区: 后端改输出带时区 UTC(datetime.now(timezone.utc)),前端新增 _lib/format.ts(parseUtc 把裸时间当 UTC + fmtLocalDateTime 用本地 getter 渲染),page.tsx/watch/page.tsx/brief-panel.tsx 改用之。顺带修了「决策时效」年龄被裸时间算错~10h 的 bug · files: backend/dashboard/{decision,brief,scan}.py, frontend/app/_lib/format.ts(new), frontend/app/page.tsx, frontend/app/watch/page.tsx, frontend/app/_components/brief-panel.tsx
+
+- [done] 2026-06-25 · scan-paper-fix · 修模拟战绩把亏损单误标「到目标止盈」: ①_exit_hint 止损判定挪到止盈前(否则下跌后浮动目标塌到现价头顶,破位被误判止盈) ②scan 结果暴露 target_num ③run_paper_trades 止盈锚定入场当天目标(pos["target"]),不再用浮动目标 · files: backend/dashboard/scan.py, backend/dashboard/scan_store.py
+
 <!-- add yours above this line -->
 
 - [done] 2026-06-24 · dca-rebuild · 定投专区重做为「全球估值菜单」: 菜单换 VTI/VEA/VWO/AVUV(砍掉 4 只贵美股),每只显示 P/E+盈利收益率(粗估长期年化)+便宜/中性/偏贵;加「证据版何时多投」(深跌-20%+动预备金/小回调-5~10%在200线上方最优/中段-10~20%别抄底/近高点照投);宏观 CAPE 背景(美40/全球27.7)+建议配置(40/30/20/10)+压舱格(BND/SGOV)+与投机仓分开提示 · files: backend/dashboard/dca.py(重写), frontend/app/dca/page.tsx(重写), frontend/app/_lib/data.ts

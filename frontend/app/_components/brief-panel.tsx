@@ -1,5 +1,7 @@
 "use client";
 
+import { parseUtc } from "../_lib/format";
+
 interface BriefPanelProps {
   brief:        string | null;
   generatedAt:  string | null;
@@ -7,8 +9,9 @@ interface BriefPanelProps {
 }
 
 function _elapsedLabel(iso: string | null): string {
-  if (!iso) return "—";
-  const ms = Date.now() - new Date(iso).getTime();
+  const d = parseUtc(iso);
+  if (!d) return "—";
+  const ms = Date.now() - d.getTime();
   if (ms < 60_000)            return "刚刚";
   if (ms < 3_600_000)         return `${Math.floor(ms / 60_000)} 分钟前`;
   if (ms < 86_400_000)        return `${Math.floor(ms / 3_600_000)} 小时前`;

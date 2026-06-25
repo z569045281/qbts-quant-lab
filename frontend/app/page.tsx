@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { MiniChart } from "./_components/mini-chart";
 import { ControlPanel } from "./_components/control-panel";
 import { getSnapshot, getLiveQuote, type Snapshot, type Decision, type LiveQuote } from "./_lib/data";
+import { fmtLocalDateTime, parseUtc } from "./_lib/format";
 
 const SESSION_BADGE: Record<LiveQuote["session"], { label: string; cls: string }> = {
   pre:     { label: "盘前", cls: "bg-amber-100 text-amber-700"   },
@@ -131,7 +132,7 @@ export default function Dashboard() {
   const d = snap.decision ?? null;
   const meta = d ? getActionMeta(d.action, d.conviction) : null;
   const todayUp = snap.today_change >= 0;
-  const genAt = snap.decision_generated_at?.slice(0, 16).replace("T", " ");
+  const genAt = fmtLocalDateTime(snap.decision_generated_at);   // UTC → 浏览器本地时区
 
   // ── Plan vitality check: compare LIVE price against the plan's kill level.
   // A displayed plan whose invalidation has been breached is worse than no
@@ -146,8 +147,9 @@ export default function Dashboard() {
       if (d.action === "SHORT_QBTZ" && liveQbts.price >= kill) planBreached = true;
     }
   }
-  const decisionAgeH = snap.decision_generated_at
-    ? (Date.now() - new Date(snap.decision_generated_at).getTime()) / 3_600_000
+  const decisionGenDate = parseUtc(snap.decision_generated_at);
+  const decisionAgeH = decisionGenDate
+    ? (Date.now() - decisionGenDate.getTime()) / 3_600_000
     : null;
   const planStale = decisionAgeH !== null && decisionAgeH > 36;
 

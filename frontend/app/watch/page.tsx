@@ -5,6 +5,7 @@ import {
   getWatchScan, postWatchAction, WATCH_EDITABLE,
   type WatchScan, type ScanResult, type PaperSim,
 } from "../_lib/data";
+import { fmtLocalDateTime } from "../_lib/format";
 
 /* ─────────────────────────────────────────────────────────────────────────
    🔭 自选扫描 — 分散高波动篮子的每日买点扫描（独立于 QBTS 决策仪表盘）。
@@ -268,7 +269,7 @@ export default function WatchScanPage() {
     if (confirm(`把 ${t} 从自选移除?`)) runAction("watch_remove", t, `移除 ${t}`);
   };
 
-  const genAt = scan?.generated_at?.slice(0, 16).replace("T", " ");
+  const genAt = fmtLocalDateTime(scan?.generated_at);   // UTC → 浏览器本地时区
   const ov = scan?.record_overall;
 
   return (

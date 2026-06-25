@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -184,6 +184,14 @@ def _exit_hint(close: float, target_num, sma20, sma50, buy_zone) -> dict | None:
     the user's entry — so it's framed as "如有持仓" and only fires on events that are
     visible the day of the scan (at/near target, or already below an MA). Returns
     {kind, tag, text} or None when a holder has nothing obvious to do (just hold)."""
+    # 止损侧:失守均线 = 结构走弱(扫描当天即可判定)。先判止损再判止盈——
+    # 否则价格回落后"上方最近目标"会塌到现价头顶,把破位止损误判成止盈。
+    if isinstance(sma50, (int, float)) and pd.notna(sma50) and close < sma50:
+        return {"kind": "risk", "tag": "⚠️ 跌破50日线",
+                "text": f"已失守 50 日线 {_money(sma50)} —— 中期结构走弱,如有持仓注意止损"}
+    if isinstance(sma20, (int, float)) and pd.notna(sma20) and close < sma20:
+        return {"kind": "risk", "tag": "⚠️ 跌破20日线",
+                "text": f"已失守 20 日线 {_money(sma20)} —— 短线转弱,如有持仓收紧止损"}
     # 止盈侧:接近或越过上方目标
     if isinstance(target_num, (int, float)) and pd.notna(target_num) and target_num > 0:
         if close >= target_num:
@@ -192,13 +200,6 @@ def _exit_hint(close: float, target_num, sma20, sma50, buy_zone) -> dict | None:
         if close >= target_num * 0.97:
             return {"kind": "profit", "tag": "🎯 接近目标",
                     "text": f"接近上方目标 {_money(target_num)} —— 如有持仓可考虑分批减"}
-    # 止损侧:失守均线 = 结构走弱(扫描当天即可判定)
-    if isinstance(sma50, (int, float)) and pd.notna(sma50) and close < sma50:
-        return {"kind": "risk", "tag": "⚠️ 跌破50日线",
-                "text": f"已失守 50 日线 {_money(sma50)} —— 中期结构走弱,如有持仓注意止损"}
-    if isinstance(sma20, (int, float)) and pd.notna(sma20) and close < sma20:
-        return {"kind": "risk", "tag": "⚠️ 跌破20日线",
-                "text": f"已失守 20 日线 {_money(sma20)} —— 短线转弱,如有持仓收紧止损"}
     # 警戒侧:正贴着下方需求区上沿,跌破则走弱
     edge = buy_zone.get("high") if isinstance(buy_zone, dict) else None
     if isinstance(edge, (int, float)) and pd.notna(edge) and edge < close <= edge * 1.02:
@@ -311,6 +312,7 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
             "rsi": round(rsi, 0) if rsi is not None else None,
             "trigger": trig,
             "levels": {"buy_zone": bz, "target": _money(target), "stop_hint": reg.get("stop_hint")},
+            "target_num": round(target, 2) if isinstance(target, (int, float)) and pd.notna(target) else None,
             "exit_hint": _exit_hint(close, target, sma20, sma50, buy_zone),
             "notes": notes,
             "error": None,
@@ -411,7 +413,7 @@ def scan_watchlist(tickers: list[str] | None = None) -> dict:
             logger.warning(f"concurrent-buys corr failed: {e}")
 
     return {
-        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),   # tz-aware UTC → 前端转本地
         "tickers": tickers,
         "results": results,
         "record_overall": overall,

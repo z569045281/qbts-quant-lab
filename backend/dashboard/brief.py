@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import anthropic
@@ -144,7 +144,7 @@ def get_or_generate_brief(snapshot: dict, force_refresh: bool = False) -> tuple[
             logger.warning(f"Brief cache read failed ({e}), regenerating…")
 
     brief = generate_brief(snapshot)
-    now_iso = datetime.now().isoformat(timespec="seconds")
+    now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")   # tz-aware UTC → 前端转本地
     try:
         _BRIEF_CACHE_PATH.write_text(
             json.dumps({"brief": brief, "generated_at": now_iso}, ensure_ascii=False)

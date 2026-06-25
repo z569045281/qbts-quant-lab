@@ -30,7 +30,7 @@ import logging
 import math
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import anthropic
@@ -522,7 +522,7 @@ def get_or_generate_decision(
         logger.warning(f"Decision generation failed: {e}")
         return None, None, False
 
-    now_iso = datetime.now().isoformat(timespec="seconds")
+    now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")   # tz-aware UTC → 前端转本地
     try:
         _CACHE_PATH.write_text(json.dumps(
             {"date": today, "generated_at": now_iso, "decision": decision},

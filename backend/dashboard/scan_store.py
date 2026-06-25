@@ -229,7 +229,9 @@ def run_paper_trades(results: list[dict]) -> dict:
     """$1000 paper trade per buy signal, held until a sell signal; records realized P&L.
 
       Buy  = stance 买入区 (and not already holding, and not thin-data noise).
-      Sell = 偏空回避(转空) | exit_hint profit(到目标止盈) | exit_hint risk(跌破均线止损).
+      Sell = 偏空回避(转空) | 现价≥入场当天目标(到目标止盈) | 失守均线(跌破均线止损).
+      止盈锚定到「入场当天」存下的目标,不是每天重算的浮动目标——后者会随价格回落,
+      把亏损单误判成止盈(见 _exit_hint 注释)。
 
     One position per ticker at a time; entry/exit at the scan-day close with ~0.2%/side
     cost so the P&L isn't fantasy. Persists the ledger to scan_paper and returns a
@@ -252,9 +254,14 @@ def run_paper_trades(results: list[dict]) -> dict:
             pos = positions[t]
             if pos.get("entry_date") == today:               # just entered; no same-day flip
                 continue
-            reason = ("转空"         if stance == "偏空回避"
-                      else "到目标止盈"  if kind == "profit"
+            # 止盈锚定到入场当天的目标(pos["target"]),而非每天重算的浮动目标——
+            # 否则价格回落后上方目标跟着塌到现价,会把亏损单误判成「到目标止盈」。
+            # 老仓位没存 target → 只能靠转空/破均线离场(保守,会自愈)。
+            tgt = pos.get("target")
+            hit_target = isinstance(tgt, (int, float)) and tgt > 0 and price >= tgt
+            reason = ("转空"          if stance == "偏空回避"
                       else "跌破均线止损" if kind == "risk"
+                      else "到目标止盈"   if hit_target
                       else None)
             if reason:
                 positions.pop(t)
@@ -271,7 +278,8 @@ def run_paper_trades(results: list[dict]) -> dict:
         elif stance == "买入区" and not r.get("thin_data"):   # flat → enter (skip noise)
             shares = _TRADE_USD * (1 - _COST_PER_SIDE) / price   # buy-side cost baked in
             positions[t] = {"entry_date": today, "entry_price": round(price, 2),
-                            "shares": round(shares, 4), "cost": _TRADE_USD}
+                            "shares": round(shares, 4), "cost": _TRADE_USD,
+                            "target": r.get("target_num")}   # anchor for 止盈, see exit logic
 
     _save_paper({"positions": positions, "closed": closed})
 
