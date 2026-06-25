@@ -74,7 +74,14 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   midnight. During a live US session `as_of` is the current date with a *partial* daily bar.
 - **Secrets**: `ANTHROPIC_API_KEY` / `SUPABASE_SECRET_KEY` / `ALPACA_*` live in root `.env`
   (gitignored). Supabase **secret** key (`sb_secret_…`) is write-capable — local/CI only;
-  the **publishable** key is safe-public read-only. Repo is public.
+  the **publishable** key is safe-public read-only. Repo is public. **Both `.env` AND
+  `.env.example` are gitignored** — document new secrets here / in `aws/README.md`, not just
+  in `.env.example`.
+- **`FRED_API_KEY`** (optional, in root `.env` + GitHub Actions secret + `template.yaml`):
+  backfills the macro calendar's **actual** values via `backend/dashboard/fred.py`. The FF
+  feed only carries forecast/previous — never actual. Without the key the calendar still
+  works (actual blank). The cloud daily-publish Lambda needs it too, so it's wired through
+  `aws/template.yaml` (`FredApiKey`) + `deploy-aws.yml`.
 - **Models**: Opus 4.8 (decision) · Sonnet 4.6 (factor gen) · Haiku 4.5 (news / reflections).
 - **Big image push to ECR occasionally times out** in CI — just re-run "Deploy AWS jobs".
 

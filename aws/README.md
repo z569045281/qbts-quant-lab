@@ -29,6 +29,7 @@ local Docker / SAM / AWS CLI. One-time setup:
    - `ANTHROPIC_API_KEY`
    - `SUPABASE_SECRET_KEY` (the `sb_secret_…` key)
    - `NEXT_PUBLIC_SUPABASE_URL` — already set for the Pages deploy; reused here as the Supabase URL.
+   - `FRED_API_KEY` — **optional**, backfills macro-calendar actual values (forecast/previous show without it). Free: https://fredaccount.stlouisfed.org/apikeys
 3. **Add repo variables** (same page → Variables):
    - `AWS_REGION` (e.g. `us-east-1`) — optional, defaults to `us-east-1`.
    - `PUBLISH_ALLOW_ORIGIN` (e.g. `https://z569045281.github.io`) — optional, defaults to `*`.

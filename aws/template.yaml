@@ -18,6 +18,13 @@ Parameters:
     Type: String
     NoEcho: true
     Description: Supabase secret/service key (write access — keep secret).
+  FredApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: >
+      FRED (St. Louis Fed) API key — backfills macro-calendar actual values.
+      Optional: blank just leaves actuals empty (forecast/previous still show).
   AllowOrigin:
     Type: String
     Default: "*"
@@ -32,6 +39,7 @@ Globals:
         ANTHROPIC_API_KEY: !Ref AnthropicApiKey
         SUPABASE_URL: !Ref SupabaseUrl
         SUPABASE_SECRET_KEY: !Ref SupabaseSecretKey
+        FRED_API_KEY: !Ref FredApiKey
 
 Resources:
   # ── Decision publish: button (Function URL) + daily auto-run ──────────────

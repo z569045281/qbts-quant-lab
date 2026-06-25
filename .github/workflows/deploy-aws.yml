@@ -59,6 +59,7 @@ jobs:
               AnthropicApiKey='${{ secrets.ANTHROPIC_API_KEY }}' \
               SupabaseUrl='${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}' \
               SupabaseSecretKey='${{ secrets.SUPABASE_SECRET_KEY }}' \
+              FredApiKey='${{ secrets.FRED_API_KEY }}' \
               AllowOrigin='${{ vars.PUBLISH_ALLOW_ORIGIN || '*' }}'
 
       - name: Show Publish Function URL

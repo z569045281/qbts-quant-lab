@@ -78,7 +78,7 @@ def get_macro_calendar(force_refresh: bool = False) -> dict:
     Returns:
       {
         "as_of": iso,
-        "events":  [ {date, time_et, title, impact, forecast, previous, nuclear} ... ],
+        "events":  [ {date, time_et, title, impact, forecast, previous, actual, nuclear} ... ],
         "nuclear": [ same shape, subset ],
         "risk_window": bool,        # nuclear event within next 48h
         "risk_note":  str,          # human-readable summary of the window
@@ -177,6 +177,17 @@ def get_macro_calendar(force_refresh: bool = False) -> dict:
             continue
         seen.add(key)
         deduped.append(ev)
+
+    # Backfill actual values for past releases from FRED (the FF feed never
+    # carries them). No-op without FRED_API_KEY; only shows self-validated values.
+    try:
+        try:
+            from dashboard.fred import enrich_actuals          # runtime (backend/ on path)
+        except ImportError:
+            from backend.dashboard.fred import enrich_actuals  # repo-root on path
+        enrich_actuals(deduped)
+    except Exception as ex:
+        logger.warning(f"FRED enrichment skipped: {ex}")
 
     nuclear = [e for e in deduped if e["nuclear"]]
 

@@ -88,9 +88,14 @@ export function macroSurprise(title: string, forecast: string, actual: string):
   const a = _parseMacroNum(actual);
   if (f === null || a === null) return null;
   if (a === f) return { label: "符合预期", tone: "neutral" };
+  // Direction wording reflects the raw number (实际 vs 预测); the 利空/利好 impact
+  // is judged separately — for inverted indicators (claims / unemployment rate)
+  // a LOWER print is the hawkish/bad surprise, so the two can disagree, e.g.
+  // claims "低于预期·利空" (fewer claims = stronger labor = hawkish).
+  const dir = a > f ? "高于预期" : "低于预期";
   const inverted = _INVERTED_TITLES.some(p => title.toLowerCase().includes(p));
   const hawkish = inverted ? a < f : a > f;
   return hawkish
-    ? { label: "高于预期·利空", tone: "bad" }
-    : { label: "低于预期·利好", tone: "good" };
+    ? { label: `${dir}·利空`, tone: "bad" }
+    : { label: `${dir}·利好`, tone: "good" };
 }
