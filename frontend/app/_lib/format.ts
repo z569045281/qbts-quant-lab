@@ -68,3 +68,29 @@ export function epochMelbTime(epochSec?: number | null): string | null {
   if (!epochSec) return null;
   return _melbTime(new Date(epochSec * 1000));
 }
+
+// ── Macro release surprise (actual vs forecast) ─────────────────────────────
+// QBTS is a high-beta long: a hawkish surprise (hotter inflation/growth/jobs
+// than forecast) tends to hurt it, a dovish surprise tends to help it. Claims
+// and the unemployment rate run the other way — a higher print means a
+// *weaker* labor market, which is the dovish (good) surprise.
+const _INVERTED_TITLES = ["claims", "unemployment rate"];
+
+function _parseMacroNum(s: string): number | null {
+  if (!s) return null;
+  const n = parseFloat(s.replace(/[^0-9.+-]/g, ""));
+  return isNaN(n) ? null : n;
+}
+
+export function macroSurprise(title: string, forecast: string, actual: string):
+  { label: string; tone: "bad" | "good" | "neutral" } | null {
+  const f = _parseMacroNum(forecast);
+  const a = _parseMacroNum(actual);
+  if (f === null || a === null) return null;
+  if (a === f) return { label: "符合预期", tone: "neutral" };
+  const inverted = _INVERTED_TITLES.some(p => title.toLowerCase().includes(p));
+  const hawkish = inverted ? a < f : a > f;
+  return hawkish
+    ? { label: "高于预期·利空", tone: "bad" }
+    : { label: "低于预期·利好", tone: "good" };
+}

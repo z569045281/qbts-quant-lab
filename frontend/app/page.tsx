@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { MiniChart } from "./_components/mini-chart";
 import { ControlPanel } from "./_components/control-panel";
 import { getSnapshot, getLiveQuote, type Snapshot, type Decision, type LiveQuote } from "./_lib/data";
-import { fmtLocalDateTime, parseUtc, etMelbSuffix, epochMelbTime } from "./_lib/format";
+import { fmtLocalDateTime, parseUtc, etMelbSuffix, epochMelbTime, macroSurprise } from "./_lib/format";
 
 const SESSION_BADGE: Record<LiveQuote["session"], { label: string; cls: string }> = {
   pre:     { label: "盘前", cls: "bg-amber-100 text-amber-700"   },
@@ -468,10 +468,23 @@ export default function Dashboard() {
                       已公布
                     </span>
                   )}
+                  {(() => {
+                    const s = macroSurprise(e.title, e.forecast, e.actual);
+                    if (!s) return null;
+                    const cls = s.tone === "bad" ? "bg-red-100 text-red-700"
+                              : s.tone === "good" ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-500";
+                    return (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${cls}`}>
+                        {s.label}
+                      </span>
+                    );
+                  })()}
                 </div>
-                {(e.forecast || e.previous) && (
+                {(e.forecast || e.previous || e.actual) && (
                   <div className="text-[10px] text-gray-500 mt-0.5 font-mono">
                     预测 {e.forecast || "—"} · 前值 {e.previous || "—"}
+                    {e.actual && ` · 实际 ${e.actual}`}
                   </div>
                 )}
               </div>

@@ -233,6 +233,7 @@ export interface MacroEvent {
   impact:      "High" | "Medium";
   forecast:    string;
   previous:    string;
+  actual:      string;    // filled by the feed after release
   nuclear:     boolean;
   hours_until?: number;   // negative = already released
 }
