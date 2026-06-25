@@ -74,7 +74,7 @@ def fetch_hourly(ticker: str = TICKER, years: int = 2) -> pd.DataFrame:
     yfinance caps 1h data at 730 days, so we fetch in 60-day windows
     and concatenate to avoid hitting the limit silently.
     """
-    end = datetime.today()
+    end = datetime.today() + timedelta(days=1)   # `end` is exclusive — +1d to include today
     start = end - timedelta(days=365 * years)
 
     chunks = []
@@ -104,7 +104,10 @@ def fetch_hourly(ticker: str = TICKER, years: int = 2) -> pd.DataFrame:
 
 
 def fetch_daily(ticker: str = TICKER, years: int = 2) -> pd.DataFrame:
-    end = datetime.today()
+    # yfinance `end` is EXCLUSIVE, so end=today drops today's (and, for a user ahead
+    # of US time in AEST, the just-closed US) session — leaving as_of a day stale.
+    # +1 day makes the latest available bar (live partial, or just-closed) show up.
+    end = datetime.today() + timedelta(days=1)
     start = end - timedelta(days=365 * years)
     logger.info(f"Fetching daily {start.date()} → {end.date()}")
     raw = yf.download(

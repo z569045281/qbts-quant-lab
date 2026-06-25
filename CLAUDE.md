@@ -68,7 +68,10 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
 - **`aws/requirements.txt` is the full dep set** for the image (repo `requirements.txt` is
   incomplete — `lightgbm` needs `libgomp`, installed via `dnf` in the Dockerfile).
 - **`dashboard_snapshot(force_refresh=True)` propagates to `load_or_fetch`** so `as_of`
-  stays current. Daily bars max out at the last *closed* US session (user is in AEST, ahead of US).
+  stays current. **yfinance `end` is EXCLUSIVE** — `fetch_daily`/`fetch_hourly` use
+  `end=today+1d` so the current (live partial) or just-closed session is included; with a
+  bare `end=today` an AEST user (ahead of US) sees `as_of` a session stale until UTC
+  midnight. During a live US session `as_of` is the current date with a *partial* daily bar.
 - **Secrets**: `ANTHROPIC_API_KEY` / `SUPABASE_SECRET_KEY` / `ALPACA_*` live in root `.env`
   (gitignored). Supabase **secret** key (`sb_secret_…`) is write-capable — local/CI only;
   the **publishable** key is safe-public read-only. Repo is public.
