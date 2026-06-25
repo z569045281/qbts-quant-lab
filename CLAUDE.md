@@ -105,6 +105,40 @@ Mistakes worth not repeating — when you learn one, add a dated bullet here.
     lockup unlock. Mechanical levels need a live-research sanity check for fresh IPOs /
     event-driven names.
 
+## Surfaces & standing decisions (as of 2026-06-25)
+
+Frontend tabs (`frontend/app/`): **🎯 决策仪表盘** (`/`) · **🔭 自选扫描** (`/watch`) ·
+**📥 定投专区** (`/dca`) · **🏆 因子排行榜** (`/factors`).
+
+- **自选扫描 (`scan.py` / `scan_store.py`)** — mechanical multi-name buy-setup scan
+  (SMC/volume/regime + trend/RSI), ~$0 (one Haiku commentary). Carries: a **$1000-per-
+  buy-signal paper-trading ledger** (`scan_paper` table; buy on 买入区, sell on 偏空回避 /
+  到目标 / 跌破均线, 0.2%/side cost), **exit hints**, a static **lockup countdown**
+  (`LOCKUPS` dict, SPCX), **earnings overlay**, a **thin-data guard** (<60 bars → flagged
+  & excluded from paper trades), **market context** (SPY/QQQ vs 50dMA + VIX risk-on/off),
+  and a **concurrent-buy correlation** note. Basket: QBTS POET EOSE RUN LUNR MARA AG NVDA
+  SPCX MP SYM (editable from the site). Buy = 买入区 only; signals score the same way for all.
+- **定投专区 (`dca.py`)** — REBUILT 2026-06-24 into a global **valuation menu**:
+  **VTI / VEA / VWO / AVUV** (deliberately NOT VOO/QQQ/VTI/IOO — those are 4 flavors of
+  expensive US). **Do not revert to dip-timing or a US-only set.** Locked-in philosophy
+  (agreed with the user): time-in-market > timing; CAPE tilts across **regions, not US
+  sectors**; from real SPY/QQQ/IOO drawdown→fwd-return data — only a **−20%+ capitulation**
+  justifies deploying the reserve, **−5~10% above the 200dMA is the best return+win-rate
+  blend**, the **−10~20% middle is the worst** ("falling knife", NOT a bargain), and
+  buying near highs is fine. Cards show P/E + earnings-yield (CAPE proxy), target weights
+  40/30/20/10, a ballast note (BND/SGOV), and a "keep separate from the QBTS speculation
+  sleeve" warning. Macro CAPE (US ~40 / global ~27.7) is hardcoded with a "re-verify" note.
+
+- **Measurement phase (important).** The scan paper-trade, decision journal, and
+  calibration only *just* started logging — **signals are statistically UNPROVEN**. A UI
+  gate warns until ≥30 graded calls. Standing guidance given to the user: **don't size up
+  real money until the track record shows an edge.** Treat the whole thing as a measurement
+  tool for now; the next optimization should be driven by the accumulated results.
+- **All Supabase migrations have been run** (decision_journal, calibration/predictions/
+  source_weights, watchlist, scan_journal, finra_short, watchlist_scan, scan_paper,
+  dca_state). Running cost ≈ **$20/mo**, almost all of it the one daily Opus decision at
+  **09:00 ET** (≈ 23:00 Melbourne in AU winter / 01:00 in AU summer).
+
 ## Durable facts vs this file
 
 `CLAUDE.md` = conventions/orientation. Cross-session **durable facts** go in the project
