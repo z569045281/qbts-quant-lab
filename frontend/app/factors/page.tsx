@@ -140,7 +140,7 @@ export default function FactorsPage() {
   const bestSharpe = factors.length ? Math.max(...factors.map(f => f.data.oos_sharpe_ratio)) : null;
 
   return (
-    <main className="max-w-[1600px] mx-auto px-6 py-6 space-y-5">
+    <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-5">
       {/* ── Header ── */}
       <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4 flex items-center justify-between flex-wrap gap-3">
         <div>

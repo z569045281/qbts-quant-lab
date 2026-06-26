@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-06-26 · choch-warn+plan-declutter · ①决策页加 CHoCH 早期反转预警横幅(snap.smc.last_event.kind==='CHoCH' 时显示,纯提示不发信号,补"等BOS确认所以进场晚"的空窗) ②交易计划卡精简:默认只显示 方向+QBTZ三价+盈亏比+仓位+失效条件,把 入场条件/波动档/QBTS镜像价/杠杆说明 收进 <details>展开看细节 · files: frontend/app/page.tsx · 注:page.tsx 同时有用户未提交的响应式 WIP,未替其提交
+
 - [done] 2026-06-25 · et-melb-annot · 决策页 ET 时间旁加注墨尔本时间(保留ET): 实时报价(asof_epoch)+经济事件(ET挂钟 date+time_et) 显示「(墨 HH:MM)」,跨日补 MM-DD。format.ts 加 etMelbSuffix/epochMelbTime,经 IANA America/New_York→Australia/Melbourne 换算(自动处理两地夏令时)。AI 简报正文里的 ET 是自由文本,无法结构化转换,保持原样 · files: frontend/app/_lib/format.ts, frontend/app/page.tsx
 
 - [done] 2026-06-25 · tz-local-render · 决策/简报/扫描时间戳显示成本地时区: 后端改输出带时区 UTC(datetime.now(timezone.utc)),前端新增 _lib/format.ts(parseUtc 把裸时间当 UTC + fmtLocalDateTime 用本地 getter 渲染),page.tsx/watch/page.tsx/brief-panel.tsx 改用之。顺带修了「决策时效」年龄被裸时间算错~10h 的 bug · files: backend/dashboard/{decision,brief,scan}.py, frontend/app/_lib/format.ts(new), frontend/app/page.tsx, frontend/app/watch/page.tsx, frontend/app/_components/brief-panel.tsx

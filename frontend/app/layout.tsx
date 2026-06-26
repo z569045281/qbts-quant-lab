@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { NavBar } from "./_components/nav";
@@ -18,6 +18,14 @@ export const metadata: Metadata = {
   description: "QBTS factor mining + decision dashboard",
 };
 
+// viewport-fit=cover lets the bottom tab bar pad for the iPhone home indicator
+// (env(safe-area-inset-bottom)); themeColor tints the mobile browser chrome to
+// match the dark brand bar.
+export const viewport: Viewport = {
+  viewportFit: "cover",
+  themeColor: "#0F1B2E",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -30,7 +38,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-[#F6F6F8]">
         <NavBar />
-        <div className="flex-1">{children}</div>
+        {/* Pad past the fixed mobile tab bar (50px + home-indicator inset);
+            desktop has no bottom bar so the padding collapses. */}
+        <div className="flex-1 pb-[calc(50px_+_env(safe-area-inset-bottom))] md:pb-0">{children}</div>
       </body>
     </html>
   );

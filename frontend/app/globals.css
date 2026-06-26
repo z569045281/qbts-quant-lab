@@ -17,4 +17,10 @@ body {
   background: #F6F6F8;
   color: #171717;
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  /* Safety net: a single wide element should never make the whole page
+     scroll sideways on a phone — the nav scrolls its own tab strip instead. */
+  overflow-x: hidden;
+  /* Stop iOS Safari from auto-inflating text on rotate. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }

@@ -95,7 +95,7 @@ export default function DcaPage() {
   const weights = state?.allocation?.weights ?? {};
 
   return (
-    <main className="max-w-[1100px] mx-auto px-6 py-6 space-y-4">
+    <main className="max-w-[1100px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-4">
       {/* 标题 + 大盘估值背景 */}
       <section className="bg-white rounded-2xl border border-[#EDEDF0] p-5 shadow-sm">
         <div className="flex items-center gap-2 flex-wrap">

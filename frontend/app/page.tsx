@@ -152,13 +152,16 @@ export default function Dashboard() {
     ? (Date.now() - decisionGenDate.getTime()) / 3_600_000
     : null;
   const planStale = decisionAgeH !== null && decisionAgeH > 36;
+  // CHoCH 早期预警:最近一次结构事件是 CHoCH(性格转变)= 反转苗头但尚未被 BOS 确认。
+  // 纯提示,不参与决策信号 —— 填补"等确认所以进场晚"的空窗。
+  const choch = snap.smc?.last_event?.kind === "CHoCH" ? snap.smc.last_event : null;
 
   const newsTop = (snap.news?.items ?? [])
     .filter(n => n.ai?.impact !== "low")
     .slice(0, 5);
 
   return (
-    <main className="max-w-[1200px] mx-auto px-6 py-6 space-y-4">
+    <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-4">
 
       {/* ══ 控制台：出决策 / 实时报价按钮（仅本地后端可达时显示）═══════════ */}
       <ControlPanel onPublished={refresh} />
@@ -182,6 +185,20 @@ export default function Dashboard() {
         <div className="bg-amber-50 border border-amber-300 text-amber-800 rounded-xl px-5 py-3 text-sm">
           ⏳ 本决策生成于 {Math.round(decisionAgeH!)} 小时前，市场可能已变化 — 建议重新运行
           <code className="mx-1 px-1 rounded bg-amber-100 font-mono text-xs">publish.py</code> 更新。
+        </div>
+      )}
+
+      {/* ══ CHoCH 早期反转预警 — 结构性格转变但未被 BOS 确认时提示，不发交易信号 ═══ */}
+      {choch && (
+        <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-xl px-5 py-3 text-sm leading-relaxed flex items-start gap-2">
+          <span className="text-base leading-none mt-0.5">🔭</span>
+          <div>
+            <span className="font-semibold">早期{choch.dir === "bullish" ? "见底" : "见顶"}预警</span>
+            ：{choch.date} 在 ${choch.level.toFixed(2)} 出现
+            <span className="font-semibold">{choch.dir === "bullish" ? "看涨" : "看跌"} CHoCH</span>
+            （结构性格转变，可能{choch.dir === "bullish" ? "见底转涨" : "见顶转跌"}的苗头）。
+            <span className="text-indigo-500"> 这是早期提示、<b>尚未被 BOS 确认</b>，系统不会据此发交易信号 —— 仅供你提前留意，要不要抢跑自己定。</span>
+          </div>
         </div>
       )}
 
@@ -257,7 +274,7 @@ export default function Dashboard() {
 
           {/* 行动卡 */}
           {d && meta && (
-            <div className={`md:w-[300px] border-l-2 ${meta.cls} p-6 flex flex-col items-center justify-center text-center`}>
+            <div className={`md:w-[300px] border-t-2 md:border-t-0 md:border-l-2 ${meta.cls} p-6 flex flex-col items-center justify-center text-center`}>
               <div className="text-xs uppercase tracking-widest opacity-70 mb-1">今日行动</div>
               <div className="text-4xl font-bold">{meta.title}</div>
               <div className="text-xs opacity-75 mt-1">{meta.sub}</div>
@@ -286,29 +303,22 @@ export default function Dashboard() {
               <div className="text-xs font-semibold text-[#525461] uppercase tracking-wider mb-3">
                 📋 交易计划
               </div>
-              <div className="text-xs text-gray-700 bg-[#F6F6F8] rounded-lg px-3 py-2 mb-3 leading-relaxed">
-                <span className="font-semibold">入场条件：</span>{d.trade_plan.entry_condition}
+              {/* 方向 — 一眼看清是做多还是做空、实际买哪个 ETF */}
+              <div className={`text-sm font-semibold rounded-lg px-3 py-2 mb-3 ${
+                d.action === "LONG_QBTX" ? "bg-emerald-50 text-emerald-700"
+                : d.action === "SHORT_QBTZ" ? "bg-red-50 text-red-700"
+                : "bg-[#F6F6F8] text-[#525461]"}`}>
+                {d.action === "LONG_QBTX" ? "📈 做多 QBTS — 买入 QBTX"
+                 : d.action === "SHORT_QBTZ" ? "📉 做空 QBTS — 买入 QBTZ"
+                 : "⏸️ 观望 — 暂不持仓"}
               </div>
-              {/* 波动率 regime — 决定止损宽度/仓位档位 */}
-              {snap.regime?.regime && (
-                <div className="text-[11px] text-[#525461] bg-[#F6F6F8] rounded-lg px-3 py-1.5 mb-3 leading-snug flex items-start gap-1.5">
-                  <span className={`shrink-0 px-1.5 py-0.5 rounded font-bold ${
-                    snap.regime.regime === "expansion" ? "bg-amber-100 text-amber-700"
-                    : snap.regime.regime === "contraction" ? "bg-blue-50 text-blue-600"
-                    : "bg-gray-100 text-gray-500"}`}>
-                    🌡️ 波动{snap.regime.regime === "expansion" ? "扩张" : snap.regime.regime === "contraction" ? "收缩" : "正常"}
-                    {snap.regime.atr_pct_percentile != null && ` ${snap.regime.atr_pct_percentile.toFixed(0)}%位`}
-                  </span>
-                  <span className="text-gray-500">{snap.regime.stop_hint}</span>
-                </div>
-              )}
               {/* HOLD has no single entry/stop/target — show the watch state
                   instead of an empty price table (which reads as "broken"). */}
               {d.action === "HOLD" ? (
                 <div className="text-sm text-[#525461] bg-[#F6F6F8] rounded-lg px-3 py-3 leading-relaxed">
                   📭 <span className="font-semibold text-gray-700">观望中 · 暂不持仓</span>
                   <div className="mt-1 text-xs">
-                    满足上方入场条件后再按对应方向进场;在此之前没有入场 / 止损 / 目标价,仓位 0%。
+                    满足入场条件(见下方「展开看细节」)后再按对应方向进场;在此之前没有入场 / 止损 / 目标价,仓位 0%。
                   </div>
                 </div>
               ) : d.plan_valid === false ? (
@@ -322,12 +332,6 @@ export default function Dashboard() {
                 <>
                   <table className="w-full text-sm">
                     <tbody>
-                      <tr className="border-b border-[#F0F0F2]">
-                        <td className="py-1.5 text-[#525461] text-xs">QBTS 入场 / 止损 / 目标</td>
-                        <td className="py-1.5 text-right font-mono">
-                          {fmtPx(d.trade_plan.qbts_entry)} / <span className="text-[#F03A3E]">{fmtPx(d.trade_plan.qbts_stop)}</span> / <span className="text-emerald-600">{fmtPx(d.trade_plan.qbts_target)}</span>
-                        </td>
-                      </tr>
                       {d.trade_plan.etf_ticker && (
                         <tr className="border-b border-[#F0F0F2]">
                           <td className="py-1.5 text-[#525461] text-xs">
@@ -352,18 +356,50 @@ export default function Dashboard() {
                       </tr>
                     </tbody>
                   </table>
-                  {d.trade_plan.etf_ticker && (
-                    <div className="mt-2 text-[10px] text-gray-400 leading-snug">
-                      {d.trade_plan.etf_ticker} 价位由实时报价按 2× 自动换算(入场时刻精确);
-                      杠杆 ETF 每日再平衡,持仓多日有衰减,止损/目标价仅为近似参考。
-                    </div>
-                  )}
                 </>
               )}
               {/* 失效条件 */}
               <div className="mt-3 text-xs text-[#B45309] bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
                 ⚠️ <span className="font-semibold">失效条件：</span>{d.invalidation}
               </div>
+
+              {/* 展开看细节 — 把 HVN/BOS/ATR/镜像价位这些收起来,默认不挡视线 */}
+              <details className="mt-3 group">
+                <summary className="text-[11px] text-[#525461] cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:text-gray-700 flex items-center gap-1">
+                  <span className="transition-transform group-open:rotate-90">▸</span>
+                  展开看细节(入场条件 · 波动档 · QBTS 价位 · 杠杆说明)
+                </summary>
+                <div className="mt-2 space-y-2">
+                  <div className="text-xs text-gray-700 bg-[#F6F6F8] rounded-lg px-3 py-2 leading-relaxed">
+                    <span className="font-semibold">入场条件：</span>{d.trade_plan.entry_condition}
+                  </div>
+                  {snap.regime?.regime && (
+                    <div className="text-[11px] text-[#525461] bg-[#F6F6F8] rounded-lg px-3 py-1.5 leading-snug flex items-start gap-1.5">
+                      <span className={`shrink-0 px-1.5 py-0.5 rounded font-bold ${
+                        snap.regime.regime === "expansion" ? "bg-amber-100 text-amber-700"
+                        : snap.regime.regime === "contraction" ? "bg-blue-50 text-blue-600"
+                        : "bg-gray-100 text-gray-500"}`}>
+                        🌡️ 波动{snap.regime.regime === "expansion" ? "扩张" : snap.regime.regime === "contraction" ? "收缩" : "正常"}
+                        {snap.regime.atr_pct_percentile != null && ` ${snap.regime.atr_pct_percentile.toFixed(0)}%位`}
+                      </span>
+                      <span className="text-gray-500">{snap.regime.stop_hint}</span>
+                    </div>
+                  )}
+                  {d.action !== "HOLD" && d.plan_valid !== false && (
+                    <div className="text-xs text-[#525461] bg-[#F6F6F8] rounded-lg px-3 py-2 font-mono flex justify-between gap-2">
+                      <span className="shrink-0">QBTS 入场/止损/目标</span>
+                      <span className="text-right">
+                        {fmtPx(d.trade_plan.qbts_entry)} / <span className="text-[#F03A3E]">{fmtPx(d.trade_plan.qbts_stop)}</span> / <span className="text-emerald-600">{fmtPx(d.trade_plan.qbts_target)}</span>
+                      </span>
+                    </div>
+                  )}
+                  {d.trade_plan.etf_ticker && d.action !== "HOLD" && (
+                    <div className="text-[10px] text-gray-400 leading-snug px-1">
+                      {d.trade_plan.etf_ticker} 价位由实时报价按 2× 自动换算(入场时刻精确);杠杆 ETF 每日再平衡,持仓多日有衰减,止损/目标价仅为近似参考。
+                    </div>
+                  )}
+                </div>
+              </details>
             </div>
 
             {/* 关键驱动 + 风险 */}
@@ -782,7 +818,7 @@ export default function Dashboard() {
       </footer>
 
       {/* 右下角版本号 */}
-      <div className="fixed bottom-2 right-3 z-10 text-[10px] font-mono text-gray-300 select-none pointer-events-none">
+      <div className="hidden md:block fixed bottom-2 right-3 z-10 text-[10px] font-mono text-gray-300 select-none pointer-events-none">
         v{APP_VERSION}
       </div>
     </main>
