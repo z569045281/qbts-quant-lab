@@ -37,11 +37,7 @@ aws/samconfig.toml
 .idea/
 *.swp
 
-# one-off migrations (generated, contain local seed data)
-decision_journal_migration.sql
-calibration_migration.sql
-watchlist_migration.sql
-finra_short_migration.sql
-scan_v11_migration.sql
-dca_migration.sql
-scan_paper_migration.sql
+# one-off migrations (now under sql/; some carry local seed data).
+# Canonical schema lives in sql/supabase_schema.sql (tracked); the per-feature
+# *_migration.sql are run once in the Supabase SQL editor and not committed.
+sql/*_migration.sql

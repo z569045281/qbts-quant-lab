@@ -8,7 +8,7 @@ Run this after you've mined / refreshed locally:
 
 It recomputes the dashboard snapshot, a fresh AI brief, the calibration table,
 and every factor's chart — then writes them to Supabase. The deployed Next.js
-site reads straight from Supabase (no backend). See supabase_schema.sql.
+site reads straight from Supabase (no backend). See sql/supabase_schema.sql.
 
 Requires in .env:
     SUPABASE_URL          (https://<project>.supabase.co)
