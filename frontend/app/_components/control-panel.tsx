@@ -92,6 +92,7 @@ function LocalPanel({ onPublished }: { onPublished: () => void }) {
   const [status, setStatus]       = useState<ControlStatus | null>(null);
   const [reachable, setReachable] = useState<boolean | null>(null);
   const [busy, setBusy]           = useState<string | null>(null);
+  const [retroMsg, setRetroMsg]   = useState<string | null>(null);
   const wasRunning = useRef(false);
 
   const pollOnce = useCallback(async (): Promise<boolean> => {
@@ -146,6 +147,19 @@ function LocalPanel({ onPublished }: { onPublished: () => void }) {
       setBusy(null);
     }
   };
+  const runRetro = async () => {
+    setBusy("retro");
+    setRetroMsg(null);
+    try {
+      const r = await fetch(`${API}/control/retrospective`, { method: "POST" });
+      const j = await r.json().catch(() => ({}));
+      setRetroMsg(r.ok && j.report_md ? "✓ 复盘已生成（页面「月度复盘」可查看）" : `✗ ${j.error || `HTTP ${r.status}`}`);
+    } catch (e) {
+      setRetroMsg(`✗ ${e instanceof Error ? e.message : "请求失败"}`);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   return (
     <Shell>
@@ -172,9 +186,25 @@ function LocalPanel({ onPublished }: { onPublished: () => void }) {
         {pusherOn ? "实时报价运行中 · 点击停止" : "▶ 开启实时报价"}
       </button>
 
+      <button
+        onClick={runRetro}
+        disabled={busy === "retro"}
+        className="px-3.5 py-2 text-sm font-medium rounded-lg border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 flex items-center gap-2"
+      >
+        {busy === "retro"
+          ? <><span className="inline-block w-2.5 h-2.5 rounded-full bg-indigo-400 animate-pulse" />生成复盘中…</>
+          : <>🔮 生成复盘</>}
+      </button>
+
       {!pub.running && pub.ok !== null && (
         <span className={`text-xs ${pub.ok ? "text-emerald-600" : "text-[#F03A3E]"}`}>
           {pub.ok ? `✓ 决策已更新 ${pub.finished_at ?? ""}` : "✗ 出决策失败（见下方日志）"}
+        </span>
+      )}
+
+      {retroMsg && (
+        <span className={`text-xs ${retroMsg.startsWith("✓") ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+          {retroMsg}
         </span>
       )}
 

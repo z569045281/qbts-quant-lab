@@ -1281,6 +1281,22 @@ async def dashboard_calibration():
     return result
 
 
+@app.post("/control/retrospective")
+async def control_retrospective():
+    """Generate the monthly retrospective (one Opus call ≈ $0.1) → Supabase.
+    Local-only trigger; the deployed site just reads the persisted row."""
+    from dashboard.retrospective import run_retrospective
+    _, df_d = await asyncio.to_thread(load_or_fetch)
+    return await asyncio.to_thread(run_retrospective, df_d)
+
+
+@app.get("/dashboard/retrospective")
+async def dashboard_retrospective():
+    """Latest persisted monthly retrospective (or {} if none generated yet)."""
+    from dashboard.retrospective import load_retrospective
+    return await asyncio.to_thread(load_retrospective) or {}
+
+
 # ── Trading endpoints ──────────────────────────────────────────────────────
 
 @app.get("/trading/status")

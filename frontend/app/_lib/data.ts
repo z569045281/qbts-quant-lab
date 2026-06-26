@@ -557,6 +557,23 @@ export async function getDcaState(): Promise<DcaState | null> {
   return data.data as DcaState;
 }
 
+/* ── 🔮 月度复盘 (model-written review of the accumulated track record) ────────── */
+export interface Retrospective {
+  generated_at:  string;
+  period_start:  string | null;
+  period_end:    string | null;
+  report_md:     string;
+  stats?:        Record<string, unknown>;
+}
+
+/** Latest persisted monthly retrospective (single 'current' row; null if none yet). */
+export async function getRetrospective(): Promise<Retrospective | null> {
+  const { data, error } = await supabase
+    .from("retrospective").select("data").eq("id", "current").maybeSingle();
+  if (error || !data) return null;
+  return data.data as Retrospective;
+}
+
 /** Edit the watchlist + re-scan. Cloud → Lambda Function URL; local → FastAPI.
  *  action: "watch_add" | "watch_remove" | "rescan". Re-scan can take ~30s. */
 export async function postWatchAction(

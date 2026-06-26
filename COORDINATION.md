@@ -13,6 +13,10 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-06-26 · sql-folder · 把根目录所有 *.sql(schema + 8 个 migration)统一移到 sql/ 文件夹;唯一代码引用 publish.py 注释改为 sql/supabase_schema.sql · files: sql/*(moved), publish.py
+
+- [done] 2026-06-26 · monthly-retrospective · 月度复盘:新 backend/dashboard/retrospective.py(拉 grade_predictions 校准 + 决策台账 → 一次 Opus 写中文复盘 → 存 Supabase retrospective 表 id=current);根目录 retrospective.py 脚本 + api.py 加 /control/retrospective(本地生成)与 /dashboard/retrospective(读);前端 _components/retrospective-panel.tsx 放进历史战绩卡,按钮 2026-07-26 前锁定(显示倒计时),解锁后读 Supabase 展示;control-panel 本地加"生成复盘"按钮;data.ts 加 getRetrospective;migration: retrospective_migration.sql · files: backend/dashboard/retrospective.py(new), retrospective.py(new), backend/api.py, frontend/app/_lib/data.ts, frontend/app/_components/retrospective-panel.tsx(new), frontend/app/_components/control-panel.tsx, frontend/app/page.tsx, supabase_schema.sql, retrospective_migration.sql(new)
+
 - [done] 2026-06-26 · mu-add+target-fix+decision-paper · ①自选扫描加 MU(存储芯片)进默认篮子+THEME ②修"上方目标"兜底:创新高/突破票上方无成交节点时不再吐低于现价的假目标(target=None,显示"已突破·上方无成交参照"),并避免污染纸面止盈 ③历史决策战绩加"模拟持仓"台账:每个方向单$1000假钱,按计划止损/目标的 ret_pct 汇总累计盈亏+当前持仓浮动(load_recent 加 paper 块,纯加法) · files: backend/dashboard/scan.py, backend/dashboard/journal.py, frontend/app/_lib/data.ts, frontend/app/page.tsx
 
 - [done] 2026-06-26 · choch-warn+plan-declutter · ①决策页加 CHoCH 早期反转预警横幅(snap.smc.last_event.kind==='CHoCH' 时显示,纯提示不发信号,补"等BOS确认所以进场晚"的空窗) ②交易计划卡精简:默认只显示 方向+QBTZ三价+盈亏比+仓位+失效条件,把 入场条件/波动档/QBTS镜像价/杠杆说明 收进 <details>展开看细节 · files: frontend/app/page.tsx · 注:page.tsx 同时有用户未提交的响应式 WIP,未替其提交

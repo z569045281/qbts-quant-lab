@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { MiniChart } from "./_components/mini-chart";
 import { ControlPanel } from "./_components/control-panel";
+import { RetrospectivePanel } from "./_components/retrospective-panel";
 import { getSnapshot, getLiveQuote, type Snapshot, type Decision, type LiveQuote } from "./_lib/data";
 import { fmtLocalDateTime, parseUtc, etMelbSuffix, epochMelbTime, macroSurprise } from "./_lib/format";
 
@@ -713,6 +714,9 @@ export default function Dashboard() {
               })}
             </div>
           )}
+
+          {/* 🔮 月度复盘按钮 — 一个月后解锁 */}
+          <RetrospectivePanel />
         </div>
 
         {/* 成交量画像 / POC */}
