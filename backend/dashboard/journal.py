@@ -253,9 +253,13 @@ def _reflect(r: dict) -> str | None:
         return None
 
 
+_PAPER_USD = 1000.0   # 模拟持仓:每个方向单跟随的假钱本金
+
+
 def load_recent(n: int = 12) -> dict:
     """Journal payload for dashboard + decision prompt."""
-    records = sorted(_load(), key=lambda r: r["date"], reverse=True)[:n]
+    allr = sorted(_load(), key=lambda r: r["date"], reverse=True)
+    records = allr[:n]
     graded = [r for r in records if r.get("status") == "graded"
               and r["result"] and r["result"]["correct"] is not None]
     n_correct = sum(1 for r in graded if r["result"]["correct"])
@@ -271,8 +275,32 @@ def load_recent(n: int = 12) -> dict:
     shadow = [r for r in records if r.get("status") == "graded" and _lean(r) is not None]
     n_shadow_correct = sum(1 for r in shadow if _lean(r))
 
+    # 模拟持仓 — 全量(非只展示的 n 条):每个已评判方向单当 $1000 假钱,按计划
+    # 止损/目标结算的 ret_pct 计盈亏;HOLD 不开仓。衡量"照决策做能不能赚到钱"。
+    # ret_pct 已是盈利视角(做空时取负),正=赚。按标的算,未含 2× ETF 杠杆/衰减。
+    _dir_graded = [r for r in allr
+                   if r.get("status") == "graded"
+                   and r.get("action") in ("LONG_QBTX", "SHORT_QBTZ")
+                   and (r.get("result") or {}).get("ret_pct") is not None]
+    _realized = sum(_PAPER_USD * r["result"]["ret_pct"] for r in _dir_graded)
+    _pwin = sum(1 for r in _dir_graded if r["result"]["ret_pct"] > 0)
+    _pend_dir = [r for r in allr if r.get("status") == "pending"
+                 and r.get("action") in ("LONG_QBTX", "SHORT_QBTZ")]
+    _op = max(_pend_dir, key=lambda r: r.get("date", "")) if _pend_dir else None
+    paper = {
+        "trade_usd": _PAPER_USD,
+        "realized":  round(_realized, 2),
+        "n_trades":  len(_dir_graded),
+        "n_win":     _pwin,
+        "win_rate":  round(_pwin / len(_dir_graded), 3) if _dir_graded else None,
+        "open": ({"action": _op["action"], "entry": _op.get("price"),
+                  "date": _op.get("date"), "stop": _op.get("stop"),
+                  "target": _op.get("target")} if _op else None),
+    }
+
     return {
         "records":   records,
+        "paper":     paper,
         "n_graded":  len(graded),
         "n_correct": n_correct,
         "accuracy":  round(n_correct / len(graded), 3) if graded else None,

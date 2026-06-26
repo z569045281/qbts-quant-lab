@@ -57,6 +57,11 @@ function fmtPx(n: number | null | undefined): string {
   return typeof n === "number" && isFinite(n) ? `$${n.toFixed(2)}` : "—";
 }
 
+/* 带正负号的金额(模拟盈亏用) */
+function fmtSignedUsd(n: number): string {
+  return `${n >= 0 ? "+" : "−"}$${Math.abs(n).toFixed(2)}`;
+}
+
 /* 给 Vivienne（完全不懂术语）看的极简动作 + 万一模型没生成 note 时的兜底文案 */
 function vivienneAction(action: Decision["action"] | undefined) {
   switch (action) {
@@ -155,6 +160,15 @@ export default function Dashboard() {
   // CHoCH 早期预警:最近一次结构事件是 CHoCH(性格转变)= 反转苗头但尚未被 BOS 确认。
   // 纯提示,不参与决策信号 —— 填补"等确认所以进场晚"的空窗。
   const choch = snap.smc?.last_event?.kind === "CHoCH" ? snap.smc.last_event : null;
+
+  // 模拟持仓:当前未平方向单的浮动盈亏(用实时 QBTS 价 vs 入场,按标的、未计 2× 杠杆)
+  const jPaper = snap.journal?.paper ?? null;
+  const jLiveQ = live?.quotes?.qbts?.price;
+  let jUnreal: number | null = null;
+  if (jPaper?.open && typeof jLiveQ === "number" && jPaper.open.entry > 0) {
+    const { action, entry } = jPaper.open;
+    jUnreal = (action === "SHORT_QBTZ" ? (entry - jLiveQ) : (jLiveQ - entry)) / entry * jPaper.trade_usd;
+  }
 
   const newsTop = (snap.news?.items ?? [])
     .filter(n => n.ai?.impact !== "low")
@@ -626,6 +640,38 @@ export default function Dashboard() {
               )}
             </div>
           </div>
+          {jPaper && (
+            <div className="mb-3 rounded-lg bg-[#F6F6F8] px-3 py-2.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-gray-700">📊 模拟持仓 · 每次 ${jPaper.trade_usd.toLocaleString()} 跟随决策</span>
+                <span className="text-[10px] text-gray-400">假钱 · 按标的方向,未计 2× 杠杆</span>
+              </div>
+              <div className="mt-1.5 font-mono">
+                已实现累计{" "}
+                <b className={jPaper.realized >= 0 ? "text-emerald-600" : "text-[#F03A3E]"}>{fmtSignedUsd(jPaper.realized)}</b>
+                <span className="text-gray-400 ml-1">
+                  ({jPaper.n_trades} 笔已平{jPaper.win_rate != null ? ` · 胜率 ${(jPaper.win_rate * 100).toFixed(0)}%` : ""})
+                </span>
+              </div>
+              {jPaper.open ? (
+                <div className="mt-1 font-mono">
+                  当前持仓：
+                  <span className={jPaper.open.action === "SHORT_QBTZ" ? "text-red-700 font-semibold" : "text-emerald-700 font-semibold"}>
+                    {jPaper.open.action === "SHORT_QBTZ" ? "做空" : "做多"}
+                  </span>
+                  <span className="text-gray-500"> 入场 ${jPaper.open.entry}（{jPaper.open.date.slice(5)}）</span>
+                  {jUnreal != null && (
+                    <> · 浮动 <b className={jUnreal >= 0 ? "text-emerald-600" : "text-[#F03A3E]"}>{fmtSignedUsd(jUnreal)}</b></>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-1 text-gray-400">当前空仓（最近决策为观望或已平）</div>
+              )}
+              {jPaper.n_trades < 10 && (
+                <div className="mt-1 text-[10px] text-amber-600">⚠️ 样本极少（{jPaper.n_trades} 笔）——系统多数日子观望、方向单稀少,这个数字还说明不了问题</div>
+              )}
+            </div>
+          )}
           {!snap.journal || snap.journal.records.length === 0 ? (
             <div className="text-xs text-gray-400 py-6 text-center">
               暂无记录 — 从下一次决策开始，每个判断都会被记录并在 5 个交易日后评判

@@ -215,8 +215,23 @@ export interface JournalRecord {
     shadow_correct?: boolean | null;  // HOLD: was that lean directionally right
   } | null;
 }
+export interface JournalPaper {
+  trade_usd: number;
+  realized:  number;
+  n_trades:  number;
+  n_win:     number;
+  win_rate:  number | null;
+  open: {
+    action: "LONG_QBTX" | "SHORT_QBTZ";
+    entry:  number;
+    date:   string;
+    stop:   number | null;
+    target: number | null;
+  } | null;
+}
 export interface DecisionJournal {
   records:   JournalRecord[];
+  paper?:    JournalPaper;
   n_graded:  number;
   n_correct: number;
   accuracy:  number | null;

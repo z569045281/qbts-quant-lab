@@ -12,7 +12,7 @@ Basket = 7 different *drivers* (avg pairwise return-correlation ≈ 0.30), chose
 for high volatility + low mutual correlation + small-capital affordability, so on
 any given day some theme is usually moving:
 
-  QBTS 量子 · POET 光电/AI光 · EOSE 储能 · RUN 太阳能 · LUNR 航天 · MARA 比特币 · AG 白银
+  QBTS 量子 · POET 光电/AI光 · EOSE 储能 · RUN 太阳能 · LUNR 航天 · MARA 比特币 · AG 白银 · MU 存储芯片
 
 Each ticker → a compact card: a buy-setup score, a plain-language trigger, and the
 key levels to act on. Ranked best-setup-first.
@@ -41,10 +41,10 @@ from dashboard.regime import analyze_regime
 logger = logging.getLogger(__name__)
 
 # Diversified, high-vol, small-capital-friendly basket (one name per driver).
-WATCHLIST = ["QBTS", "POET", "EOSE", "RUN", "LUNR", "MARA", "AG"]
+WATCHLIST = ["QBTS", "POET", "EOSE", "RUN", "LUNR", "MARA", "AG", "MU"]
 THEME = {
     "QBTS": "量子", "POET": "光电", "EOSE": "储能", "RUN": "太阳能",
-    "LUNR": "航天", "MARA": "比特币", "AG": "白银",
+    "LUNR": "航天", "MARA": "比特币", "AG": "白银", "MU": "存储芯片",
     # personal-interest adds
     "NVDA": "芯片", "SPCX": "SpaceX",
     # diversifying drivers (low corr to basket, verified 2026-06-24)
@@ -262,8 +262,13 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
         below_demand = [z for z in demand if z.get("high", 1e9) <= close]
         buy_zone = max(below_demand, key=lambda z: z["high"]) if below_demand else None
         supply_above = [z["low"] for z in supply if z.get("low", 0) > close]
-        target = mag_up or vah or (min(supply_above) if supply_above else None)
-        brk = (min(supply_above) if supply_above else None) or vah
+        # 上方参照必须真的在现价之上 —— 突破/创新高的票上方常无成交节点或供给,
+        # 兜底绝不能吐一个低于现价的数当"上方目标"(读着像胡说,还会污染纸面止盈)。
+        _cand = [mag_up, vah, (min(supply_above) if supply_above else None)]
+        _ups = [x for x in _cand if isinstance(x, (int, float)) and pd.notna(x) and x > close]
+        target = min(_ups) if _ups else None
+        brk = (min(supply_above) if supply_above else None) \
+              or (vah if (isinstance(vah, (int, float)) and pd.notna(vah) and vah > close) else None)
 
         # ── plain-language trigger ───────────────────────────────────────────
         bz = f"{_money(buy_zone['low'])}–{_money(buy_zone['high'])}" if buy_zone else None
@@ -272,6 +277,7 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
             elif val:  trig = f"结构偏多,回踩价值区下沿 {_money(val)} 附近可买"
             else:      trig = "结构偏多,回踩不破前低可分批买"
             if target: trig += f",上方先看 {_money(target)}"
+            else:      trig += ",已突破·上方无成交参照(创新高,追高谨慎)"
         elif stance == "接近买点":
             ref = bz or _money(val)
             if brk: trig = f"偏多但需确认:放量站上 {_money(brk)} 再进,或回踩 {ref} 企稳买"
