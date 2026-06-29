@@ -13,6 +13,10 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-06-29 · decision-chart+ev-warn · ①决策页图表:扩展现有 MiniChart(复用 lightweight-charts,不新建组件/依赖)——加 计划三线(入场/止损/目标)、SMC 供给/需求带(最近一档)、POC、历史已评判决策 ✓/✗ 标记。page.tsx 用 useMemo(chartPlan/chartMarkers,避免30s实时轮询重建图表)喂入。②交易计划卡负 EV 软警告:tradeEv()=系统自己的胜率(做空取1−p_up)×盈亏比−败率,<0 时红框提示(标注"胜率验证期,软参考")。 · files: frontend/app/_components/mini-chart.tsx, frontend/app/page.tsx
+
+- [done] 2026-06-29 · sec-dilution-overlay · 免费 SEC EDGAR 增发/稀释叠加(补机械扫描的事件盲区)。altdata.py 加 fetch_sec_dilution(ticker):data.sec.gov submissions JSON,424B*=实际增发(high)、S-3/S-1=货架(warn);窗口分开(增发120天/货架365天);UA 要邮箱形式否则403(沿用伪域名默认,可 SEC_USER_AGENT 覆盖)。无需新表——结果挂在 scan 每张卡(scan_ticker base 加 dilution)随 watchlist_scan 持久化;decision 也喂 QBTS(refresh_decision extras + _build_user_msg 出「⚠️ SEC增发/稀释」段)。前端 ScanResult 加 dilution 类型 + watch 卡片红/橙 badge。实测 QBTS=S-3ASR货架/POET=424B5增发 · files: backend/data/altdata.py, backend/dashboard/scan.py, backend/dashboard/decision.py, backend/api.py, frontend/app/_lib/data.ts, frontend/app/watch/page.tsx, CLAUDE.md
+
 - [done] 2026-06-29 · decision-stability+structured-output · ①(A)当日一致性护栏放在 **Supabase 支持的 journal.record()**(不是本地缓存——手机点部署站→Lambda 冷启动会清 /tmp,本地缓存抓不到她在手机上反复点的场景)。同日累计 action 存进当天 journal 记录,翻面则 decision.intraday_unstable=true 并 mutate decision→随快照发布;前端决策页行动卡下方出琥珀色横幅「今日判断不稳定→视为观望」。手机/本地/云三方共享同一 Supabase 列表 ②(B)决策改用结构化输出 output_config.format+json_schema(_DECISION_SCHEMA),去掉脆弱的正则去围栏/删尾逗号;实测 Opus4.8+thinking adaptive 通过(踩坑:etf_ticker 不能 type+enum 混用,改 enum-only) · files: backend/dashboard/decision.py, backend/dashboard/journal.py, frontend/app/_lib/data.ts, frontend/app/page.tsx
 
 - [done] 2026-06-26 · sql-folder · 把根目录所有 *.sql(schema + 8 个 migration)统一移到 sql/ 文件夹;唯一代码引用 publish.py 注释改为 sql/supabase_schema.sql · files: sql/*(moved), publish.py

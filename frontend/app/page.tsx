@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MiniChart } from "./_components/mini-chart";
 import { ControlPanel } from "./_components/control-panel";
 import { RetrospectivePanel } from "./_components/retrospective-panel";
@@ -63,6 +63,17 @@ function fmtSignedUsd(n: number): string {
   return `${n >= 0 ? "+" : "−"}$${Math.abs(n).toFixed(2)}`;
 }
 
+/* 期望值(每单位风险):用系统自己的胜率估计 × 盈亏比。
+   p_up_5d=未来5日上涨概率;做空时赢面=1−p_up。RR=回报/风险。
+   EV = p赢×RR − (1−p赢)。<0 = 按它自己的概率长期重复做都不划算。
+   注意:p_up 仍在测量期、未被验证 —— 这是"软"参考,不是硬熔断。 */
+function tradeEv(action: Decision["action"], pUp: number, rr: number | null | undefined): number | null {
+  if (rr == null || !isFinite(rr) || rr <= 0) return null;
+  if (action !== "LONG_QBTX" && action !== "SHORT_QBTZ") return null;
+  const pWin = action === "LONG_QBTX" ? pUp : 1 - pUp;
+  return pWin * rr - (1 - pWin);
+}
+
 /* 给 Vivienne（完全不懂术语）看的极简动作 + 万一模型没生成 note 时的兜底文案 */
 function vivienneAction(action: Decision["action"] | undefined) {
   switch (action) {
@@ -108,6 +119,26 @@ export default function Dashboard() {
     const id = setInterval(tick, 30_000);
     return () => { stop = true; clearInterval(id); };
   }, []);
+
+  // ── Decision-chart props (memoized so the 30s live-poll re-render doesn't
+  // re-init the chart). Stable refs come straight off `snap`; the two derived
+  // objects below are the only ones built fresh, so they're memoized. ──────────
+  const chartMarkers = useMemo(() =>
+    (snap?.journal?.records ?? [])
+      .filter(r => r.action !== "HOLD" && r.result)
+      .map(r => ({
+        time: Math.floor(Date.parse(r.date + "T00:00:00Z") / 1000),
+        action: r.action,
+        correct: r.result?.correct ?? null,
+      })),
+    [snap?.journal]);
+  const chartPlan = useMemo(() => {
+    const dd = snap?.decision;
+    return dd && dd.action !== "HOLD" && dd.plan_valid !== false
+      ? { entry: dd.trade_plan.qbts_entry, stop: dd.trade_plan.qbts_stop,
+          target: dd.trade_plan.qbts_target, action: dd.action }
+      : null;
+  }, [snap?.decision]);
 
   if (loading && !snap) {
     return (
@@ -385,6 +416,20 @@ export default function Dashboard() {
                       </tr>
                     </tbody>
                   </table>
+                  {/* 负 EV 软警告:用系统自己的胜率估计 × 盈亏比 */}
+                  {(() => {
+                    const ev = tradeEv(d.action, d.p_up_5d, d.trade_plan.rr_ratio);
+                    if (ev == null || ev >= 0) return null;
+                    const pWin = d.action === "LONG_QBTX" ? d.p_up_5d : 1 - d.p_up_5d;
+                    return (
+                      <div className="mt-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 leading-relaxed">
+                        ⚠️ <span className="font-semibold">期望值为负(EV≈{ev.toFixed(2)})</span>：
+                        按系统自己的概率({(pWin * 100).toFixed(0)}% 赢面)× 盈亏比 1:{d.trade_plan.rr_ratio?.toFixed(1)},
+                        长期重复做这种赔率赚不回来 —— 赔率太薄或胜算不够,这种更该观望。
+                        <span className="block text-red-400 mt-0.5">(胜率仍在验证期,仅作软参考)</span>
+                      </div>
+                    );
+                  })()}
                 </>
               )}
               {/* 失效条件 */}
@@ -874,6 +919,11 @@ export default function Dashboard() {
           sma200={snap.chart.sma200}
           high_52w={snap.chart.high_52w}
           low_52w={snap.chart.low_52w}
+          plan={chartPlan}
+          supply={snap.smc?.supply_zones}
+          demand={snap.smc?.demand_zones}
+          poc={snap.volume_profile?.poc ?? null}
+          markers={chartMarkers}
         />
       </section>
 
