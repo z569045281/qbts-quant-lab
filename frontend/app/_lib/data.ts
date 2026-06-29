@@ -290,6 +290,8 @@ export interface Decision {
   invalidation_price?: number;   // QBTS level that kills the plan (machine-checkable)
   plan_valid?:        boolean;   // false = stop/target geometry was inconsistent
   vivienne_note?:     string;    // plain-language, no-jargon note for a non-expert reader
+  intraday_unstable?: boolean;   // true = today's call flip-flopped across regenerations
+  intraday_actions?:  ("LONG_QBTX" | "SHORT_QBTZ" | "HOLD")[];  // actions seen today, in order
 }
 
 /* ── /dashboard/calibration payload ──────────────────────────────────────── */

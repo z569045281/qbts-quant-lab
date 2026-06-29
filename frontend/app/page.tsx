@@ -309,6 +309,20 @@ export default function Dashboard() {
         </div>
       </section>
 
+      {/* 当日一致性护栏 — 今天多次生成结果反复 → 视为无明确优势 */}
+      {d?.intraday_unstable && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          ⚠️ <span className="font-semibold">今日判断不稳定</span>：今天多次生成,结果在{" "}
+          <span className="font-mono">
+            {(d.intraday_actions ?? [])
+              .map(a => (a === "LONG_QBTX" ? "做多" : a === "SHORT_QBTZ" ? "做空" : "观望"))
+              .join(" → ")}
+          </span>{" "}
+          之间反复。模型本身带随机性,信心临界点上会翻面 —— <span className="font-semibold">这本身就说明今天没有清晰优势</span>。
+          建议<span className="font-semibold">视为观望</span>,别在反复的答案里挑你想要的那个。
+        </div>
+      )}
+
       {d && (
         <>
           {/* ══ 2. 交易计划 + 3. 关键驱动 ══════════════════════════════════ */}

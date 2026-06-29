@@ -108,9 +108,33 @@ def _save(records: list[dict]) -> None:
 
 
 def record(decision: dict, price_at_decision: float, as_of: str) -> None:
-    """Append a fresh decision (idempotent: one per calendar date)."""
+    """Append a fresh decision (idempotent: one per calendar date).
+
+    Also runs the **intraday consistency guard**: the running list of actions
+    generated *today* is stored on the day's record. Because this table is
+    Supabase-backed, a phone tap on the deployed site, a local run, and a cloud
+    Lambda all share the SAME list — so flip-flopping ("做空→观望→做空" from
+    tapping 生成决策 repeatedly) is caught no matter where it happens. If the
+    action changes within a day the edge isn't real; we flag `intraday_unstable`
+    and mutate `decision` so the published snapshot carries it for the UI banner.
+    """
     records = _load()
     today = datetime.now().strftime("%Y-%m-%d")
+
+    # Accumulate today's actions from the existing same-day record (if any).
+    prior_actions: list[str] = []
+    for r in records:
+        if r.get("date") == today:
+            prior_actions = [a for a in (r.get("intraday_actions") or []) if a]
+            if not prior_actions and r.get("action"):
+                prior_actions = [r["action"]]
+            break
+    new_action = decision.get("action")
+    actions = prior_actions + ([new_action] if new_action else [])
+    unstable = len({a for a in actions if a}) > 1
+    decision["intraday_actions"] = actions      # mutate → flows to the published snapshot
+    decision["intraday_unstable"] = unstable
+
     # Same-day regeneration (e.g. post-CPI refresh) REPLACES the pending
     # same-day record — the final decision of the day is what gets graded.
     records = [r for r in records
@@ -130,6 +154,8 @@ def record(decision: dict, price_at_decision: float, as_of: str) -> None:
         "summary":    (decision.get("summary") or "")[:160],
         "status":     "pending",
         "result":     None,
+        "intraday_actions":  actions,
+        "intraday_unstable": unstable,
     })
     _save(records)
 

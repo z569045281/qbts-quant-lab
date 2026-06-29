@@ -455,8 +455,75 @@ def _sanitize_decision(decision: dict, snapshot: dict, extras: dict | None) -> d
     return decision
 
 
+# Structured-output schema — Opus 4.8's `output_config.format` constrains the
+# model to schema-shaped JSON, so we no longer hand-clean fences / trailing
+# commas. Every object needs additionalProperties:false + all keys in required;
+# optional fields are made nullable (no min/max constraints — unsupported).
+_NUM = {"type": ["number", "null"]}
+_DECISION_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["action", "conviction", "p_up_5d", "summary", "trade_plan",
+                 "key_drivers", "risks", "upcoming_catalysts", "invalidation",
+                 "invalidation_price", "vivienne_note"],
+    "properties": {
+        "action": {"type": "string", "enum": ["LONG_QBTX", "SHORT_QBTZ", "HOLD"]},
+        "conviction": {"type": "integer"},
+        "p_up_5d": {"type": "number"},
+        "summary": {"type": "string"},
+        "trade_plan": {
+            "type": "object", "additionalProperties": False,
+            "required": ["qbts_entry", "qbts_stop", "qbts_target", "etf_ticker",
+                         "etf_entry", "etf_stop", "etf_target", "rr_ratio",
+                         "suggested_position_pct", "entry_condition"],
+            "properties": {
+                "qbts_entry": _NUM, "qbts_stop": _NUM, "qbts_target": _NUM,
+                "etf_ticker": {"enum": ["QBTX", "QBTZ", None]},  # enum-only: a type+enum mix is rejected
+                "etf_entry": _NUM, "etf_stop": _NUM, "etf_target": _NUM,
+                "rr_ratio": _NUM, "suggested_position_pct": _NUM,
+                "entry_condition": {"type": "string"},
+            },
+        },
+        "key_drivers": {
+            "type": "array",
+            "items": {
+                "type": "object", "additionalProperties": False,
+                "required": ["name", "direction", "strength", "note"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "direction": {"type": "string", "enum": ["bullish", "bearish"]},
+                    "strength": {"type": "string", "enum": ["强", "中", "弱"]},
+                    "note": {"type": "string"},
+                },
+            },
+        },
+        "risks": {"type": "array", "items": {"type": "string"}},
+        "upcoming_catalysts": {
+            "type": "array",
+            "items": {
+                "type": "object", "additionalProperties": False,
+                "required": ["date", "event", "impact", "note"],
+                "properties": {
+                    "date": {"type": "string"},
+                    "event": {"type": "string"},
+                    "impact": {"type": "string", "enum": ["高", "中", "低"]},
+                    "note": {"type": "string"},
+                },
+            },
+        },
+        "invalidation": {"type": "string"},
+        "invalidation_price": _NUM,
+        "vivienne_note": {"type": "string"},
+    },
+}
+
+
 def generate_decision(snapshot: dict, extras: dict | None = None) -> dict:
-    """One Claude call → parsed decision dict. Raises on hard failure."""
+    """One Claude call → parsed decision dict. Raises on hard failure.
+
+    Uses structured outputs (`output_config.format`) so the model is constrained
+    to valid, schema-shaped JSON — no fragile regex de-fencing / comma-stripping.
+    """
     user_msg = _build_user_msg(snapshot, extras)
 
     resp = _CLIENT.messages.create(
@@ -467,23 +534,19 @@ def generate_decision(snapshot: dict, extras: dict | None = None) -> dict:
         thinking={"type": "adaptive"},
         system=_SYSTEM,
         messages=[{"role": "user", "content": user_msg}],
+        output_config={"format": {"type": "json_schema", "schema": _DECISION_SCHEMA}},
     )
-    # The model emits thinking blocks before the text block —
-    # take the first block that actually has text content.
+    # Thinking blocks stream first; the text block is now guaranteed valid JSON.
     text = next(
         (b.text for b in resp.content if getattr(b, "type", "") == "text"),
         "",
     ).strip()
     if not text:
-        raise ValueError("no text block in model response")
-    # Strip accidental fences
-    text = re.sub(r"^```(?:json)?\s*", "", text)
-    text = re.sub(r"\s*```$", "", text)
-    # Models occasionally emit trailing commas (legal in JS, not JSON) — strip them.
-    text = re.sub(r",(\s*[}\]])", r"\1", text)
+        # A safety refusal (stop_reason="refusal") yields no schema-shaped text.
+        raise ValueError(f"no text block in model response (stop_reason={resp.stop_reason})")
     decision = json.loads(text)
 
-    # Minimal schema guard
+    # Minimal guard — structured outputs already enforces the shape.
     if decision.get("action") not in ("LONG_QBTX", "SHORT_QBTZ", "HOLD"):
         raise ValueError(f"bad action: {decision.get('action')}")
     decision["conviction"] = max(0, min(10, int(decision.get("conviction", 0))))
@@ -522,6 +585,10 @@ def get_or_generate_decision(
         logger.warning(f"Decision generation failed: {e}")
         return None, None, False
 
+    # NOTE: the intraday consistency guard (flip-flop detection) lives in
+    # journal.record() — it reads/writes Supabase, so a phone tap on the deployed
+    # site, a local run, and a cloud Lambda all share one running action list.
+    # A local cache file would NOT (Lambda /tmp is wiped per cold start).
     now_iso = datetime.now(timezone.utc).isoformat(timespec="seconds")   # tz-aware UTC → 前端转本地
     try:
         _CACHE_PATH.write_text(json.dumps(

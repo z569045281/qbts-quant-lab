@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-06-29 · decision-stability+structured-output · ①(A)当日一致性护栏放在 **Supabase 支持的 journal.record()**(不是本地缓存——手机点部署站→Lambda 冷启动会清 /tmp,本地缓存抓不到她在手机上反复点的场景)。同日累计 action 存进当天 journal 记录,翻面则 decision.intraday_unstable=true 并 mutate decision→随快照发布;前端决策页行动卡下方出琥珀色横幅「今日判断不稳定→视为观望」。手机/本地/云三方共享同一 Supabase 列表 ②(B)决策改用结构化输出 output_config.format+json_schema(_DECISION_SCHEMA),去掉脆弱的正则去围栏/删尾逗号;实测 Opus4.8+thinking adaptive 通过(踩坑:etf_ticker 不能 type+enum 混用,改 enum-only) · files: backend/dashboard/decision.py, backend/dashboard/journal.py, frontend/app/_lib/data.ts, frontend/app/page.tsx
+
 - [done] 2026-06-26 · sql-folder · 把根目录所有 *.sql(schema + 8 个 migration)统一移到 sql/ 文件夹;唯一代码引用 publish.py 注释改为 sql/supabase_schema.sql · files: sql/*(moved), publish.py
 
 - [done] 2026-06-26 · monthly-retrospective · 月度复盘:新 backend/dashboard/retrospective.py(拉 grade_predictions 校准 + 决策台账 → 一次 Opus 写中文复盘 → 存 Supabase retrospective 表 id=current);根目录 retrospective.py 脚本 + api.py 加 /control/retrospective(本地生成)与 /dashboard/retrospective(读);前端 _components/retrospective-panel.tsx 放进历史战绩卡,按钮 2026-07-26 前锁定(显示倒计时),解锁后读 Supabase 展示;control-panel 本地加"生成复盘"按钮;data.ts 加 getRetrospective;migration: retrospective_migration.sql · files: backend/dashboard/retrospective.py(new), retrospective.py(new), backend/api.py, frontend/app/_lib/data.ts, frontend/app/_components/retrospective-panel.tsx(new), frontend/app/_components/control-panel.tsx, frontend/app/page.tsx, supabase_schema.sql, retrospective_migration.sql(new)
