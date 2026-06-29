@@ -45,6 +45,15 @@ def _require_env() -> tuple[str, str]:
 
 
 def main() -> None:
+    # Windows consoles default to GBK; the progress prints below use ✓/✗/→/!.
+    # Make stdout/stderr UTF-8 so a checkmark never crashes the publish at the
+    # finish line (the write itself would otherwise raise UnicodeEncodeError).
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+
     url, key = _require_env()
 
     # Heavy imports happen only after env is validated, so a misconfig fails fast.

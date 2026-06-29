@@ -2,8 +2,9 @@
 Watchlist scanner — a daily buy-setup scan across a diversified high-beta basket.
 
 This is the "广而浅" companion to the deep single-stock QBTS dashboard. It reuses
-ONLY the ticker-agnostic signal modules — SMC structure, volume profile, and the
-volatility regime — plus simple trend/RSI on freshly fetched bars. It deliberately
+ONLY the ticker-agnostic signal modules — SMC structure, volume profile, the
+volatility regime, and the non-repainting Nadaraya-Watson envelope — plus simple
+trend/RSI on freshly fetched bars. It deliberately
 does NOT use any QBTS-specific data (13F / short volume / leveraged-ETF flow /
 quantum peer basket) and makes NO per-name LLM call, so it's pure mechanical and
 costs ~$0.
@@ -37,6 +38,7 @@ from data.fetcher import _clean_ohlcv
 from dashboard.smc import analyze_smc
 from dashboard.volume_profile import analyze_volume_profile
 from dashboard.regime import analyze_regime
+from dashboard.nadaraya_watson import analyze_nw_envelope
 
 logger = logging.getLogger(__name__)
 
@@ -240,6 +242,7 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
         smc = analyze_smc(df_d, None, df_h if not df_h.empty else None)
         vp = analyze_volume_profile(df_h, None) if not df_h.empty else {}
         reg = analyze_regime(df_d)
+        nw = analyze_nw_envelope(df_d)   # 非重绘 NW 包络（均值回归）
 
         # ── transparent buy-setup score (-7..+7) ────────────────────────────
         pts = 0
@@ -258,6 +261,11 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
         if rsi is not None:
             if rsi < 35:   pts += 1
             elif rsi > 75: pts -= 1
+        # NW 包络:贴近下轨=均值回归抄底(+1),贴近上轨=拉伸偏贵(-1)。与 RSI 同量级,
+        # 不让这个尚未验证的新信号一票独大;它和别的信号一样进纸面交易被真实评判。
+        if nw.get("active"):
+            if nw.get("signal") == 1:   pts += 1
+            elif nw.get("signal") == -1: pts -= 1
 
         if pts >= 3:    stance, emoji = "买入区", "🟢"
         elif pts >= 1:  stance, emoji = "接近买点", "🟡"
@@ -310,6 +318,8 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
             notes.append(f"波动{reg_cn}" + (f"（{pctl:.0f}%位）" if pctl is not None else ""))
         if vp.get("action_hint"):
             notes.append(vp["action_hint"][:60])
+        if nw.get("active") and nw.get("stance") != "inside":
+            notes.append(nw["note"])
 
         thin = n_bars < _MIN_BARS
         if thin:
@@ -330,6 +340,8 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
             "trigger": trig,
             "levels": {"buy_zone": bz, "target": _money(target), "stop_hint": reg.get("stop_hint")},
             "target_num": round(target, 2) if isinstance(target, (int, float)) and pd.notna(target) else None,
+            "nw": {k: nw.get(k) for k in ("stance", "signal", "lower", "upper",
+                   "buy_line", "sell_line", "nw", "position_pct", "crossed_in", "crossed_out")} if nw.get("active") else None,
             "exit_hint": _exit_hint(close, target, sma20, sma50, buy_zone),
             "notes": notes,
             "error": None,

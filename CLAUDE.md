@@ -84,6 +84,18 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   `aws/template.yaml` (`FredApiKey`) + `deploy-aws.yml`.
 - **Models**: Opus 4.8 (decision) · Sonnet 4.6 (factor gen) · Haiku 4.5 (news / reflections).
 - **Big image push to ECR occasionally times out** in CI — just re-run "Deploy AWS jobs".
+- **Nadaraya-Watson 包络** (`backend/dashboard/nadaraya_watson.py::analyze_nw_envelope`):
+  non-repainting Gaussian-kernel mean-reversion band (causal one-sided kernel — does
+  NOT peek at the future like LuxAlgo's default two-sided version, so its win rate is
+  the honest, tradeable one, not the inflated repainting backtest). Faithful port of the
+  user's Pine v5 strategy "NWE Mean Reversion [魔改 v4]" — same endpoint algo, bands, and
+  trigger lines. `level=90` → buy_line at bottom 10% of the band (their yellow line, price
+  ≤ it = buy, +1 to scan score), sell_line at top 10% (orange line, ≥ it = fade, −1);
+  `crossed_in/out` flag the exact crossunder/crossover bar. Wired into the scan score (±1, same
+  magnitude as RSI so it can't dominate) + card (`nw` block, note) and the QBTS decision
+  prompt (`snapshot['nw_envelope']`, framed as a mean-reversion entry-timing/take-profit
+  reference, not a standalone direction). Gets graded by the paper-trade ledger like every
+  other signal — treat its edge as UNPROVEN until the record shows one.
 - **SEC dilution overlay** (`backend/data/altdata.py::fetch_sec_dilution`): free EDGAR
   (`data.sec.gov`), no key — flags recent 424B* (实际增发/high) & S-3/S-1 (货架/warn) per
   ticker. Wired into the scan (badge on every 自选 card) and the QBTS decision prompt. **SEC
@@ -124,7 +136,7 @@ Frontend tabs (`frontend/app/`): **🎯 决策仪表盘** (`/`) · **🔭 自选
 **📥 定投专区** (`/dca`) · **🏆 因子排行榜** (`/factors`).
 
 - **自选扫描 (`scan.py` / `scan_store.py`)** — mechanical multi-name buy-setup scan
-  (SMC/volume/regime + trend/RSI), ~$0 (one Haiku commentary). Carries: a **$1000-per-
+  (SMC/volume/regime + trend/RSI + **NW 包络**), ~$0 (one Haiku commentary). Carries: a **$1000-per-
   buy-signal paper-trading ledger** (`scan_paper` table; buy on 买入区, sell on 偏空回避 /
   到目标 / 跌破均线, 0.2%/side cost), **exit hints**, a static **lockup countdown**
   (`LOCKUPS` dict, SPCX), **earnings overlay**, a **thin-data guard** (<60 bars → flagged

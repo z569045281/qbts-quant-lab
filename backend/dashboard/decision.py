@@ -287,6 +287,16 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
     if reg and reg.get("rationale"):
         parts.append(f"## 波动率 Regime\n  {reg['rationale']}")
 
+    # ── Nadaraya-Watson 包络（非重绘均值回归带）────────────────
+    nw = snapshot.get("nw_envelope")
+    if nw and nw.get("active"):
+        parts.append(
+            f"## Nadaraya-Watson 包络（非重绘核回归均值回归带）\n  {nw['rationale']}\n"
+            f"  → 现价贴近下轨=拉伸偏便宜的均值回归买点;贴近上轨=拉伸偏贵、利于止盈/减仓。"
+            f"这是均值回归类信号,与趋势/突破类证据可能相左——若与 SMC 趋势/动量背离,"
+            f"把它当作【入场时机/止盈位】的参考,而非单独的方向依据,且因其用因果核(不重绘),"
+            f"真实胜率低于 TradingView 重绘版回测,勿据此单独给高 conviction。")
+
     # ── 历史战绩与教训（系统自我反省）────────────────────────
     journal = extras.get("journal")
     if journal and journal.get("records"):

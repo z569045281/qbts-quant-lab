@@ -100,6 +100,7 @@ export interface Snapshot {
   smc?: SmcAnalysis | null;
   volume_profile?:    VolumeProfile | null;
   regime?:            VolatilityRegime | null;
+  nw_envelope?:       NwEnvelope | null;
   squeeze?:           SqueezeFuel | null;
   relative_strength?: RelativeStrength | null;
   journal?: DecisionJournal | null;
@@ -162,6 +163,32 @@ export interface VolatilityRegime {
   gap_gt5_pct?: number;
   stop_hint?: string;
   rationale: string;
+}
+
+/* ── Nadaraya-Watson envelope (non-repainting mean-reversion band) ────────── */
+export interface NwBand {
+  time: number; upper: number; lower: number;
+  buy_line: number; sell_line: number; nw: number;
+}
+export interface NwEnvelope {
+  active:       boolean;
+  signal:       -1 | 0 | 1;
+  stance?:      "near_lower" | "inside" | "near_upper";
+  nw?:          number;
+  upper?:       number;
+  lower?:       number;
+  buy_line?:    number;
+  sell_line?:   number;
+  position?:    number;
+  position_pct?: number;
+  slope?:       "up" | "down" | "flat";
+  crossed_in?:  boolean;
+  crossed_out?: boolean;
+  broke_upper?: boolean;
+  level?:       number;
+  bands?:       NwBand[];
+  note?:        string;
+  rationale:    string;
 }
 
 /* ── squeeze fuel composite ──────────────────────────────────────────────── */

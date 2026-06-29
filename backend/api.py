@@ -42,6 +42,7 @@ from dashboard.macro       import get_macro_calendar
 from dashboard.smc         import analyze_smc
 from dashboard.volume_profile    import analyze_volume_profile
 from dashboard.regime            import analyze_regime
+from dashboard.nadaraya_watson    import analyze_nw_envelope
 from dashboard.squeeze           import analyze_squeeze
 from dashboard.relative_strength import analyze_relative_strength
 from dashboard.journal     import record as journal_record, grade_pending, load_recent as journal_recent
@@ -994,6 +995,10 @@ async def dashboard_snapshot(force_refresh: bool = False):
     except Exception as e:
         regime = {"regime": "normal", "rationale": f"波动率 regime 失败: {str(e)[:80]}"}
     try:
+        nw_env = await asyncio.to_thread(analyze_nw_envelope, df_d)
+    except Exception as e:
+        nw_env = {"active": False, "signal": 0, "rationale": f"NW 包络失败: {str(e)[:80]}"}
+    try:
         rel_strength = await asyncio.to_thread(analyze_relative_strength, df_d)
     except Exception as e:
         rel_strength = {"signal": 0, "label": "HOLD", "rationale": f"相对强度失败: {str(e)[:80]}"}
@@ -1014,6 +1019,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["smc"]            = smc
     payload["volume_profile"] = vol_profile
     payload["regime"]         = regime
+    payload["nw_envelope"]    = nw_env
     payload["relative_strength"] = rel_strength
     payload["squeeze"]        = squeeze
     payload["journal"]        = journal
@@ -1124,9 +1130,15 @@ _PUSHER_LOCK = threading.Lock()
 
 def _run_publish_blocking() -> None:
     import time as _t
+    import os as _os
+    # Force UTF-8 on both ends: publish.py prints ✓/✗/→ progress marks, but a
+    # Windows console / piped subprocess defaults to GBK and crashes when it
+    # writes a checkmark — which made a fully-successful publish report failure.
     proc = subprocess.run(
         [sys.executable, "publish.py"],
         cwd=str(_REPO_ROOT), capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
+        env={**_os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"},
     )
     out = ((proc.stdout or "") + (proc.stderr or "")).strip()
     with _PUBLISH_LOCK:

@@ -924,6 +924,7 @@ export default function Dashboard() {
           demand={snap.smc?.demand_zones}
           poc={snap.volume_profile?.poc ?? null}
           markers={chartMarkers}
+          nwBands={snap.nw_envelope?.bands}
         />
       </section>
 

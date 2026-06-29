@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done]   2026-06-30 · nw-envelope · 新增 Nadaraya-Watson 包络(非重绘高斯核)作为又一机械判据。新建 backend/dashboard/nadaraya_watson.py(analyze_nw_envelope(df_d):因果单边核,不偷看未来→上/下/中轨+价格在包络内位置 pos+stance);接 scan.py 打分(贴近下轨pos≤0.12 +1 / 贴近上轨pos≥0.90 −1,与RSI同量级不一票独大)+卡片note;接 api.py snapshot(payload['nw_envelope'])+decision.py _build_user_msg 喂 QBTS 决策。阈值用用户TradingView的 88%/90%。⚠️给用户讲清LuxAlgo默认版重绘会灌水回测胜率,这里用非重绘版让它进纸面交易被真实验证 · files: backend/dashboard/nadaraya_watson.py(new), backend/dashboard/scan.py, backend/api.py, backend/dashboard/decision.py
+
 - [done] 2026-06-29 · decision-chart+ev-warn · ①决策页图表:扩展现有 MiniChart(复用 lightweight-charts,不新建组件/依赖)——加 计划三线(入场/止损/目标)、SMC 供给/需求带(最近一档)、POC、历史已评判决策 ✓/✗ 标记。page.tsx 用 useMemo(chartPlan/chartMarkers,避免30s实时轮询重建图表)喂入。②交易计划卡负 EV 软警告:tradeEv()=系统自己的胜率(做空取1−p_up)×盈亏比−败率,<0 时红框提示(标注"胜率验证期,软参考")。 · files: frontend/app/_components/mini-chart.tsx, frontend/app/page.tsx
 
 - [done] 2026-06-29 · sec-dilution-overlay · 免费 SEC EDGAR 增发/稀释叠加(补机械扫描的事件盲区)。altdata.py 加 fetch_sec_dilution(ticker):data.sec.gov submissions JSON,424B*=实际增发(high)、S-3/S-1=货架(warn);窗口分开(增发120天/货架365天);UA 要邮箱形式否则403(沿用伪域名默认,可 SEC_USER_AGENT 覆盖)。无需新表——结果挂在 scan 每张卡(scan_ticker base 加 dilution)随 watchlist_scan 持久化;decision 也喂 QBTS(refresh_decision extras + _build_user_msg 出「⚠️ SEC增发/稀释」段)。前端 ScanResult 加 dilution 类型 + watch 卡片红/橙 badge。实测 QBTS=S-3ASR货架/POET=424B5增发 · files: backend/data/altdata.py, backend/dashboard/scan.py, backend/dashboard/decision.py, backend/api.py, frontend/app/_lib/data.ts, frontend/app/watch/page.tsx, CLAUDE.md
