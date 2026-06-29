@@ -84,6 +84,12 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   `aws/template.yaml` (`FredApiKey`) + `deploy-aws.yml`.
 - **Models**: Opus 4.8 (decision) · Sonnet 4.6 (factor gen) · Haiku 4.5 (news / reflections).
 - **Big image push to ECR occasionally times out** in CI — just re-run "Deploy AWS jobs".
+- **SEC dilution overlay** (`backend/data/altdata.py::fetch_sec_dilution`): free EDGAR
+  (`data.sec.gov`), no key — flags recent 424B* (实际增发/high) & S-3/S-1 (货架/warn) per
+  ticker. Wired into the scan (badge on every 自选 card) and the QBTS decision prompt. **SEC
+  requires an email-shaped `User-Agent` or it 403s** — default is a fake-domain UA (like FINRA);
+  override with `SEC_USER_AGENT` if ever needed. No Supabase table (rides watchlist_scan + live
+  decision fetch). This is the event-aware backstop for the otherwise event-blind mechanical scan.
 
 ## Lessons learned (append new ones here)
 

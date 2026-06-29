@@ -132,6 +132,18 @@ function ScanCard({ r, editable, onRemove }: {
         </div>
       )}
 
+      {r.dilution?.risk && (
+        <div className={`mt-2 text-[11px] leading-relaxed rounded-lg px-2.5 py-1.5 border ${
+          r.dilution.level === "high" ? "bg-red-50 text-red-700 border-red-200"
+          : "bg-amber-50 text-amber-700 border-amber-200"}`}
+          title={r.dilution.recent.map(h => `${h.form} · ${h.date}`).join("\n")}>
+          {r.dilution.level === "high" ? "🔴 增发风险" : "🟠 稀释隐患"}
+          ：<b>{r.dilution.recent.map(h => h.form).join("、")}</b>
+          （{r.dilution.recent[0]?.date}）
+          <span className="block opacity-80 mt-0.5">{r.dilution.note}</span>
+        </div>
+      )}
+
       <div className="mt-2.5 flex flex-wrap gap-1.5 text-[10px]">
         {r.trend && (
           <span className={`px-1.5 py-0.5 rounded ${

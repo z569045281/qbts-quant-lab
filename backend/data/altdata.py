@@ -434,6 +434,104 @@ def altdata_health_check(refresh: bool = False) -> dict:
     }
 
 
+# ── SEC EDGAR: 增发/稀释文件叠加(免费,无需 key)──────────────────────────────
+# 机械扫描看不见公司层面的供给冲击(增发、货架登记、ATM)——但这些都必须报备 SEC,
+# 所以 EDGAR 一定有。我们只拉每家"最近文件清单",标记近 N 天内出现的稀释类文件:
+#   424B2/B3/B4/B5 = 实际增发定价(强信号) · S-1/S-3/S-3ASR/EFFECT = 登记/货架(有弹药)。
+# 免费接口,但 SEC 要求带 User-Agent;任何失败都安静返回 None,绝不影响扫描。
+import json as _json
+import os as _os
+
+# SEC 要求 UA 带"邮箱形式"的联系方式,否则 403(不会校验邮箱真伪)。沿用 FINRA 的伪域名。
+_SEC_USER_AGENT  = _os.getenv("SEC_USER_AGENT", "qbts-quant-lab research@qbts-quant-lab.local")
+_SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
+_SEC_SUBMISSIONS = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
+_DILUTION_OFFERING = {"424B5", "424B4", "424B3", "424B2"}                  # actual takedown/offering
+_DILUTION_SHELF    = {"S-3", "S-3/A", "S-3ASR", "S-1", "S-1/A", "EFFECT"}  # registered capacity
+_cik_map: "dict[str, int] | None" = None
+
+
+def _sec_get(url: str, timeout: int = 8) -> "bytes | None":
+    try:
+        req = urllib.request.Request(url, headers={
+            "User-Agent": _SEC_USER_AGENT, "Accept-Encoding": "gzip, deflate"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read()
+            if resp.headers.get("Content-Encoding") == "gzip":
+                import gzip
+                raw = gzip.decompress(raw)
+            return raw
+    except Exception:
+        return None
+
+
+def _sec_cik(ticker: str) -> "int | None":
+    """Ticker → SEC CIK (cached for the process). SEC's company_tickers.json maps both."""
+    global _cik_map
+    if _cik_map is None:
+        raw = _sec_get(_SEC_TICKERS_URL)
+        _cik_map = {}
+        if raw:
+            try:
+                for row in _json.loads(raw).values():
+                    _cik_map[row["ticker"].upper()] = int(row["cik_str"])
+            except Exception:
+                _cik_map = {}
+    return _cik_map.get(ticker.upper())
+
+
+def fetch_sec_dilution(ticker: str, offering_days: int = 120, shelf_days: int = 365) -> "dict | None":
+    """Recent dilution-relevant SEC filings for `ticker`.
+
+    Two windows by relevance: an actual offering (424B*) matters while recent
+    (`offering_days`); a shelf/registration (S-3/S-1) stays loaded ammunition for
+    up to ~3 years, so we use a longer `shelf_days` window — but not so long that
+    every company's ancient effective shelf over-flags.
+
+    Returns {risk, level('high'|'warn'), recent:[{form,date}], note} or None when
+    there are none / the lookup fails. 'high' = an actual offering was filed;
+    'warn' = only registered capacity. Event-aware backstop for the otherwise
+    event-blind mechanical scan — informational, not a trade signal.
+    """
+    cik = _sec_cik(ticker)
+    if cik is None:
+        return None
+    raw = _sec_get(_SEC_SUBMISSIONS.format(cik=cik))
+    if not raw:
+        return None
+    try:
+        recent = _json.loads(raw)["filings"]["recent"]
+        forms = recent.get("form", [])
+        dates = recent.get("filingDate", [])
+    except Exception:
+        return None
+
+    today = datetime.now().date()
+    off_cut   = today - timedelta(days=offering_days)
+    shelf_cut = today - timedelta(days=shelf_days)
+    hits: list[dict] = []
+    for form, ds in zip(forms, dates):
+        f = (form or "").upper()
+        try:
+            d = datetime.fromisoformat(ds).date()
+        except Exception:
+            continue
+        if f in _DILUTION_OFFERING and d >= off_cut:
+            hits.append({"form": f, "date": ds, "kind": "offering"})
+        elif f in _DILUTION_SHELF and d >= shelf_cut:
+            hits.append({"form": f, "date": ds, "kind": "shelf"})
+    if not hits:
+        return None
+    hits.sort(key=lambda h: h["date"], reverse=True)
+    has_offering = any(h["kind"] == "offering" for h in hits)
+    note = ("近期有实际增发文件(424B),供给压顶 —— 买点上方有新股稀释风险"
+            if has_offering else
+            "已递交货架/登记(S-3 等),增发弹药已就位但未必马上发")
+    return {"risk": True, "level": "high" if has_offering else "warn",
+            "recent": [{"form": h["form"], "date": h["date"]} for h in hits[:4]],
+            "note": note}
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     status = altdata_health_check()

@@ -452,6 +452,10 @@ export interface ScanResult {
   bars?:         number;        // daily bars available
   thin_data?:    boolean;       // <60 bars → technicals unreliable (e.g. fresh IPO)
   earnings?:     { date: string; days: number; soon: boolean } | null;  // 财报跳空风险
+  dilution?:     {                                  // SEC 增发/稀释文件(事件面,机械扫描看不见)
+    risk: boolean; level: "high" | "warn"; note: string;
+    recent: { form: string; date: string }[];
+  } | null;
   stance:        string;        // 买入区 / 接近买点 / 观望 / 偏空回避 / —
   stance_emoji:  string;
   trend?:        "bullish" | "bearish" | "neutral" | null;

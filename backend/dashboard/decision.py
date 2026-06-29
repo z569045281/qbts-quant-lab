@@ -331,6 +331,15 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
         if future:
             parts.append("## 财报日历（已确认日期）\n  下次财报: " + ", ".join(future))
 
+    # ── SEC 增发/稀释文件(供给冲击,价格信号看不见的事件面)──────
+    dil = extras.get("dilution")
+    if dil and dil.get("risk"):
+        recent = "、".join(f"{h['form']}({h['date']})" for h in dil.get("recent", []))
+        tag = "🔴 实际增发" if dil.get("level") == "high" else "🟠 货架/登记"
+        parts.append(f"## ⚠️ SEC 增发/稀释文件（来自 EDGAR，机械信号看不见的供给面）\n"
+                     f"  {tag}：{recent}\n  {dil.get('note','')}\n"
+                     f"  纪律：增发=新股供给压顶,会削弱上方目标、放大下行;做多 conviction 应打折,目标位保守。")
+
     # ── 量化元模型（机械加权参考值）──────────────────────────
     edge = snapshot.get("edge")
     if edge and not edge.get("error"):

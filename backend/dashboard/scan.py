@@ -126,6 +126,16 @@ def _earnings_info(ticker: str) -> dict | None:
     return {"date": d.isoformat(), "days": days, "soon": days <= 14}
 
 
+def _dilution_info(ticker: str) -> dict | None:
+    """Recent SEC dilution filings (424B offering / S-3 shelf) — event-aware backstop
+    for the event-blind mechanical scan. Free EDGAR; never raises."""
+    try:
+        from data.altdata import fetch_sec_dilution
+        return fetch_sec_dilution(ticker)
+    except Exception:
+        return None
+
+
 def _market_context() -> dict | None:
     """Risk-on/off gate from SPY/QQQ vs their 50-day MA + VIX, computed once per scan.
     The per-name scan is otherwise blind to the broad tape — a buy signal in a market-
@@ -212,7 +222,8 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
     """Scan one ticker → (card, daily_df). Never raises; errors are captured.
     The daily df is returned so the caller can grade past calls without re-fetching."""
     base = {"ticker": ticker, "theme": THEME.get(ticker, "其他"),
-            "lockup": _lockup_info(ticker), "earnings": _earnings_info(ticker)}
+            "lockup": _lockup_info(ticker), "earnings": _earnings_info(ticker),
+            "dilution": _dilution_info(ticker)}
     df_d = None
     try:
         df_d, df_h = _fetch(ticker)

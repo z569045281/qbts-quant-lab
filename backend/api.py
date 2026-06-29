@@ -1234,6 +1234,11 @@ async def refresh_decision():
     except Exception:
         pass
     try:
+        from data.altdata import fetch_sec_dilution
+        extras["dilution"] = await asyncio.to_thread(fetch_sec_dilution, "QBTS")
+    except Exception:
+        pass
+    try:
         today = await today_signals(top_n=5)
         extras["mined_factors"] = today.get("factors", [])
     except Exception:
