@@ -136,6 +136,12 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   (playbook still refreshes + shows). `NTFY_URL` optional (default `https://ntfy.sh`). Title
   stays ASCII (HTTP header is latin-1); Chinese detail goes in the UTF-8 body. QuoteFunction
   bumped to 1024MB / 90s for the pandas recompute. Subscribe to the topic in the ntfy phone app.
+  **Lambda sys.path trap**: `quote_handler` imports `dashboard.*` directly, but `backend/` is
+  only added to `sys.path` as a side-effect of importing `backend.api` (api.py line ~22) — which
+  the quote path never does. So `lambda_handlers.py` now inserts `$LAMBDA_TASK_ROOT/backend` on
+  `sys.path` at module load; without it `from dashboard…` raises `ModuleNotFoundError` (was the
+  bug that kept the intraday block from ever landing). `live_quote.data['smc_err']` surfaces any
+  recompute exception (only set on failure) so you can debug from Supabase without CloudWatch.
 
 ## Lessons learned (append new ones here)
 
