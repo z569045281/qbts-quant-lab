@@ -253,23 +253,32 @@ def build_playbook(price: float, structure: dict, pos: float,
 
     want_ob = "demand" if lock == "bull" else "supply"
 
-    # ── relay OBs (Module 2 降维) on the pullback side, nearest to price ──
+    # ── relay zones (Module 2 降维): direction-appropriate zones near the 0.5
+    # equilibrium that price can still travel INTO. Do NOT skip a zone just
+    # because price poked its near edge — the nearest UNTESTED supply/demand zone
+    # around eq IS the relay target. Prefer intraday (1h/4h) over the far daily
+    # Extreme OB; pick the zone NEAREST the equilibrium line.
+    def _dist_to_eq(z):
+        return 0.0 if z["low"] <= eq <= z["high"] else min(abs(z["low"] - eq), abs(z["high"] - eq))
+    tf_rank = {"1h": 0, "4h": 1, "日线": 2}     # finer/intraday relay preferred
+
     relay = []
     for z in pool_obs:
         if z["type"] != want_ob:
             continue
-        if lock == "bull" and z["high"] <= price * (1 + tol):
-            relay.append(z)
-        elif lock == "bear" and z["low"] >= price * (1 - tol):
-            relay.append(z)
-    relay.sort(key=(lambda z: -z["high"]) if lock == "bull" else (lambda z: z["low"]))
-    # dedup identical zones surfaced on multiple TFs (keep the first / nearest)
-    _seen, _dedup = set(), []
+        if lock == "bull":                       # demand: room below price, discount half
+            if z["low"] <= price * (1 + tol) and z["low"] <= eq * (1 + tol):
+                relay.append(z)
+        else:                                    # supply: room above price, premium half
+            if z["high"] >= price * (1 - tol) and z["high"] >= eq * (1 - tol):
+                relay.append(z)
+    # dedup identical zones across TFs, keeping the finer TF
+    _best: dict = {}
     for z in relay:
         key = (z["low"], z["high"])
-        if key not in _seen:
-            _seen.add(key); _dedup.append(z)
-    relay = _dedup
+        if key not in _best or tf_rank.get(z["tf"], 3) < tf_rank.get(_best[key]["tf"], 3):
+            _best[key] = z
+    relay = sorted(_best.values(), key=lambda z: (_dist_to_eq(z), tf_rank.get(z["tf"], 3)))
     nearest_relay = relay[0] if relay else None
     touching_relay = bool(nearest_relay and
                           nearest_relay["low"] * (1 - tol) <= price <= nearest_relay["high"] * (1 + tol))
@@ -291,31 +300,51 @@ def build_playbook(price: float, structure: dict, pos: float,
     state_cn = {"TRIGGER": "扣扳机 · 可入场", "ARMED": "预警 · 已就位，等 15m 触发",
                 "WAIT": "等待回踩到位", "NO_LOCK": "无方向锁定 · 观望"}[state]
 
-    # ── entry = FVG edge ∩ OB overlap (Module 3 共振狙击点) ───────
+    # ── entry = precise confluence INSIDE the relay zone, drilled to 1h/4h
+    # (Module 2/3 共振狙击点). The relay zone is the region; refine to the finest-
+    # TF FVG∩OB overlap / sub-TF imbalance that falls inside it for the exact
+    # price. Never fall back to the far daily Extreme OB when a relay zone exists.
     entry_zone = None
-    if lock in ("bull", "bear"):
-        candidates = []
+    if nearest_relay:
+        r_lo, r_hi = nearest_relay["low"], nearest_relay["high"]
+
+        def _clip(lo, hi):
+            return round(max(lo, r_lo), 2), round(min(hi, r_hi), 2)
+
+        confl = []
+        # (a) FVG ∩ OB overlaps intersecting the relay region → resonance level
         for ob in (z for z in pool_obs if z["type"] == want_ob):
             for fv in pool_fvg:
                 lo, hi = max(ob["low"], fv["low"]), min(ob["high"], fv["high"])
-                if hi > lo:
-                    candidates.append({"low": round(lo, 2), "high": round(hi, 2),
-                                       "basis": f"FVG∩OB ({ob['tf']})"})
-        if lock == "bull":
-            below = [c for c in candidates if c["high"] <= price * (1 + tol)]
-            entry_zone = max(below, key=lambda c: c["high"]) if below else None
+                if hi > lo and hi >= r_lo and lo <= r_hi:
+                    clo, chi = _clip(lo, hi)
+                    confl.append({"low": clo, "high": chi, "tf": ob["tf"],
+                                  "basis": f"FVG∩OB ({ob['tf']})"})
+        # (b) sub-TF (1h/4h) FVGs inside the region → precise imbalance level
+        for z in pool_fvg:
+            if z["tf"] in ("1h", "4h") and z["high"] >= r_lo and z["low"] <= r_hi:
+                clo, chi = _clip(z["low"], z["high"])
+                confl.append({"low": clo, "high": chi, "tf": z["tf"],
+                              "basis": f"{z['tf']} FVG×中继区"})
+        # (c) sub-TF (1h/4h) OBs inside the region → precise relay level
+        for z in pool_obs:
+            if (z["type"] == want_ob and z["tf"] in ("1h", "4h")
+                    and z["high"] >= r_lo and z["low"] <= r_hi):
+                clo, chi = _clip(z["low"], z["high"])
+                confl.append({"low": clo, "high": chi, "tf": z["tf"],
+                              "basis": f"{z['tf']} {'供给' if want_ob == 'supply' else '需求'}区"})
+        if confl:
+            confl.sort(key=lambda c: (tf_rank.get(c["tf"], 3), _dist_to_eq(c)))
+            entry_zone = {k: confl[0][k] for k in ("low", "high", "basis")}
         else:
-            above = [c for c in candidates if c["low"] >= price * (1 - tol)]
-            entry_zone = min(above, key=lambda c: c["low"]) if above else None
-        if entry_zone is None and nearest_relay:   # fallback: the relay OB itself
-            entry_zone = {"low": nearest_relay["low"], "high": nearest_relay["high"],
-                          "basis": f"中继OB ({nearest_relay['tf']})"}
+            entry_zone = {"low": r_lo, "high": r_hi, "basis": f"中继OB ({nearest_relay['tf']})"}
 
-    # ── stop just beyond the entry zone ──────────────────────────
+    # ── stop just beyond the RELAY zone far edge (structural invalidation) ──
     stop = None
-    if entry_zone:
-        stop = round(entry_zone["low"] * (1 - 0.008), 2) if lock == "bull" \
-            else round(entry_zone["high"] * (1 + 0.008), 2)
+    stop_ref = nearest_relay or entry_zone
+    if stop_ref:
+        stop = round(stop_ref["low"] * (1 - 0.008), 2) if lock == "bull" \
+            else round(stop_ref["high"] * (1 + 0.008), 2)
 
     # ── TP1 = nearest unfilled FVG edge ahead (Module 3 止盈磁吸) ─
     tp1 = None
