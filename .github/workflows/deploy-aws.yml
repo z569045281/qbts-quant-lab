@@ -49,6 +49,14 @@ jobs:
         # image). Passing -t aws/template.yaml would re-read the source template
         # and fail with "Image not found for ImageUri parameter".
         run: |
+          # NtfyTopic is optional (blank = no push). SAM's Key=Value shorthand
+          # rejects an EMPTY value ("NtfyTopic=" → invalid format), so only pass
+          # it when the secret is set; otherwise CloudFormation uses the template
+          # Default "". (Topic charset is [-_A-Za-z0-9] → safe unquoted.)
+          NTFY_PARAM=""
+          if [ -n "${{ secrets.NTFY_TOPIC }}" ]; then
+            NTFY_PARAM="NtfyTopic=${{ secrets.NTFY_TOPIC }}"
+          fi
           sam deploy \
             --stack-name qbts-jobs \
             --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
@@ -61,7 +69,7 @@ jobs:
               SupabaseSecretKey='${{ secrets.SUPABASE_SECRET_KEY }}' \
               FredApiKey='${{ secrets.FRED_API_KEY }}' \
               AllowOrigin='${{ vars.PUBLISH_ALLOW_ORIGIN || '*' }}' \
-              NtfyTopic='${{ secrets.NTFY_TOPIC }}'
+              $NTFY_PARAM
 
       - name: Show Publish Function URL
         run: |
