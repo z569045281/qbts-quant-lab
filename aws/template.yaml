@@ -31,6 +31,18 @@ Parameters:
     Description: >
       Browser origin allowed to call the publish Function URL, e.g.
       https://z569045281.github.io . "*" works but lets anyone trigger it.
+  NtfyTopic:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: >
+      ntfy.sh topic for the SMC TRIGGER push. Blank = no push (intraday playbook
+      still refreshes + shows on the dashboard). Pick an unguessable name and
+      subscribe to it in the ntfy phone app.
+  NtfyUrl:
+    Type: String
+    Default: "https://ntfy.sh"
+    Description: ntfy server base URL (override only for a self-hosted instance).
 
 Globals:
   Function:
@@ -40,6 +52,8 @@ Globals:
         SUPABASE_URL: !Ref SupabaseUrl
         SUPABASE_SECRET_KEY: !Ref SupabaseSecretKey
         FRED_API_KEY: !Ref FredApiKey
+        NTFY_TOPIC: !Ref NtfyTopic
+        NTFY_URL: !Ref NtfyUrl
 
 Resources:
   # ── Decision publish: button (Function URL) + daily auto-run ──────────────
@@ -83,8 +97,8 @@ Resources:
       PackageType: Image
       ImageConfig:
         Command: ["lambda_handlers.quote_handler"]
-      MemorySize: 512
-      Timeout: 60
+      MemorySize: 1024     # +pandas SMC playbook recompute (~every 5 min)
+      Timeout: 90          # headroom for a cold-start bar fetch on the SMC minute
       Events:
         MarketHoursEveryMinute:
           Type: ScheduleV2

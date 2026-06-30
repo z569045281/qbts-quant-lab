@@ -454,6 +454,9 @@ export interface LiveQuote {
   asof_et:    string;
   asof_epoch: number;
   quotes:     Partial<Record<"qbts" | "qbtx" | "qbtz", LiveQuoteEntry>>;
+  // Intraday SMC playbook refresh (cloud QuoteFunction, ~every 5 min) — fresher
+  // than the daily snapshot's, so the page prefers this when present.
+  smc?: { playbook: SmcPlaybook; asof: string; price: number | null } | null;
 }
 
 /** Live quote — Supabase row in deployed mode, local backend in dev. Null on failure. */

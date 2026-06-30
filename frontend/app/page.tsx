@@ -192,8 +192,11 @@ export default function Dashboard() {
   // CHoCH 早期预警:最近一次结构事件是 CHoCH(性格转变)= 反转苗头但尚未被 BOS 确认。
   // 纯提示,不参与决策信号 —— 填补"等确认所以进场晚"的空窗。
   const choch = snap.smc?.last_event?.kind === "CHoCH" ? snap.smc.last_event : null;
-  // SMC 顺势纪律 Playbook(全局锁→降维中继→15m 扣扳机→FVG)= 系统的整体评判标准
-  const pb = snap.smc?.playbook ?? null;
+  // SMC 顺势纪律 Playbook(全局锁→降维中继→15m 扣扳机→FVG)= 系统的整体评判标准。
+  // 盘中由每分钟心跳每 ~5min 刷新写进 live_quote,比每日快照新 → 有则优先用 live 那份。
+  const livePb = live?.smc?.playbook ?? null;
+  const pb = livePb ?? snap.smc?.playbook ?? null;
+  const pbLive = !!livePb;
 
   // 模拟持仓:当前未平方向单的浮动盈亏(用实时 QBTS 价 vs 入场,按标的、未计 2× 杠杆)
   const jPaper = snap.journal?.paper ?? null;
@@ -628,6 +631,11 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[11px] font-semibold text-[#525461] uppercase tracking-wider">
                     ⚖️ 顺势纪律 Playbook
+                    {pbLive && (
+                      <span className="ml-1.5 inline-flex items-center gap-1 text-[9px] font-bold text-emerald-600 normal-case">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />盘中实时
+                      </span>
+                    )}
                   </span>
                   <span className="text-[10px] text-gray-400">满足 {pb.conditions_met}</span>
                 </div>

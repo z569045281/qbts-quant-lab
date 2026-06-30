@@ -121,6 +121,21 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   cache so the `(1h,1d)` `load_or_fetch` tuple contract is untouched; yfinance 15m caps at
   ~60d; returns `None` on failure → playbook degrades to "trigger unavailable"). Like every
   other signal it's UNPROVEN until the paper-trade/journal record shows an edge.
+- **SMC playbook 盘中刷新 + TRIGGER 推送** (`backend/dashboard/intraday_smc.py`,
+  wired in `aws/lambda_handlers.py::quote_handler`). The daily 09:00 publish computes
+  the playbook **once** — but its TRIGGER (15m CHoCH + VMC dot) is fleeting & intraday,
+  so a once-a-day compute can never catch it. Fix: the **per-minute QuoteFunction**
+  (`cron(* 4-19 ... ET)`) recomputes the *cheap* playbook (cached daily/1h + **fresh
+  15m** only; no LLM → ~$0) **~every 5 min** (`now_et.minute % 5 == 0`, pre/regular/post),
+  writes it into `live_quote.data['smc']`, and **carries it forward** on the off-minutes so
+  it doesn't flicker. The frontend (`page.tsx`) **prefers the live playbook** over the daily
+  snapshot's (`live?.smc?.playbook ?? snap.smc?.playbook`) + shows a「盘中实时」pulse.
+  **Push**: an `ntfy.sh` POST fires on the **rising edge** into TRIGGER only (dedup via the
+  previous state read back from `live_quote`). Set **`NTFY_TOPIC`** (root `.env` + GitHub
+  Actions secret + `template.yaml` `NtfyTopic` param → `deploy-aws.yml`); blank = no push
+  (playbook still refreshes + shows). `NTFY_URL` optional (default `https://ntfy.sh`). Title
+  stays ASCII (HTTP header is latin-1); Chinese detail goes in the UTF-8 body. QuoteFunction
+  bumped to 1024MB / 90s for the pandas recompute. Subscribe to the topic in the ntfy phone app.
 
 ## Lessons learned (append new ones here)
 

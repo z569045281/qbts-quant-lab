@@ -34,12 +34,51 @@ os.makedirs("/tmp/cache", exist_ok=True)
 
 
 def quote_handler(event, context):
-    """One live-quote push to Supabase. Stateless — perfect for a 1-min schedule."""
+    """One live-quote push to Supabase. Stateless — perfect for a 1-min schedule.
+
+    Also refreshes the cheap SMC playbook ~every 5 min during market hours and
+    fires an ntfy push when the state rises into TRIGGER — so the fleeting 15m
+    trigger can actually be caught, not just at the 09:00 daily publish.
+    """
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
     import quote_pusher
+
     sb = quote_pusher.get_supabase()
-    payload = quote_pusher.push_once(sb)
+    payload = quote_pusher.build_payload()
+
+    # Previous SMC block (for rising-edge dedup + carry-forward between recomputes).
+    prev_smc = None
+    try:
+        r = sb.table("live_quote").select("data").eq("id", 1).single().execute()
+        prev_smc = ((r.data or {}).get("data") or {}).get("smc")
+    except Exception:
+        prev_smc = None
+
+    now_et = datetime.now(ZoneInfo("America/New_York"))
+    recompute = payload.get("session") in ("pre", "regular", "post") and now_et.minute % 5 == 0
+    if recompute:
+        try:
+            from dashboard.intraday_smc import compute_playbook, maybe_notify_trigger
+            qpx = ((payload.get("quotes") or {}).get("qbts") or {}).get("price")
+            fresh = compute_playbook(qpx)
+            if fresh:
+                payload["smc"] = fresh
+                prev_state = ((prev_smc or {}).get("playbook") or {}).get("state")
+                maybe_notify_trigger(prev_state, fresh)
+            elif prev_smc:
+                payload["smc"] = prev_smc          # keep last good if recompute failed
+        except Exception as e:
+            print(f"! intraday SMC skipped: {e}")
+            if prev_smc:
+                payload["smc"] = prev_smc
+    elif prev_smc:
+        payload["smc"] = prev_smc                  # carry forward on off-minutes
+
+    quote_pusher.push_payload(sb, payload)
     q = (payload.get("quotes") or {}).get("qbts") or {}
-    return {"ok": True, "session": payload.get("session"), "qbts_price": q.get("price")}
+    return {"ok": True, "session": payload.get("session"), "qbts_price": q.get("price"),
+            "smc_state": ((payload.get("smc") or {}).get("playbook") or {}).get("state")}
 
 
 def _publish_decision_only() -> dict:

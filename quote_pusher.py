@@ -105,12 +105,19 @@ def get_supabase():
     return create_client(url, key)
 
 
-def push_once(sb) -> dict:
-    payload = build_payload()
+def push_payload(sb, payload: dict) -> dict:
+    """Upsert a pre-built payload into the live_quote row (id=1)."""
     sb.table("live_quote").upsert(
         {"id": 1, "updated_at": datetime.utcnow().isoformat() + "Z", "data": payload}
     ).execute()
     return payload
+
+
+def push_once(sb) -> dict:
+    """Build + push a quote payload. The local loop uses this lean path; the
+    cloud QuoteFunction builds the payload itself so it can attach the intraday
+    SMC playbook before upserting (see aws/lambda_handlers.quote_handler)."""
+    return push_payload(sb, build_payload())
 
 
 def main() -> None:

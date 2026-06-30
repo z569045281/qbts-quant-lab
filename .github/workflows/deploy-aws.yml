@@ -60,7 +60,8 @@ jobs:
               SupabaseUrl='${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}' \
               SupabaseSecretKey='${{ secrets.SUPABASE_SECRET_KEY }}' \
               FredApiKey='${{ secrets.FRED_API_KEY }}' \
-              AllowOrigin='${{ vars.PUBLISH_ALLOW_ORIGIN || '*' }}'
+              AllowOrigin='${{ vars.PUBLISH_ALLOW_ORIGIN || '*' }}' \
+              NtfyTopic='${{ secrets.NTFY_TOPIC }}'
 
       - name: Show Publish Function URL
         run: |
