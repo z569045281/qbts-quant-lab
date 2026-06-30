@@ -112,9 +112,13 @@ def fetch_holdings(ticker: str = "QBTS") -> dict:
     exits         = [h for h in active if h["pct_change"] <= _EXIT_THRESHOLD]
 
     top10_concentration = sum(h["pct_held"] for h in institutional[:10])
+    # Most-recent 13F report date — 13F is filed up to 45d after quarter-end, so
+    # this is often 2-4 months stale. Surface it so the prompt can down-weight it.
+    report_date = max((h["date"] for h in all_holders if h["date"]), default="")
 
     return {
         "ticker":              ticker,
+        "report_date":         report_date,
         "institution_pct":     round(institution_pct, 4),
         "institution_count":   institution_count,
         "insider_pct":         round(insider_pct, 4),

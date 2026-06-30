@@ -524,10 +524,22 @@ def fetch_sec_dilution(ticker: str, offering_days: int = 120, shelf_days: int = 
         return None
     hits.sort(key=lambda h: h["date"], reverse=True)
     has_offering = any(h["kind"] == "offering" for h in hits)
-    note = ("近期有实际增发文件(424B),供给压顶 —— 买点上方有新股稀释风险"
-            if has_offering else
-            "已递交货架/登记(S-3 等),增发弹药已就位但未必马上发")
+    # Age of the most-recent relevant filing — a 5-month-old shelf is background,
+    # not a current catalyst; without decay the prompt over-weights stale events.
+    latest = datetime.fromisoformat(hits[0]["date"]).date()
+    age_days = (today - latest).days
+    mo = age_days / 30.0
+    if has_offering:
+        note = (f"{age_days}天前实际增发定价(424B),新股供给正在/刚冲击 —— 买点上方真实稀释,做多打折"
+                if age_days <= 30 else
+                f"{age_days}天前的增发(424B,约{mo:.0f}个月前),供给冲击多已消化,作背景")
+    else:
+        note = (f"{age_days}天前刚登记货架(S-3 等),增发弹药新就位、随时可能发,关注"
+                if age_days <= 45 else
+                f"货架登记已 {age_days} 天(约{mo:.0f}个月前)、期间未实际增发 —— 只是注册容量,"
+                f"属陈旧背景而非当前催化,权重应低")
     return {"risk": True, "level": "high" if has_offering else "warn",
+            "age_days": age_days,
             "recent": [{"form": h["form"], "date": h["date"]} for h in hits[:4]],
             "note": note}
 
