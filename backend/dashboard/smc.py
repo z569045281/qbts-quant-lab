@@ -21,6 +21,11 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+try:
+    from dashboard.wavetrend import analyze_wavetrend
+except ImportError:  # allow running as a loose module
+    from wavetrend import analyze_wavetrend
+
 
 # ── swings ───────────────────────────────────────────────────────────────────
 
@@ -166,6 +171,219 @@ def find_sweeps(df: pd.DataFrame, swing_highs: list[dict], swing_lows: list[dict
     return out[-3:]
 
 
+# ── multi-timeframe playbook (global lock → relay → 15m trigger → FVG) ───────
+
+def resample_ohlc(df: pd.DataFrame | None, rule: str = "4h") -> pd.DataFrame | None:
+    """Resample an intraday frame to a higher TF (e.g. 1h → 4h)."""
+    if df is None or len(df) == 0:
+        return None
+    agg = {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}
+    out = df.resample(rule).agg(agg).dropna(subset=["open", "high", "low", "close"])
+    return out if len(out) else None
+
+
+def _frame_zones(df: pd.DataFrame | None, k: int = 2, tail: int = 320) -> tuple[list, list]:
+    """(order_blocks, fvgs) on an intraday frame — reuses the daily machinery."""
+    if df is None or len(df) < 2 * k + 12:
+        return [], []
+    d = df.tail(tail)
+    sh, sl = find_swings(d, k=k)
+    st = analyze_structure(d, sh, sl)
+    obs = find_order_blocks(d, st["recent_events"])
+    fvgs = find_fvgs(d, lookback=min(120, len(d)))
+    return obs, fvgs
+
+
+def _ltf15_trigger(df_15m: pd.DataFrame | None, lock: str) -> dict | None:
+    """15m read for the final trigger: a fresh same-direction CHoCH + a
+    close-confirmed WaveTrend (VMC) dot. Returns None when 15m data is absent."""
+    if df_15m is None or len(df_15m) < 40:
+        return None
+    d15 = df_15m.tail(220)
+    sh, sl = find_swings(d15, k=2)
+    st15 = analyze_structure(d15, sh, sl)
+    wt = analyze_wavetrend(d15)
+    le15 = st15.get("last_event")
+    n15 = len(d15)
+    want_dir = "bullish" if lock == "bull" else "bearish"
+    bars_since = (n15 - 1 - le15["i"]) if le15 else None
+    choch_ok = bool(le15 and le15["kind"] == "CHoCH" and le15["dir"] == want_dir
+                    and bars_since is not None and bars_since <= 12)
+    if lock == "bull":
+        dot_ok = bool(wt and (wt["green_dot"] or (wt["cross_up"] and wt["zone"] == "oversold")))
+    else:
+        dot_ok = bool(wt and (wt["red_dot"] or (wt["cross_dn"] and wt["zone"] == "overbought")))
+    return {"trend": st15["trend"], "last_event": le15, "bars_since_event": bars_since,
+            "choch_ok": choch_ok, "wt": wt, "dot_ok": dot_ok}
+
+
+def build_playbook(price: float, structure: dict, pos: float,
+                   rng_hi: float, rng_lo: float,
+                   daily_fvgs: list, daily_obs: list,
+                   df_4h: pd.DataFrame | None, df_1h: pd.DataFrame | None,
+                   df_15m: pd.DataFrame | None, tol: float = 0.006) -> dict:
+    """
+    Disciplined trend-following state machine:
+
+      Module 1  Global lock  — direction is read ONLY from the latest daily
+                               structure label (BOS/CHoCH). Bull lock → longs only.
+      Module 2  Relay/降维   — on a pullback, drop to 4h/1h for a relay OB + the
+                               fib-0.5 equilibrium; price in discount(premium) AND
+                               touching a sub-TF OB ⇒ ARMED. Then 15m CHoCH + VMC
+                               (WaveTrend) dot ⇒ TRIGGER (AND logic).
+      Module 3  FVG          — entry = FVG edge ∩ OB overlap (共振狙击点);
+                               TP1 = nearest unfilled FVG edge ahead (止盈磁吸).
+    """
+    le = structure.get("last_event")
+    lock = ("bull" if le and le["dir"] == "bullish"
+            else "bear" if le and le["dir"] == "bearish" else "none")
+    lock_reason = (f"{le['date']} {'向上' if le['dir'] == 'bullish' else '向下'}"
+                   f"{le['kind']} @ ${le['level']:.2f}" if le else "日线尚无明确结构标签")
+    eq = round((rng_hi + rng_lo) / 2, 2) if rng_hi > rng_lo else round(price, 2)
+
+    # ── zone pools across daily + 4h + 1h ────────────────────────
+    obs_4h, fvg_4h = _frame_zones(df_4h)
+    obs_1h, fvg_1h = _frame_zones(df_1h)
+    pool_obs = ([{**z, "tf": "日线"} for z in daily_obs]
+                + [{**z, "tf": "4h"} for z in obs_4h]
+                + [{**z, "tf": "1h"} for z in obs_1h])
+    pool_fvg = ([{**z, "tf": "日线"} for z in daily_fvgs]
+                + [{**z, "tf": "4h"} for z in fvg_4h]
+                + [{**z, "tf": "1h"} for z in fvg_1h])
+
+    want_ob = "demand" if lock == "bull" else "supply"
+
+    # ── relay OBs (Module 2 降维) on the pullback side, nearest to price ──
+    relay = []
+    for z in pool_obs:
+        if z["type"] != want_ob:
+            continue
+        if lock == "bull" and z["high"] <= price * (1 + tol):
+            relay.append(z)
+        elif lock == "bear" and z["low"] >= price * (1 - tol):
+            relay.append(z)
+    relay.sort(key=(lambda z: -z["high"]) if lock == "bull" else (lambda z: z["low"]))
+    # dedup identical zones surfaced on multiple TFs (keep the first / nearest)
+    _seen, _dedup = set(), []
+    for z in relay:
+        key = (z["low"], z["high"])
+        if key not in _seen:
+            _seen.add(key); _dedup.append(z)
+    relay = _dedup
+    nearest_relay = relay[0] if relay else None
+    touching_relay = bool(nearest_relay and
+                          nearest_relay["low"] * (1 - tol) <= price <= nearest_relay["high"] * (1 + tol))
+
+    in_zone = False
+    if rng_hi > rng_lo:
+        in_zone = (pos <= 0.5) if lock == "bull" else (pos >= 0.5) if lock == "bear" else False
+
+    ltf15 = _ltf15_trigger(df_15m, lock) if lock != "none" else None
+
+    # ── state machine ────────────────────────────────────────────
+    if lock == "none":
+        state = "NO_LOCK"
+    else:
+        armed = in_zone and touching_relay
+        triggered = bool(armed and ltf15 and ltf15["choch_ok"] and ltf15["dot_ok"])
+        state = "TRIGGER" if triggered else ("ARMED" if armed else "WAIT")
+    action = ("buy" if lock == "bull" else "sell") if state == "TRIGGER" else "wait"
+    state_cn = {"TRIGGER": "扣扳机 · 可入场", "ARMED": "预警 · 已就位，等 15m 触发",
+                "WAIT": "等待回踩到位", "NO_LOCK": "无方向锁定 · 观望"}[state]
+
+    # ── entry = FVG edge ∩ OB overlap (Module 3 共振狙击点) ───────
+    entry_zone = None
+    if lock in ("bull", "bear"):
+        candidates = []
+        for ob in (z for z in pool_obs if z["type"] == want_ob):
+            for fv in pool_fvg:
+                lo, hi = max(ob["low"], fv["low"]), min(ob["high"], fv["high"])
+                if hi > lo:
+                    candidates.append({"low": round(lo, 2), "high": round(hi, 2),
+                                       "basis": f"FVG∩OB ({ob['tf']})"})
+        if lock == "bull":
+            below = [c for c in candidates if c["high"] <= price * (1 + tol)]
+            entry_zone = max(below, key=lambda c: c["high"]) if below else None
+        else:
+            above = [c for c in candidates if c["low"] >= price * (1 - tol)]
+            entry_zone = min(above, key=lambda c: c["low"]) if above else None
+        if entry_zone is None and nearest_relay:   # fallback: the relay OB itself
+            entry_zone = {"low": nearest_relay["low"], "high": nearest_relay["high"],
+                          "basis": f"中继OB ({nearest_relay['tf']})"}
+
+    # ── stop just beyond the entry zone ──────────────────────────
+    stop = None
+    if entry_zone:
+        stop = round(entry_zone["low"] * (1 - 0.008), 2) if lock == "bull" \
+            else round(entry_zone["high"] * (1 + 0.008), 2)
+
+    # ── TP1 = nearest unfilled FVG edge ahead (Module 3 止盈磁吸) ─
+    tp1 = None
+    if lock == "bull":
+        ahead = [z for z in pool_fvg if z["low"] > price]
+        if ahead:
+            m = min(ahead, key=lambda z: z["low"])
+            tp1 = {"price": m["low"], "basis": f"FVG 磁吸 ${m['low']}–${m['high']} ({m['tf']})"}
+    elif lock == "bear":
+        ahead = [z for z in pool_fvg if z["high"] < price]
+        if ahead:
+            m = max(ahead, key=lambda z: z["high"])
+            tp1 = {"price": m["high"], "basis": f"FVG 磁吸 ${m['low']}–${m['high']} ({m['tf']})"}
+
+    tp2 = None
+    if lock == "bull" and rng_hi > price:
+        tp2 = {"price": round(rng_hi, 2), "basis": "区间高（主摆动高）"}
+    elif lock == "bear" and rng_lo < price:
+        tp2 = {"price": round(rng_lo, 2), "basis": "区间低（主摆动低）"}
+
+    rr = None
+    if entry_zone and stop and tp1:
+        mid = (entry_zone["low"] + entry_zone["high"]) / 2
+        risk, reward = abs(mid - stop), abs(tp1["price"] - mid)
+        rr = round(reward / risk, 2) if risk > 0 else None
+
+    bias_note = {"bull": "多头锁定：一切回落视为【回踩 (Mitigation)】，只找做多，不做空。",
+                 "bear": "空头锁定：一切反弹视为【诱多回撤】，只找做空，不抄底。",
+                 "none": "日线无明确结构锁定，保持观望，等新的 BOS/CHoCH 印出方向。"}[lock]
+
+    # ── actionable checklist (✓/✗ in the UI) ─────────────────────
+    side_cn = "做空" if lock == "bear" else "做多"
+    zone_label = "溢价区(≥50%)" if lock == "bear" else "折价区(≤50%)"
+    dir_cn = "向下" if lock == "bear" else "向上"
+    dot_cn = "红点" if lock == "bear" else "绿点"
+    relay_detail = (f"{nearest_relay['tf']} {'供给' if want_ob == 'supply' else '需求'}区 "
+                    f"${nearest_relay['low']}–${nearest_relay['high']}"
+                    if nearest_relay else "暂无次级别中继区")
+    wt = ltf15.get("wt") if ltf15 else None
+    le15 = ltf15.get("last_event") if ltf15 else None
+    checklist = [
+        {"key": "lock", "label": "① 日线方向锁定", "ok": lock != "none", "detail": lock_reason},
+        {"key": "pullback", "label": f"② 价格回到{zone_label}", "ok": bool(in_zone),
+         "detail": f"当前区间位置 {pos * 100:.0f}%（均衡线 ${eq}）"},
+        {"key": "relay", "label": "③ 触及次级别中继订单块 (4h/1h)", "ok": bool(touching_relay),
+         "detail": relay_detail},
+        {"key": "choch15", "label": f"④ 15m 出现{dir_cn} CHoCH", "ok": bool(ltf15 and ltf15["choch_ok"]),
+         "detail": (f"15m 最近 {le15['dir']} {le15['kind']}（{ltf15['bars_since_event']} 根前）"
+                    if le15 else ("无 15m 数据" if not ltf15 else "15m 暂无反转结构"))},
+        {"key": "vmc", "label": f"⑤ 15m VMC {dot_cn}（收盘确认）", "ok": bool(ltf15 and ltf15["dot_ok"]),
+         "detail": (f"WaveTrend wt1={wt['wt1']} / wt2={wt['wt2']}（{wt['zone']}）"
+                    if wt else ("无 15m 数据" if not ltf15 else "WaveTrend 未就绪"))},
+    ]
+    n_ok = sum(1 for c in checklist if c["ok"])
+
+    return {
+        "lock": lock, "lock_reason": lock_reason, "bias_note": bias_note,
+        "state": state, "state_cn": state_cn, "action": action,
+        "side_cn": side_cn,
+        "equilibrium": eq, "discount_premium": ("discount" if pos < 0.5 else "premium"),
+        "range_position": round(pos, 3),
+        "entry_zone": entry_zone, "stop": stop, "tp1": tp1, "tp2": tp2, "rr": rr,
+        "relay_ob": nearest_relay, "relay_obs": relay[:3],
+        "ltf15": ltf15,
+        "checklist": checklist, "conditions_met": f"{n_ok}/5",
+    }
+
+
 # ── lower-timeframe structure (multi-timeframe confluence) ───────────────────
 
 def analyze_ltf_structure(df_h: pd.DataFrame, bars: int = 240, k: int = 3) -> dict | None:
@@ -187,8 +405,10 @@ def analyze_ltf_structure(df_h: pd.DataFrame, bars: int = 240, k: int = 3) -> di
 # ── composite ────────────────────────────────────────────────────────────────
 
 def analyze_smc(df: pd.DataFrame, live_price: float | None = None,
-                df_h: pd.DataFrame | None = None) -> dict:
-    """Full SMC read on the last ~120 daily bars (+ optional 1h confluence)."""
+                df_h: pd.DataFrame | None = None,
+                df_15m: pd.DataFrame | None = None) -> dict:
+    """Full SMC read on the last ~120 daily bars (+ optional 1h confluence
+    + optional 4h/1h/15m playbook when intraday frames are supplied)."""
     d = df.tail(120).reset_index().rename(columns=str.lower)
     d = d.set_index(d.columns[0]) if d.columns[0] != "open" else d
     d.index = pd.DatetimeIndex(df.tail(120).index)
@@ -244,6 +464,15 @@ def analyze_smc(df: pd.DataFrame, live_price: float | None = None,
     if ltf and ltf["trend"] != "neutral" and structure["trend"] != "neutral":
         confluence = "aligned" if ltf["trend"] == structure["trend"] else "conflict"
 
+    # ── disciplined trend-following playbook (lock → relay → 15m → FVG) ──
+    df_4h = resample_ohlc(df_h, "4h") if df_h is not None else None
+    try:
+        playbook = build_playbook(price, structure, pos, rng_hi, rng_lo,
+                                  fvgs, obs, df_4h, df_h, df_15m)
+    except Exception as e:  # never let the playbook break the base SMC read
+        playbook = {"lock": "none", "state": "NO_LOCK",
+                    "state_cn": f"playbook 计算失败: {str(e)[:60]}", "checklist": []}
+
     return {
         "signal": signal,
         "label":  label,
@@ -260,6 +489,7 @@ def analyze_smc(df: pd.DataFrame, live_price: float | None = None,
         "sweeps": sweeps,
         "rationale": "；".join(notes) if notes else "结构中性，无显著 SMC 信号",
         "price_used": round(price, 2),
+        "playbook": playbook,
     }
 
 
@@ -267,7 +497,9 @@ if __name__ == "__main__":
     import sys
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
-    from data.fetcher import load_or_fetch
+    from data.fetcher import load_or_fetch, load_15m
     df_h, df_d = load_or_fetch()
+    df_15m = load_15m()
     import json
-    print(json.dumps(analyze_smc(df_d, df_h=df_h), ensure_ascii=False, indent=2, default=str))
+    print(json.dumps(analyze_smc(df_d, df_h=df_h, df_15m=df_15m),
+                     ensure_ascii=False, indent=2, default=str))

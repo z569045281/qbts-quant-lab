@@ -263,6 +263,37 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
             + mtf_s
         )
 
+        # ── SMC 顺势纪律 Playbook（全局锁 → 降维中继 → 15m 扣扳机 → FVG）──
+        pb = smc.get("playbook")
+        if pb and pb.get("lock"):
+            chk = "\n".join(
+                f"    [{'✓' if c['ok'] else '✗'}] {c['label']}：{c['detail']}"
+                for c in (pb.get("checklist") or []))
+            ez = pb.get("entry_zone")
+            tp1, tp2 = pb.get("tp1"), pb.get("tp2")
+            plan_lines = []
+            if ez:
+                plan_lines.append(f"    入场(共振区 {ez['basis']}): ${ez['low']}–${ez['high']}")
+            if pb.get("stop") is not None:
+                plan_lines.append(f"    止损: ${pb['stop']}")
+            if tp1:
+                plan_lines.append(f"    TP1(FVG磁吸): ${tp1['price']} — {tp1['basis']}")
+            if tp2:
+                plan_lines.append(f"    TP2: ${tp2['price']} — {tp2['basis']}")
+            if pb.get("rr") is not None:
+                plan_lines.append(f"    盈亏比 ≈ {pb['rr']}")
+            lock_cn = {"bull": "多头锁定", "bear": "空头锁定", "none": "无锁定"}[pb["lock"]]
+            parts.append(
+                f"## SMC 顺势纪律 Playbook（这是本系统的【整体评判标准】，优先于零散信号）\n"
+                f"  全局状态: 【{lock_cn}】（{pb.get('lock_reason','')}）——{pb.get('bias_note','')}\n"
+                f"  当前阶段: 【{pb.get('state_cn','?')}】 建议动作={pb.get('action','wait')}"
+                f"（满足条件 {pb.get('conditions_met','?')}）\n"
+                f"  扣扳机清单（AND 逻辑，全 ✓ 才进场）:\n{chk}\n"
+                + ("  交易计划:\n" + "\n".join(plan_lines) + "\n" if plan_lines else "")
+                + "  纪律: 只在【锁定方向】找机会；价格未回到折价/溢价区+触及次级别中继OB前为【预警/等待】，"
+                  "不可因零散看多/看空信号提前进场。15m CHoCH+VMC 点是最后的收盘确认扳机。"
+            )
+
     # ── 成交量画像 / POC（价值区与磁吸位，直接用于设目标/止损）──────────
     vp = snapshot.get("volume_profile")
     if vp and vp.get("poc") is not None:

@@ -114,6 +114,33 @@ export interface SmcZone {
   high: number;
   date: string;
 }
+export interface SmcChecklistItem {
+  key: string;
+  label: string;
+  ok: boolean;
+  detail: string;
+}
+export interface SmcPlaybook {
+  lock: "bull" | "bear" | "none";
+  lock_reason: string;
+  bias_note: string;
+  state: "TRIGGER" | "ARMED" | "WAIT" | "NO_LOCK";
+  state_cn: string;
+  action: "buy" | "sell" | "wait";
+  side_cn: string;
+  equilibrium: number;
+  discount_premium: "discount" | "premium";
+  range_position: number;
+  entry_zone: { low: number; high: number; basis: string } | null;
+  stop: number | null;
+  tp1: { price: number; basis: string } | null;
+  tp2: { price: number; basis: string } | null;
+  rr: number | null;
+  relay_ob: (SmcZone & { tf: string }) | null;
+  relay_obs: (SmcZone & { tf: string })[];
+  checklist: SmcChecklistItem[];
+  conditions_met: string;
+}
 export interface SmcAnalysis {
   signal: -1 | 0 | 1;
   label:  "BUY" | "SELL" | "HOLD";
@@ -129,6 +156,7 @@ export interface SmcAnalysis {
   price_used: number;
   ltf?: { trend: "bullish" | "bearish" | "neutral"; last_event: SmcAnalysis["last_event"] } | null;
   confluence?: "aligned" | "conflict" | "neutral";
+  playbook?: SmcPlaybook | null;
 }
 
 /* ── volume profile / POC ────────────────────────────────────────────────── */

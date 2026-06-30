@@ -192,6 +192,8 @@ export default function Dashboard() {
   // CHoCH 早期预警:最近一次结构事件是 CHoCH(性格转变)= 反转苗头但尚未被 BOS 确认。
   // 纯提示,不参与决策信号 —— 填补"等确认所以进场晚"的空窗。
   const choch = snap.smc?.last_event?.kind === "CHoCH" ? snap.smc.last_event : null;
+  // SMC 顺势纪律 Playbook(全局锁→降维中继→15m 扣扳机→FVG)= 系统的整体评判标准
+  const pb = snap.smc?.playbook ?? null;
 
   // 模拟持仓:当前未平方向单的浮动盈亏(用实时 QBTS 价 vs 入场,按标的、未计 2× 杠杆)
   const jPaper = snap.journal?.paper ?? null;
@@ -620,6 +622,83 @@ export default function Dashboard() {
                 {snap.smc.signal > 0 ? "偏多" : snap.smc.signal < 0 ? "偏空" : "中性"}
               </span>
             </div>
+            {/* ── 顺势纪律 Playbook(整体评判标准):全局锁 → 降维中继 → 15m 扣扳机 → FVG ── */}
+            {pb && (
+              <div className="mb-3 rounded-xl border border-[#EDEDF0] bg-[#FAFAFB] p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-semibold text-[#525461] uppercase tracking-wider">
+                    ⚖️ 顺势纪律 Playbook
+                  </span>
+                  <span className="text-[10px] text-gray-400">满足 {pb.conditions_met}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <span className={`px-2 py-1 rounded-md text-xs font-bold ${
+                    pb.lock === "bull" ? "bg-emerald-600 text-white"
+                    : pb.lock === "bear" ? "bg-red-600 text-white"
+                    : "bg-gray-400 text-white"}`}>
+                    {pb.lock === "bull" ? "多头锁定" : pb.lock === "bear" ? "空头锁定" : "无锁定"}
+                  </span>
+                  <span className={`px-2 py-1 rounded-md text-xs font-bold ${
+                    pb.state === "TRIGGER" ? "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300"
+                    : pb.state === "ARMED" ? "bg-amber-100 text-amber-800 ring-1 ring-amber-300"
+                    : pb.state === "WAIT" ? "bg-blue-50 text-blue-700"
+                    : "bg-gray-100 text-gray-500"}`}>
+                    {pb.state === "TRIGGER" ? "🎯 " : pb.state === "ARMED" ? "⏳ " : ""}{pb.state_cn}
+                  </span>
+                  {pb.lock_reason && (
+                    <span className="text-[10px] text-gray-400 font-mono">{pb.lock_reason}</span>
+                  )}
+                </div>
+                <p className="text-[11px] text-[#525461] leading-snug mb-2">{pb.bias_note}</p>
+                {/* 扣扳机清单(AND 逻辑,全 ✓ 才进场) */}
+                <div className="space-y-1 mb-2">
+                  {pb.checklist.map((c) => (
+                    <div key={c.key} className="flex items-start gap-1.5 text-[11px] leading-snug">
+                      <span className={c.ok ? "text-emerald-600 font-bold" : "text-gray-300"}>
+                        {c.ok ? "✓" : "○"}
+                      </span>
+                      <span className={c.ok ? "text-[#1A1A1E] font-medium shrink-0" : "text-gray-400 shrink-0"}>
+                        {c.label}
+                      </span>
+                      <span className="text-gray-400 ml-auto text-right">{c.detail}</span>
+                    </div>
+                  ))}
+                </div>
+                {/* 交易计划:共振入场 / 止损 / FVG 磁吸止盈 */}
+                {(pb.entry_zone || pb.tp1) && (
+                  <div className="grid grid-cols-2 gap-1.5 text-[11px] pt-2 border-t border-[#EDEDF0]">
+                    {pb.entry_zone && (
+                      <div className="col-span-2 flex items-center justify-between px-2 py-1 rounded-md bg-violet-50 text-violet-700">
+                        <span className="font-medium">🎯 共振入场 [{pb.entry_zone.basis}]</span>
+                        <span className="font-mono">${pb.entry_zone.low.toFixed(2)} – ${pb.entry_zone.high.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {pb.stop != null && (
+                      <div className="flex items-center justify-between px-2 py-1 rounded-md bg-red-50 text-red-700">
+                        <span className="font-medium">止损</span><span className="font-mono">${pb.stop.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {pb.rr != null && (
+                      <div className="flex items-center justify-between px-2 py-1 rounded-md bg-gray-50 text-gray-600">
+                        <span className="font-medium">盈亏比</span><span className="font-mono">{pb.rr.toFixed(1)}</span>
+                      </div>
+                    )}
+                    {pb.tp1 && (
+                      <div className="col-span-2 flex items-center justify-between px-2 py-1 rounded-md bg-emerald-50 text-emerald-700">
+                        <span className="font-medium">TP1 · {pb.tp1.basis}</span>
+                        <span className="font-mono">${pb.tp1.price.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {pb.tp2 && (
+                      <div className="col-span-2 flex items-center justify-between px-2 py-1 rounded-md bg-emerald-50/50 text-emerald-600">
+                        <span className="font-medium">TP2 · {pb.tp2.basis}</span>
+                        <span className="font-mono">${pb.tp2.price.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex flex-wrap gap-2 mb-3 text-xs">
               <span className={`px-2 py-1 rounded-md font-medium ${
                 snap.smc.trend === "bullish" ? "bg-emerald-50 text-emerald-700"

@@ -123,6 +123,57 @@ def fetch_daily(ticker: str = TICKER, years: int = 2) -> pd.DataFrame:
     return _clean_ohlcv(raw, "1d")
 
 
+def fetch_15m(ticker: str = TICKER, days: int = 58) -> pd.DataFrame:
+    """
+    15-minute bars for the SMC 'trigger' timeframe (15m CHoCH + WaveTrend dot).
+    yfinance caps intraday <1h at ~60 calendar days, so we clamp to 58.
+    """
+    days = min(days, 58)
+    end = datetime.today() + timedelta(days=1)   # `end` exclusive — +1d to include today
+    start = end - timedelta(days=days)
+    logger.info(f"Fetching 15m {start.date()} → {end.date()}")
+    raw = yf.download(
+        ticker,
+        start=start.strftime("%Y-%m-%d"),
+        end=end.strftime("%Y-%m-%d"),
+        interval="15m",
+        auto_adjust=True,
+        progress=False,
+    )
+    if raw.empty:
+        raise RuntimeError(f"No 15m data returned for {ticker}")
+    return _clean_ohlcv(raw, "15m")
+
+
+def load_15m(ticker: str = TICKER, force_refresh: bool = False) -> pd.DataFrame | None:
+    """
+    15m bars, cached to its own Parquet (separate from the (1h,1d) tuple so the
+    widely-used load_or_fetch contract is untouched). Returns None on failure —
+    the SMC trigger gracefully degrades to 'cannot confirm' rather than erroring.
+    """
+    m_path = DATA_DIR / f"{ticker}_15m.parquet"
+    try:
+        cache_stale = False
+        if m_path.exists():
+            age_hours = (datetime.now() - datetime.fromtimestamp(m_path.stat().st_mtime)).total_seconds() / 3600
+            if age_hours > 24:
+                logger.info(f"15m cache is {age_hours:.1f}h old — refreshing")
+                cache_stale = True
+        if not force_refresh and not cache_stale and m_path.exists():
+            return pd.read_parquet(m_path)
+        df_m = fetch_15m(ticker)
+        df_m.to_parquet(m_path)
+        return df_m
+    except Exception as e:
+        logger.warning(f"load_15m failed ({e}); 15m trigger will be unavailable")
+        if m_path.exists():
+            try:
+                return pd.read_parquet(m_path)   # fall back to stale cache if present
+            except Exception:
+                return None
+        return None
+
+
 def load_or_fetch(ticker: str = TICKER, force_refresh: bool = False):
     """
     Returns (hourly_df, daily_df).

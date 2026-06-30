@@ -25,7 +25,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from data.fetcher import load_or_fetch
+from data.fetcher import load_or_fetch, load_15m
 from data.sentiment import get_sentiment_context, get_fear_greed, sentiment_to_prompt_context
 from data.enricher import enrich
 from data.altdata import altdata_health_check, get_latest_etf_prices
@@ -982,7 +982,11 @@ async def dashboard_snapshot(force_refresh: bool = False):
         _live_px = None
         if _lq and (now - _LIVE_QUOTE_CACHE.get("ts", 0) < 300):
             _live_px = (_lq.get("quotes", {}).get("qbts") or {}).get("price")
-        smc = await asyncio.to_thread(analyze_smc, df_d, _live_px, df_h)
+        # 15m bars for the SMC playbook trigger (CHoCH + WaveTrend dot). Loaded
+        # here (not via load_or_fetch) so the (1h,1d) contract stays untouched;
+        # None on failure → the playbook degrades to "cannot confirm trigger".
+        df_15m = await asyncio.to_thread(load_15m, "QBTS", force_refresh)
+        smc = await asyncio.to_thread(analyze_smc, df_d, _live_px, df_h, df_15m)
     except Exception as e:
         smc = {"signal": 0, "label": "HOLD", "rationale": f"SMC 分析失败: {str(e)[:80]}"}
     try:

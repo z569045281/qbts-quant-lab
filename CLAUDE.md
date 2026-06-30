@@ -102,6 +102,25 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   requires an email-shaped `User-Agent` or it 403s** — default is a fake-domain UA (like FINRA);
   override with `SEC_USER_AGENT` if ever needed. No Supabase table (rides watchlist_scan + live
   decision fetch). This is the event-aware backstop for the otherwise event-blind mechanical scan.
+- **SMC 顺势纪律 Playbook** (`backend/dashboard/smc.py::build_playbook`, attached as
+  `smc['playbook']`; **QBTS decision page only**, 自选扫描 still uses the legacy `analyze_smc`
+  fields untouched). Three-module disciplined state machine on top of the base SMC read:
+  **① 全局方向锁** = read ONLY from the *latest* daily structure label (`last_event.dir`,
+  BOS **or** CHoCH) → `lock` bull/bear/none; bull = longs-only (回踩), bear = shorts-only
+  (诱多). **② 降维中继状态机**: `WAIT → ARMED → TRIGGER`. ARMED = price in discount(bull)/
+  premium(bear) past the fib-0.5 equilibrium **AND** touching a sub-TF (4h-resampled-from-1h
+  or 1h) relay order block. TRIGGER (AND logic) = ARMED **AND** a fresh 15m same-direction
+  **CHoCH** **AND** a close-confirmed **VMC dot**. **③ FVG**: entry = FVG∩OB overlap
+  (共振狙击点); TP1 = nearest unfilled FVG near-edge ahead (止盈磁吸); TP2 = range extreme.
+  Output carries a 5-item ✓/✗ checklist + entry/stop/TP1/TP2/RR — the UI renders it as the
+  card's top block and `decision.py` frames it as the **整体评判标准** (overrides scattered
+  signals). **VMC green/red dot is replicated** via `backend/dashboard/wavetrend.py`
+  (LazyBear WaveTrend — VMC/Cipher-B is just WT crossing out of oversold/overbought) since
+  VMC itself is a closed TradingView script — treat it as a faithful *approximation*, not
+  pixel-identical. **15m bars**: new `data/fetcher.py::load_15m` (separate `QBTS_15m.parquet`
+  cache so the `(1h,1d)` `load_or_fetch` tuple contract is untouched; yfinance 15m caps at
+  ~60d; returns `None` on failure → playbook degrades to "trigger unavailable"). Like every
+  other signal it's UNPROVEN until the paper-trade/journal record shows an edge.
 
 ## Lessons learned (append new ones here)
 
