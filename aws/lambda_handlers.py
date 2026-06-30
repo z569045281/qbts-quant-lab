@@ -24,6 +24,7 @@ see aws/README.md for the Supabase-backed-journal upgrade.
 """
 import json
 import os
+import sys
 
 # Lambda's only writable path is /tmp. The image symlinks backend/data/cache →
 # /tmp/cache, but that target doesn't exist at cold start, and Path.mkdir(
@@ -31,6 +32,12 @@ import os
 # the link, finds nothing, and re-raises). Create the target once, up front,
 # before any backend module imports and runs its own mkdir.
 os.makedirs("/tmp/cache", exist_ok=True)
+
+# Put backend/ on sys.path so `from dashboard...` / `from data...` resolve in BOTH
+# handlers. publish_handler gets this for free (importing backend.api runs api.py,
+# which does its own sys.path.insert), but quote_handler imports dashboard.* without
+# ever touching api.py — hence "No module named 'dashboard'" until we add it here.
+sys.path.insert(0, os.path.join(os.environ.get("LAMBDA_TASK_ROOT", os.path.dirname(__file__)), "backend"))
 
 
 def quote_handler(event, context):
