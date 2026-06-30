@@ -410,15 +410,15 @@ def scan_watchlist(tickers: list[str] | None = None) -> dict:
     except Exception as e:
         logger.warning(f"scan track-record failed: {e}")
 
+    # broad-tape context FIRST — it gates paper entries (don't buy into a risk_off selloff)
+    market = _market_context()
+
     # paper trades: $1000 per buy signal, held to a sell signal → realized/unrealized P&L
     paper = None
     try:
-        paper = store.run_paper_trades(results)
+        paper = store.run_paper_trades(results, market_regime=(market or {}).get("regime"))
     except Exception as e:
         logger.warning(f"scan paper-trades failed: {e}")
-
-    # broad-tape context (the per-name scan is otherwise blind to it)
-    market = _market_context()
 
     # portfolio-level risk: if >1 clean buy signal, how correlated are they?
     concurrent = None

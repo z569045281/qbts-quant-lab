@@ -186,8 +186,13 @@ Frontend tabs (`frontend/app/`): **🎯 决策仪表盘** (`/`) · **🔭 自选
 
 - **自选扫描 (`scan.py` / `scan_store.py`)** — mechanical multi-name buy-setup scan
   (SMC/volume/regime + trend/RSI + **NW 包络**), ~$0 (one Haiku commentary). Carries: a **$1000-per-
-  buy-signal paper-trading ledger** (`scan_paper` table; buy on 买入区, sell on 偏空回避 /
-  到目标 / 跌破均线, 0.2%/side cost), **exit hints**, a static **lockup countdown**
+  buy-signal paper-trading ledger** (`scan_paper` table; buy on 买入区 **only when the tape
+  isn't risk_off**, sell on a **volatility-scaled stop fixed at entry** (≈2× daily vol, clamped
+  6–14% — `_stop_pct`) / 偏空回避 / 到目标, 0.2%/side cost. **2026-07-01 fix**: the old sim
+  reused the soft UI "跌破20/50线" `exit_hint` as a hard stop, so a 买入区 (needs close>20MA but
+  can sit <50MA) was flagged 'risk' and stopped the SAME day it opened → every trade a 1-day
+  whipsaw loss. Now the stop is its own entry-anchored level and entries are tape-gated; the
+  ledger was reset once on this change.), **exit hints**, a static **lockup countdown**
   (`LOCKUPS` dict, SPCX), **earnings overlay**, a **thin-data guard** (<60 bars → flagged
   & excluded from paper trades), **market context** (SPY/QQQ vs 50dMA + VIX risk-on/off),
   and a **concurrent-buy correlation** note. Basket: QBTS POET EOSE RUN LUNR MARA AG NVDA

@@ -39,6 +39,19 @@ _MAX_RECORDS   = 800    # cap journal size (rolling)
 _TRADE_USD     = 1000.0 # paper-trade size per buy signal
 _COST_PER_SIDE = 0.002  # ~0.2%/side (spread+commission) on these high-vol names
 _MAX_CLOSED    = 200    # cap closed-trade ledger (rolling)
+_STOP_VOL_MULT = 2.0          # paper stop ≈ this × recent daily vol …
+_STOP_MIN, _STOP_MAX = 0.06, 0.14   # … clamped to [6%, 14%]
+
+
+def _stop_pct(vol_annual) -> float:
+    """Volatility-scaled paper stop (fraction). ≈2× daily vol, clamped 6–14%, so
+    normal 1-day noise on these 2× names doesn't whipsaw the trade out, but a real
+    breakdown is still capped. Replaces the old 'sell on any MA-break' UI hint,
+    which stopped trades the same day they were opened (bought >20MA / closed <50MA)."""
+    if not isinstance(vol_annual, (int, float)) or vol_annual <= 0:
+        return 0.10
+    daily = vol_annual / (252 ** 0.5)
+    return min(max(_STOP_VOL_MULT * daily, _STOP_MIN), _STOP_MAX)
 
 _SB = None
 _SB_INIT = False
@@ -225,13 +238,17 @@ def _bdays(d0: str, d1: str) -> int:
         return 0
 
 
-def run_paper_trades(results: list[dict]) -> dict:
+def run_paper_trades(results: list[dict], market_regime: str | None = None) -> dict:
     """$1000 paper trade per buy signal, held until a sell signal; records realized P&L.
 
-      Buy  = stance 买入区 (and not already holding, and not thin-data noise).
-      Sell = 偏空回避(转空) | 现价≥入场当天目标(到目标止盈) | 失守均线(跌破均线止损).
-      止盈锚定到「入场当天」存下的目标,不是每天重算的浮动目标——后者会随价格回落,
-      把亏损单误判成止盈(见 _exit_hint 注释)。
+      Buy  = stance 买入区 (not already holding, not thin-data noise, AND the broad
+             tape is not risk_off — don't fight a market-wide selloff).
+      Sell = 现价≤入场止损价(止损,按波动率定档) | 偏空回避(转空) | 现价≥入场当天目标(到目标止盈).
+
+    The stop is its OWN volatility-scaled level fixed at entry — NOT the UI's soft
+    'below the 20/50-day MA' hint, which used to stop trades the same day they opened
+    (a 买入区 needs close>20MA but can sit <50MA → flagged 'risk' → instant whipsaw loss).
+    止盈锚定到入场当天的目标(浮动目标会随回落塌到头顶,把亏损误判成止盈)。
 
     One position per ticker at a time; entry/exit at the scan-day close with ~0.2%/side
     cost so the P&L isn't fantasy. Persists the ledger to scan_paper and returns a
@@ -248,20 +265,22 @@ def run_paper_trades(results: list[dict]) -> dict:
         if not t or not isinstance(price, (int, float)) or price <= 0:
             continue
         stance = r.get("stance")
-        kind = (r.get("exit_hint") or {}).get("kind")
 
         if t in positions:                                   # holding → maybe exit
             pos = positions[t]
             if pos.get("entry_date") == today:               # just entered; no same-day flip
                 continue
-            # 止盈锚定到入场当天的目标(pos["target"]),而非每天重算的浮动目标——
-            # 否则价格回落后上方目标跟着塌到现价,会把亏损单误判成「到目标止盈」。
-            # 老仓位没存 target → 只能靠转空/破均线离场(保守,会自愈)。
+            # real stop fixed at entry (legacy positions without one → derive a fallback).
+            # NOT the UI's soft 'below 20/50 MA' hint, which stopped trades the same day
+            # they opened (买入区 needs close>20MA but can sit <50MA → 'risk' → whipsaw).
+            # 止盈锚定到入场当天的目标——浮动目标会随回落塌到现价,把亏损误判成止盈。
+            sp_price = pos.get("stop_price") or round(
+                pos["entry_price"] * (1 - _stop_pct(r.get("vol_annual"))), 2)
             tgt = pos.get("target")
             hit_target = isinstance(tgt, (int, float)) and tgt > 0 and price >= tgt
-            reason = ("转空"          if stance == "偏空回避"
-                      else "跌破均线止损" if kind == "risk"
-                      else "到目标止盈"   if hit_target
+            reason = ("止损"        if price <= sp_price
+                      else "转空"    if stance == "偏空回避"
+                      else "到目标止盈" if hit_target
                       else None)
             if reason:
                 positions.pop(t)
@@ -275,11 +294,15 @@ def run_paper_trades(results: list[dict]) -> dict:
                     "pnl": round(pnl, 2), "pnl_pct": round(pnl / pos["cost"], 4),
                     "reason": reason, "days": _bdays(pos["entry_date"], today),
                 })
-        elif stance == "买入区" and not r.get("thin_data"):   # flat → enter (skip noise)
+        elif stance == "买入区" and not r.get("thin_data"):   # flat → maybe enter
+            if market_regime == "risk_off":                  # tape filter: don't fight a selloff
+                continue
+            sp = _stop_pct(r.get("vol_annual"))
             shares = _TRADE_USD * (1 - _COST_PER_SIDE) / price   # buy-side cost baked in
             positions[t] = {"entry_date": today, "entry_price": round(price, 2),
                             "shares": round(shares, 4), "cost": _TRADE_USD,
-                            "target": r.get("target_num")}   # anchor for 止盈, see exit logic
+                            "target": r.get("target_num"),          # anchor for 止盈
+                            "stop_price": round(price * (1 - sp), 2), "stop_pct": round(sp, 4)}
 
     _save_paper({"positions": positions, "closed": closed})
 
