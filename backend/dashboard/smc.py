@@ -217,6 +217,39 @@ def _ltf15_trigger(df_15m: pd.DataFrame | None, lock: str) -> dict | None:
             "choch_ok": choch_ok, "wt": wt, "dot_ok": dot_ok}
 
 
+def _dealing_range(d: pd.DataFrame, swing_highs: list, swing_lows: list,
+                   last_event: dict | None, price: float) -> tuple[float, float]:
+    """Premium/discount range anchored to the swing that PRINTED the last
+    structure label — NOT the global hi/lo (which inflates the 0.5 line).
+
+    Down-break (bearish BOS/CHoCH): top = the Lower High just BEFORE the break,
+    bottom = the lowest low SINCE the break. Up-break: mirror. This binds the
+    50% equilibrium to the active structural leg, per the SMC dealing-range rule.
+    """
+    h, l = d["high"].values, d["low"].values
+    n = len(d)
+
+    def _recent_swing_range():
+        hi = max((s["price"] for s in swing_highs[-4:]), default=float(h.max()))
+        lo = min((s["price"] for s in swing_lows[-4:]),  default=float(l.min()))
+        return hi, lo
+
+    if not last_event:
+        return _recent_swing_range()
+    bi = int(last_event["i"])
+    if last_event["dir"] == "bearish":
+        prior = [s for s in swing_highs if s["i"] < bi]
+        rng_hi = float(prior[-1]["price"]) if prior else float(h[:max(bi, 1)].max())
+        rng_lo = float(l[bi:].min()) if bi < n else float(l.min())
+    else:
+        prior = [s for s in swing_lows if s["i"] < bi]
+        rng_lo = float(prior[-1]["price"]) if prior else float(l[:max(bi, 1)].min())
+        rng_hi = float(h[bi:].max()) if bi < n else float(h.max())
+    if rng_hi <= rng_lo:                       # degenerate guard
+        return _recent_swing_range()
+    return rng_hi, rng_lo
+
+
 def build_playbook(price: float, structure: dict, pos: float,
                    rng_hi: float, rng_lo: float,
                    daily_fvgs: list, daily_obs: list,
@@ -289,16 +322,13 @@ def build_playbook(price: float, structure: dict, pos: float,
 
     ltf15 = _ltf15_trigger(df_15m, lock) if lock != "none" else None
 
-    # ── state machine ────────────────────────────────────────────
+    # ── state machine (action/label finalized AFTER the RR circuit breaker) ──
     if lock == "none":
         state = "NO_LOCK"
     else:
         armed = in_zone and touching_relay
         triggered = bool(armed and ltf15 and ltf15["choch_ok"] and ltf15["dot_ok"])
         state = "TRIGGER" if triggered else ("ARMED" if armed else "WAIT")
-    action = ("buy" if lock == "bull" else "sell") if state == "TRIGGER" else "wait"
-    state_cn = {"TRIGGER": "扣扳机 · 可入场", "ARMED": "预警 · 已就位，等 15m 触发",
-                "WAIT": "等待回踩到位", "NO_LOCK": "无方向锁定 · 观望"}[state]
 
     # ── entry = precise confluence INSIDE the relay zone, drilled to 1h/4h
     # (Module 2/3 共振狙击点). The relay zone is the region; refine to the finest-
@@ -333,28 +363,44 @@ def build_playbook(price: float, structure: dict, pos: float,
                 clo, chi = _clip(z["low"], z["high"])
                 confl.append({"low": clo, "high": chi, "tf": z["tf"],
                               "basis": f"{z['tf']} {'供给' if want_ob == 'supply' else '需求'}区"})
+        # never emit a wide daily OB span — prefer the TIGHTEST (≤$1) 1h/4h
+        # confluence; tie-break by finer TF then nearest the equilibrium.
+        MAX_W = 1.00
         if confl:
-            confl.sort(key=lambda c: (tf_rank.get(c["tf"], 3), _dist_to_eq(c)))
+            confl.sort(key=lambda c: (0 if (c["high"] - c["low"]) <= MAX_W else 1,
+                                      tf_rank.get(c["tf"], 3), _dist_to_eq(c)))
             entry_zone = {k: confl[0][k] for k in ("low", "high", "basis")}
         else:
             entry_zone = {"low": r_lo, "high": r_hi, "basis": f"中继OB ({nearest_relay['tf']})"}
+        # enforce ≤$1.00: if still a wide daily region (no LTF confluence found),
+        # clip to a $1 band at the PROXIMAL edge (where price first interacts).
+        if (entry_zone["high"] - entry_zone["low"]) > MAX_W:
+            if lock == "bear":     # supply: proximal edge = bottom (first touched on a rally)
+                entry_zone = {"low": round(r_lo, 2), "high": round(r_lo + MAX_W, 2),
+                              "basis": f"中继区近端·需1h确认 ({nearest_relay['tf']})"}
+            else:                  # demand: proximal edge = top (first touched on a dip)
+                entry_zone = {"low": round(r_hi - MAX_W, 2), "high": round(r_hi, 2),
+                              "basis": f"中继区近端·需1h确认 ({nearest_relay['tf']})"}
 
-    # ── stop just beyond the RELAY zone far edge (structural invalidation) ──
+    # ── stop just beyond the (refined) ENTRY zone — 降维 = tighter stop → higher RR ──
     stop = None
-    stop_ref = nearest_relay or entry_zone
-    if stop_ref:
-        stop = round(stop_ref["low"] * (1 - 0.008), 2) if lock == "bull" \
-            else round(stop_ref["high"] * (1 + 0.008), 2)
+    if entry_zone:
+        stop = round(entry_zone["low"] * (1 - 0.008), 2) if lock == "bull" \
+            else round(entry_zone["high"] * (1 + 0.008), 2)
 
-    # ── TP1 = nearest unfilled FVG edge ahead (Module 3 止盈磁吸) ─
+    # ── TP1 = nearest unfilled FVG edge BEYOND the entry zone (Module 3 止盈磁吸).
+    # Measured from the entry edge (not current price) so an FVG overlapping the
+    # entry can't masquerade as the target and collapse RR into a false veto. ─
     tp1 = None
     if lock == "bull":
-        ahead = [z for z in pool_fvg if z["low"] > price]
+        floor_ = (entry_zone or {}).get("high", price)
+        ahead = [z for z in pool_fvg if z["low"] > floor_]
         if ahead:
             m = min(ahead, key=lambda z: z["low"])
             tp1 = {"price": m["low"], "basis": f"FVG 磁吸 ${m['low']}–${m['high']} ({m['tf']})"}
     elif lock == "bear":
-        ahead = [z for z in pool_fvg if z["high"] < price]
+        cap = (entry_zone or {}).get("low", price)
+        ahead = [z for z in pool_fvg if z["high"] < cap]
         if ahead:
             m = max(ahead, key=lambda z: z["high"])
             tp1 = {"price": m["high"], "basis": f"FVG 磁吸 ${m['low']}–${m['high']} ({m['tf']})"}
@@ -370,6 +416,18 @@ def build_playbook(price: float, structure: dict, pos: float,
         mid = (entry_zone["low"] + entry_zone["high"]) / 2
         risk, reward = abs(mid - stop), abs(tp1["price"] - mid)
         rr = round(reward / risk, 2) if risk > 0 else None
+
+    # ── 风控熔断: RR < 2.0 的入场策略无效 → 强制观望 (Module 3) ──
+    rr_veto = (rr is not None and rr < 2.0)
+    if rr_veto and state in ("TRIGGER", "ARMED"):
+        state = "WAIT"
+    action = ("buy" if lock == "bull" else "sell") if state == "TRIGGER" else "wait"
+    state_cn = {"TRIGGER": "扣扳机 · 可入场", "ARMED": "预警 · 已就位，等 15m 触发",
+                "WAIT": "等待回踩到位", "NO_LOCK": "无方向锁定 · 观望"}[state]
+    risk_note = None
+    if rr_veto:
+        state_cn = f"观望 · RR {rr}<2 风控熔断"
+        risk_note = f"⚠️ 盈亏比 {rr} < 2.0,风险收益不达标 → 风控熔断,此入场策略无效,强制观望。"
 
     bias_note = {"bull": "多头锁定：一切回落视为【回踩 (Mitigation)】，只找做多，不做空。",
                  "bear": "空头锁定：一切反弹视为【诱多回撤】，只找做空，不抄底。",
@@ -407,6 +465,7 @@ def build_playbook(price: float, structure: dict, pos: float,
         "equilibrium": eq, "discount_premium": ("discount" if pos < 0.5 else "premium"),
         "range_position": round(pos, 3),
         "entry_zone": entry_zone, "stop": stop, "tp1": tp1, "tp2": tp2, "rr": rr,
+        "rr_veto": rr_veto, "risk_note": risk_note,
         "relay_ob": nearest_relay, "relay_obs": relay[:3],
         "ltf15": ltf15,
         "checklist": checklist, "conditions_met": f"{n_ok}/5",
@@ -450,10 +509,11 @@ def analyze_smc(df: pd.DataFrame, live_price: float | None = None,
     obs       = find_order_blocks(d, structure["recent_events"])
     sweeps    = find_sweeps(d, swing_highs, swing_lows)
 
-    # premium / discount within the dominant range (last major swing hi/lo)
-    rng_hi = max((s["price"] for s in swing_highs[-4:]), default=price)
-    rng_lo = min((s["price"] for s in swing_lows[-4:]),  default=price)
+    # premium / discount within the DEALING RANGE anchored to the swing that
+    # printed the last structure label (not the global hi/lo — that inflates 0.5).
+    rng_hi, rng_lo = _dealing_range(d, swing_highs, swing_lows, structure["last_event"], price)
     pos = (price - rng_lo) / (rng_hi - rng_lo) if rng_hi > rng_lo else 0.5
+    pos = max(0.0, min(1.0, pos))
     zone = "discount(折价区)" if pos < 0.4 else ("premium(溢价区)" if pos > 0.6 else "equilibrium(均衡区)")
 
     # nearest unmitigated zones relative to price

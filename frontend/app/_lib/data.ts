@@ -136,6 +136,8 @@ export interface SmcPlaybook {
   tp1: { price: number; basis: string } | null;
   tp2: { price: number; basis: string } | null;
   rr: number | null;
+  rr_veto?: boolean;
+  risk_note?: string | null;
   relay_ob: (SmcZone & { tf: string }) | null;
   relay_obs: (SmcZone & { tf: string })[];
   checklist: SmcChecklistItem[];

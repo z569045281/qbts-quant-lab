@@ -658,6 +658,11 @@ export default function Dashboard() {
                   )}
                 </div>
                 <p className="text-[11px] text-[#525461] leading-snug mb-2">{pb.bias_note}</p>
+                {pb.risk_note && (
+                  <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5 mb-2 leading-snug">
+                    {pb.risk_note}
+                  </div>
+                )}
                 {/* 扣扳机清单(AND 逻辑,全 ✓ 才进场) */}
                 <div className="space-y-1 mb-2">
                   {pb.checklist.map((c) => (

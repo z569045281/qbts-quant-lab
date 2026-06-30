@@ -112,6 +112,15 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   or 1h) relay order block. TRIGGER (AND logic) = ARMED **AND** a fresh 15m same-direction
   **CHoCH** **AND** a close-confirmed **VMC dot**. **③ FVG**: entry = FVG∩OB overlap
   (共振狙击点); TP1 = nearest unfilled FVG near-edge ahead (止盈磁吸); TP2 = range extreme.
+  **Refinements (2026-07-01)**: premium/discount is anchored to the **dealing range of the
+  swing that printed the last structure label** (`_dealing_range`: down-break → top = the LH
+  just before the break, bottom = lowest low since), NOT the global hi/lo (which inflated the
+  0.5 line). The entry is forced **≤ $1.00 wide** — drilled to the tightest 1h/4h FVG∩OB
+  confluence inside the relay zone (clipped to the proximal edge as a last resort), so a wide
+  daily OB never tanks the RR. The stop hugs the **refined entry** (not the HTF zone). And a
+  **risk circuit-breaker** (`rr_veto`): if RR < 2.0 the entry is invalid → state forced to
+  观望 (`risk_note` rendered amber on the card). TP1 is measured **beyond the entry edge** so an
+  FVG overlapping the entry can't masquerade as the target and trigger a false veto.
   Output carries a 5-item ✓/✗ checklist + entry/stop/TP1/TP2/RR — the UI renders it as the
   card's top block and `decision.py` frames it as the **整体评判标准** (overrides scattered
   signals). **VMC green/red dot is replicated** via `backend/dashboard/wavetrend.py`
