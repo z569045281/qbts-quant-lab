@@ -24,24 +24,21 @@ def compute_playbook(live_price: float | None = None) -> dict | None:
     """Cheap SMC playbook recompute (cached daily+1h, fresh 15m).
 
     Returns the `live_quote` 'smc' sub-payload {playbook, asof, price}, or None
-    on failure (caller then keeps the previous value)."""
-    try:
-        from data.fetcher import load_or_fetch, load_15m
-        from dashboard.smc import analyze_smc
-        df_h, df_d = load_or_fetch()              # cached: lock/zones change slowly
-        df_15m = load_15m(force_refresh=True)     # fresh: the trigger timeframe
-        smc = analyze_smc(df_d, live_price, df_h, df_15m)
-        pb = smc.get("playbook")
-        if not pb:
-            return None
-        return {
-            "playbook": pb,
-            "asof": datetime.now(timezone.utc).isoformat(),
-            "price": smc.get("price_used"),
-        }
-    except Exception as e:
-        print(f"! intraday playbook compute failed: {type(e).__name__}: {e}")
+    if the playbook is empty. Raises on a real failure so the caller can surface
+    the reason (the push itself is protected one level up)."""
+    from data.fetcher import load_or_fetch, load_15m
+    from dashboard.smc import analyze_smc
+    df_h, df_d = load_or_fetch()              # cached: lock/zones change slowly
+    df_15m = load_15m(force_refresh=True)     # fresh: the trigger timeframe
+    smc = analyze_smc(df_d, live_price, df_h, df_15m)
+    pb = smc.get("playbook")
+    if not pb:
         return None
+    return {
+        "playbook": pb,
+        "asof": datetime.now(timezone.utc).isoformat(),
+        "price": smc.get("price_used"),
+    }
 
 
 def _ntfy(title: str, body: str, tags: str = "rotating_light", priority: str = "high") -> bool:

@@ -69,7 +69,9 @@ def quote_handler(event, context):
             elif prev_smc:
                 payload["smc"] = prev_smc          # keep last good if recompute failed
         except Exception as e:
-            print(f"! intraday SMC skipped: {e}")
+            import traceback
+            payload["smc_err"] = f"{type(e).__name__}: {e}"   # surfaced for observability
+            print("! intraday SMC skipped:\n" + traceback.format_exc())
             if prev_smc:
                 payload["smc"] = prev_smc
     elif prev_smc:
