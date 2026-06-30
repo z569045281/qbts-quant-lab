@@ -12,6 +12,15 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* 夜间模式:整页 invert + hue-rotate(180°) —— 翻转明暗但近似保留红绿涨跌语义,
+   零改动那上百个字面 hex 颜色类。已是深色的顶栏二次反相还原(否则被翻成浅色)。
+   ponytail: filter-invert dark mode;够用即可,要像素级深色配色再逐元素上 dark: 变体。 */
+html.dark {
+  filter: invert(1) hue-rotate(180deg);
+  background: #0b0b0d;
+}
+html.dark header { filter: invert(1) hue-rotate(180deg); }
+
 /* Force light theme — this is a financial dashboard, always light. */
 body {
   background: #F6F6F8;

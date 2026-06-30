@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { READONLY } from "../_lib/supabase";
+import { ThemeToggle } from "./theme-toggle";
 
 /* ── SF-Symbol-ish line icons for the mobile bottom tab bar.
    Monochrome, inheriting color via `currentColor` so selection is shown by
@@ -98,7 +99,10 @@ export function NavBar() {
               );
             })}
           </nav>
-          <div className="ml-auto hidden lg:block text-xs text-blue-200/60 font-mono shrink-0">QBTS · D-Wave Quantum Inc.</div>
+          <div className="ml-auto flex items-center gap-3">
+            <span className="hidden lg:block text-xs text-blue-200/60 font-mono shrink-0">QBTS · D-Wave Quantum Inc.</span>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
