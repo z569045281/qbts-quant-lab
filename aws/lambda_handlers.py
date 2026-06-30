@@ -66,9 +66,9 @@ def quote_handler(event, context):
     recompute = payload.get("session") in ("pre", "regular", "post") and now_et.minute % 5 == 0
     if recompute:
         try:
-            from dashboard.intraday_smc import compute_playbook, maybe_notify_trigger
+            from dashboard.intraday_smc import compute_smc, maybe_notify_trigger
             qpx = ((payload.get("quotes") or {}).get("qbts") or {}).get("price")
-            fresh = compute_playbook(qpx)
+            fresh = compute_smc(qpx)
             if fresh:
                 payload["smc"] = fresh
                 prev_state = ((prev_smc or {}).get("playbook") or {}).get("state")

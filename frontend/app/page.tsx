@@ -191,12 +191,12 @@ export default function Dashboard() {
   const planStale = decisionAgeH !== null && decisionAgeH > 36;
   // CHoCH 早期预警:最近一次结构事件是 CHoCH(性格转变)= 反转苗头但尚未被 BOS 确认。
   // 纯提示,不参与决策信号 —— 填补"等确认所以进场晚"的空窗。
-  const choch = snap.smc?.last_event?.kind === "CHoCH" ? snap.smc.last_event : null;
-  // SMC 顺势纪律 Playbook(全局锁→降维中继→15m 扣扳机→FVG)= 系统的整体评判标准。
-  // 盘中由每分钟心跳每 ~5min 刷新写进 live_quote,比每日快照新 → 有则优先用 live 那份。
-  const livePb = live?.smc?.playbook ?? null;
-  const pb = livePb ?? snap.smc?.playbook ?? null;
-  const pbLive = !!livePb;
+  // SMC 读数:盘中每 ~5min 刷新写进 live_quote,比每日快照新 → 整张卡(结构/区位/区域
+  // /playbook)统一优先用 live 那份,保证同源一致(否则会出现 live 50% vs 快照 33% 的矛盾)。
+  const smc = live?.smc ?? snap.smc ?? null;
+  const pbLive = !!live?.smc;
+  const choch = smc?.last_event?.kind === "CHoCH" ? smc.last_event : null;
+  const pb = smc?.playbook ?? null;
 
   // 模拟持仓:当前未平方向单的浮动盈亏(用实时 QBTS 价 vs 入场,按标的、未计 2× 杠杆)
   const jPaper = snap.journal?.paper ?? null;
@@ -612,17 +612,17 @@ export default function Dashboard() {
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* SMC 聪明钱结构 */}
-        {snap.smc && (
+        {smc && (
           <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
                 🧠 SMC 聪明钱结构
               </span>
               <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-                snap.smc.signal > 0 ? "bg-emerald-100 text-emerald-700"
-                : snap.smc.signal < 0 ? "bg-red-100 text-red-700"
+                smc.signal > 0 ? "bg-emerald-100 text-emerald-700"
+                : smc.signal < 0 ? "bg-red-100 text-red-700"
                 : "bg-gray-100 text-gray-500"}`}>
-                {snap.smc.signal > 0 ? "偏多" : snap.smc.signal < 0 ? "偏空" : "中性"}
+                {smc.signal > 0 ? "偏多" : smc.signal < 0 ? "偏空" : "中性"}
               </span>
             </div>
             {/* ── 顺势纪律 Playbook(整体评判标准):全局锁 → 降维中继 → 15m 扣扳机 → FVG ── */}
@@ -709,27 +709,27 @@ export default function Dashboard() {
             )}
             <div className="flex flex-wrap gap-2 mb-3 text-xs">
               <span className={`px-2 py-1 rounded-md font-medium ${
-                snap.smc.trend === "bullish" ? "bg-emerald-50 text-emerald-700"
-                : snap.smc.trend === "bearish" ? "bg-red-50 text-red-700"
+                smc.trend === "bullish" ? "bg-emerald-50 text-emerald-700"
+                : smc.trend === "bearish" ? "bg-red-50 text-red-700"
                 : "bg-gray-50 text-gray-600"}`}>
-                结构 {snap.smc.trend === "bullish" ? "看多" : snap.smc.trend === "bearish" ? "看空" : "中性"}
+                结构 {smc.trend === "bullish" ? "看多" : smc.trend === "bearish" ? "看空" : "中性"}
               </span>
-              {snap.smc.last_event && (
+              {smc.last_event && (
                 <span className="px-2 py-1 rounded-md bg-violet-50 text-violet-700 font-medium">
-                  {snap.smc.last_event.date} {snap.smc.last_event.dir === "bullish" ? "↗" : "↘"} {snap.smc.last_event.kind} @ ${snap.smc.last_event.level.toFixed(2)}
+                  {smc.last_event.date} {smc.last_event.dir === "bullish" ? "↗" : "↘"} {smc.last_event.kind} @ ${smc.last_event.level.toFixed(2)}
                 </span>
               )}
               <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 font-medium">
-                {snap.smc.zone} {(snap.smc.range_position * 100).toFixed(0)}%
+                {smc.zone} {(smc.range_position * 100).toFixed(0)}%
               </span>
               {/* 多周期共振 (1h vs 日线) */}
-              {snap.smc.ltf && snap.smc.confluence && (
+              {smc.ltf && smc.confluence && (
                 <span className={`px-2 py-1 rounded-md font-medium ${
-                  snap.smc.confluence === "aligned" ? "bg-emerald-50 text-emerald-700"
-                  : snap.smc.confluence === "conflict" ? "bg-amber-50 text-amber-700"
+                  smc.confluence === "aligned" ? "bg-emerald-50 text-emerald-700"
+                  : smc.confluence === "conflict" ? "bg-amber-50 text-amber-700"
                   : "bg-gray-50 text-gray-500"}`}>
-                  1h {snap.smc.ltf.trend === "bullish" ? "↗" : snap.smc.ltf.trend === "bearish" ? "↘" : "→"}
-                  {snap.smc.confluence === "aligned" ? " 同向" : snap.smc.confluence === "conflict" ? " 背离" : " 中性"}
+                  1h {smc.ltf.trend === "bullish" ? "↗" : smc.ltf.trend === "bearish" ? "↘" : "→"}
+                  {smc.confluence === "aligned" ? " 同向" : smc.confluence === "conflict" ? " 背离" : " 中性"}
                 </span>
               )}
             </div>
@@ -741,19 +741,19 @@ export default function Dashboard() {
             )}
             {/* 关键区域 */}
             <div className="space-y-1.5 text-xs">
-              {snap.smc.supply_zones.map((z, i) => (
+              {smc.supply_zones.map((z, i) => (
                 <div key={`s${i}`} className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-red-50/60 border border-red-100">
                   <span className="text-red-700 font-medium">▼ 供给区 [{z.kind}]</span>
                   <span className="font-mono text-gray-700">${z.low.toFixed(2)} – ${z.high.toFixed(2)}</span>
                 </div>
               ))}
-              {snap.smc.demand_zones.map((z, i) => (
+              {smc.demand_zones.map((z, i) => (
                 <div key={`d${i}`} className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-emerald-50/60 border border-emerald-100">
                   <span className="text-emerald-700 font-medium">▲ 需求区 [{z.kind}]</span>
                   <span className="font-mono text-gray-700">${z.low.toFixed(2)} – ${z.high.toFixed(2)}</span>
                 </div>
               ))}
-              {snap.smc.sweeps.slice(-2).map((s, i) => (
+              {smc.sweeps.slice(-2).map((s, i) => (
                 <div key={`w${i}`} className="text-[11px] text-[#525461] px-2.5 py-1">
                   💧 {s.note}
                 </div>
@@ -1007,8 +1007,8 @@ export default function Dashboard() {
           high_52w={snap.chart.high_52w}
           low_52w={snap.chart.low_52w}
           plan={chartPlan}
-          supply={snap.smc?.supply_zones}
-          demand={snap.smc?.demand_zones}
+          supply={smc?.supply_zones}
+          demand={smc?.demand_zones}
           poc={snap.volume_profile?.poc ?? null}
           markers={chartMarkers}
           nwBands={snap.nw_envelope?.bands}

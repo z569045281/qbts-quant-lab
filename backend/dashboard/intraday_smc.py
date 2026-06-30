@@ -20,25 +20,23 @@ import urllib.request
 from datetime import datetime, timezone
 
 
-def compute_playbook(live_price: float | None = None) -> dict | None:
-    """Cheap SMC playbook recompute (cached daily+1h, fresh 15m).
+def compute_smc(live_price: float | None = None) -> dict | None:
+    """Cheap full SMC recompute (cached daily+1h, fresh 15m).
 
-    Returns the `live_quote` 'smc' sub-payload {playbook, asof, price}, or None
-    if the playbook is empty. Raises on a real failure so the caller can surface
-    the reason (the push itself is protected one level up)."""
+    Returns the FULL `analyze_smc` read (structure/zones/sweeps + playbook) with
+    an `asof` stamp, so the dashboard renders the WHOLE SMC card from one live
+    source — otherwise the live playbook (e.g. 50%) and the daily snapshot's
+    badges (e.g. 33%) disagree once price moves intraday. None if no playbook;
+    raises on a real failure so the caller can surface the reason."""
     from data.fetcher import load_or_fetch, load_15m
     from dashboard.smc import analyze_smc
     df_h, df_d = load_or_fetch()              # cached: lock/zones change slowly
     df_15m = load_15m(force_refresh=True)     # fresh: the trigger timeframe
     smc = analyze_smc(df_d, live_price, df_h, df_15m)
-    pb = smc.get("playbook")
-    if not pb:
+    if not smc.get("playbook"):
         return None
-    return {
-        "playbook": pb,
-        "asof": datetime.now(timezone.utc).isoformat(),
-        "price": smc.get("price_used"),
-    }
+    smc["asof"] = datetime.now(timezone.utc).isoformat()
+    return smc
 
 
 def _ntfy(title: str, body: str, tags: str = "rotating_light", priority: str = "high") -> bool:
@@ -83,5 +81,5 @@ if __name__ == "__main__":
     import sys, json
     from pathlib import Path
     sys.path.insert(0, str(Path(__file__).parent.parent))
-    out = compute_playbook()
+    out = compute_smc()
     print(json.dumps(out, ensure_ascii=False, indent=2, default=str) if out else "compute failed")
