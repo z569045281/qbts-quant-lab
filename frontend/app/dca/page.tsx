@@ -160,6 +160,17 @@ export default function DcaPage() {
         </div>
       )}
 
+      {/* 择机观察(不进核心配置,便宜了再买)*/}
+      {state?.watch && state.watch.length > 0 && (
+        <section className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4 shadow-sm">
+          <div className="text-xs font-semibold text-indigo-700 mb-1">🔭 择机观察 · 便宜了再买(不占核心权重)</div>
+          {state.watch_note && <p className="text-[11px] text-indigo-600/80 leading-relaxed mb-3">{state.watch_note}</p>}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {state.watch.map(r => <DcaCard key={r.ticker} r={r} />)}
+          </div>
+        </section>
+      )}
+
       {/* 压舱格(债券/现金)*/}
       {state?.ballast && (
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">

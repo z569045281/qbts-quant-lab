@@ -63,8 +63,6 @@ export interface Snapshot {
     atr_14:   number;
   };
   etf_prices: { qbtx: number | null; qbtz: number | null };
-  brief:                string | null;
-  brief_generated_at:   string | null;
   edge?: {
     signal:              -1 | 0 | 1;
     label:               "BUY" | "SELL" | "HOLD";

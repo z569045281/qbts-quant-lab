@@ -31,7 +31,6 @@ from data.enricher import enrich
 from data.altdata import altdata_health_check, get_latest_etf_prices
 from dashboard.strategies import run_all_strategies, aggregate_consensus
 from dashboard.news       import get_news_snapshot
-from dashboard.brief       import generate_brief, get_or_generate_brief, get_cached_brief
 from dashboard.edge        import compute_edge
 from dashboard.options     import get_options_signal
 from dashboard.intraday    import get_intraday_signal
@@ -920,7 +919,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
         "atr_14":      round(float(df["atr_14"].iloc[-1]) * last_close, 2),  # absolute ATR
     }
 
-    # 5.5 — Live ETF prices (used by brief + position calculator)
+    # 5.5 — Live ETF prices (used by the position calculator)
     etf_prices = await asyncio.to_thread(get_latest_etf_prices)
 
     payload = {
@@ -938,15 +937,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
         },
         "chart":           chart_data,
         "etf_prices":      etf_prices,            # {qbtx: float | None, qbtz: float | None}
-        # Brief is loaded from persistent cache — never auto-regenerated here.
-        # Use POST /dashboard/brief/refresh to force a fresh one (costs ~$0.015).
-        "brief":               None,
-        "brief_generated_at":  None,
     }
-
-    cached_brief, cached_at = get_cached_brief()
-    payload["brief"]              = cached_brief
-    payload["brief_generated_at"] = cached_at
 
     # ── AI Decision (the user-facing verdict) — cached only here. ──
     # publish.py / POST /dashboard/decision/refresh force-generate it.
@@ -1071,24 +1062,6 @@ async def dashboard_snapshot(force_refresh: bool = False):
     _DASHBOARD_CACHE["payload"] = payload
     _DASHBOARD_CACHE["ts"]      = now
     return payload
-
-
-@app.post("/dashboard/brief/refresh")
-async def refresh_brief():
-    """
-    Force-regenerate the AI brief. This is the ONLY entry point that calls
-    Claude for the brief — costs ~$0.015 per call.
-    """
-    snap = await dashboard_snapshot(force_refresh=False)
-    brief, generated_at, _ = await asyncio.to_thread(get_or_generate_brief, snap, True)
-
-    # Update in-memory snapshot cache so subsequent /dashboard/snapshot returns
-    # the fresh brief without regenerating the whole payload.
-    if _DASHBOARD_CACHE["payload"]:
-        _DASHBOARD_CACHE["payload"]["brief"]              = brief
-        _DASHBOARD_CACHE["payload"]["brief_generated_at"] = generated_at
-
-    return {"brief": brief, "generated_at": generated_at}
 
 
 _LIVE_QUOTE_CACHE: dict = {"ts": 0.0, "payload": None}

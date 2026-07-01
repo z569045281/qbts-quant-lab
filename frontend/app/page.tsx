@@ -168,7 +168,6 @@ export default function Dashboard() {
 
   const d = snap.decision ?? null;
   const meta = d ? getActionMeta(d.action, d.conviction) : null;
-  const todayUp = snap.today_change >= 0;
   const genAt = fmtLocalDateTime(snap.decision_generated_at);   // UTC → 浏览器本地时区
 
   // ── Plan vitality check: compare LIVE price against the plan's kill level.
@@ -191,10 +190,12 @@ export default function Dashboard() {
   const planStale = decisionAgeH !== null && decisionAgeH > 36;
   // CHoCH 早期预警:最近一次结构事件是 CHoCH(性格转变)= 反转苗头但尚未被 BOS 确认。
   // 纯提示,不参与决策信号 —— 填补"等确认所以进场晚"的空窗。
-  // SMC 读数:盘中每 ~5min 刷新写进 live_quote,比每日快照新 → 整张卡(结构/区位/区域
-  // /playbook)统一优先用 live 那份,保证同源一致(否则会出现 live 50% vs 快照 33% 的矛盾)。
-  const smc = live?.smc ?? snap.smc ?? null;
-  const pbLive = !!live?.smc;
+  // SMC 读数:盘中每 ~5min 刷新写进 live_quote,比每日快照新 → 优先用 live 那份。
+  // 但必须和上面的价格显示走【同一个 3 分钟新鲜度闸门】:实时报价过期时价格会回退到
+  // 快照价,SMC 也要一起回退到快照那份——否则会出现"页面显示 $24.43、但 SMC 卡用的是
+  // 上一条 live($23.94)算的",导致价格已在某区间内、对应勾却是灰色的自相矛盾。
+  const smc = (liveFresh && live?.smc) ? live.smc : (snap.smc ?? null);
+  const pbLive = !!(liveFresh && live?.smc);
   const choch = smc?.last_event?.kind === "CHoCH" ? smc.last_event : null;
   const pb = smc?.playbook ?? null;
 
@@ -725,7 +726,7 @@ export default function Dashboard() {
                 </span>
               )}
               <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 font-medium">
-                {smc.zone} {(smc.range_position * 100).toFixed(0)}%
+                {smc.zone} {typeof smc.range_position === "number" ? `${(smc.range_position * 100).toFixed(0)}%` : "—"}
               </span>
               {/* 多周期共振 (1h vs 日线) */}
               {smc.ltf && smc.confluence && (
@@ -887,9 +888,9 @@ export default function Dashboard() {
             </div>
             {/* 价值区刻度 */}
             <div className="flex items-center justify-between text-xs mb-3 px-1">
-              <span className="text-red-600 font-mono">VAL ${snap.volume_profile.val.toFixed(2)}</span>
-              <span className="font-mono font-bold text-violet-700">POC ${snap.volume_profile.poc.toFixed(2)}</span>
-              <span className="text-emerald-600 font-mono">VAH ${snap.volume_profile.vah.toFixed(2)}</span>
+              <span className="text-red-600 font-mono">VAL {fmtPx(snap.volume_profile.val)}</span>
+              <span className="font-mono font-bold text-violet-700">POC {fmtPx(snap.volume_profile.poc)}</span>
+              <span className="text-emerald-600 font-mono">VAH {fmtPx(snap.volume_profile.vah)}</span>
             </div>
             {/* 操作提示 — 把磁吸位翻译成明确的突破/跌破触发 */}
             {snap.volume_profile.action_hint && (

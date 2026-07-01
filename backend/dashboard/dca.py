@@ -42,6 +42,15 @@ META = {
     "AVUV": {"name": "美股小盘价值", "role": "美股便宜角落",     "target": 10},
 }
 DCA_ETFS = list(META.keys())
+
+# 择机观察名单 —— 不进核心配置(不占 40/30/20/10 权重),只显示估值,便宜了再择机加。
+# 故意独立于 META:加进 META 会污染 DCA_ETFS 和 allocation 权重条。
+WATCH = {
+    "QQQ": {"name": "纳指100", "role": "美国大科技·择机(现贵,等便宜)"},
+}
+WATCH_ETFS = list(WATCH.keys())
+_META_ALL = {**META, **WATCH}   # 仅用于 _compute_etf 取名字/角色
+
 _WINTER = {11, 12, 1, 2, 3, 4}   # historically strong half (kept as a minor detail)
 
 
@@ -78,7 +87,7 @@ def _deploy(drawdown: float, below_200: bool) -> dict:
 
 
 def _compute_etf(ticker: str) -> dict:
-    meta = META.get(ticker, {})
+    meta = _META_ALL.get(ticker, {})
     base = {"ticker": ticker, "name": meta.get("name", ticker),
             "role": meta.get("role", ""), "target_weight": meta.get("target")}
     try:
@@ -152,10 +161,15 @@ def _compute_etf(ticker: str) -> dict:
 def compute_dca(tickers: list[str] | None = None) -> dict:
     tickers = tickers or DCA_ETFS
     results = [_compute_etf(t) for t in tickers]
+    watch = [_compute_etf(t) for t in WATCH_ETFS]
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "etfs": tickers,
         "results": results,
+        # 择机观察(不进核心配置):便宜了再买
+        "watch": watch,
+        "watch_note": "这些不进上面的核心配置、不占权重。只看估值:🔴偏贵就等、"
+                      "转🟡中性/🟢便宜再考虑择机小仓加(卫星仓,不是压舱石)。",
         # recommended valuation-tilted allocation (moderate; rebalance annually)
         "allocation": {
             "weights": {t: META[t]["target"] for t in tickers if t in META},

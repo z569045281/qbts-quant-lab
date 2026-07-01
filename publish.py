@@ -6,7 +6,7 @@ Run this after you've mined / refreshed locally:
 
     .venv/bin/python publish.py
 
-It recomputes the dashboard snapshot, a fresh AI brief, the calibration table,
+It recomputes the dashboard snapshot, the AI decision, the calibration table,
 and every factor's chart — then writes them to Supabase. The deployed Next.js
 site reads straight from Supabase (no backend). See sql/supabase_schema.sql.
 
