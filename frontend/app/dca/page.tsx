@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getDcaState, type DcaState, type DcaResult } from "../_lib/data";
+import { DcaCalculator } from "../_components/dca-calculator";
 
 /* ─────────────────────────────────────────────────────────────────────────
    📥 定投专区 — 闲钱定投的「全球估值菜单」。不是择时:决定结果的是 多投>早投>
@@ -44,6 +45,15 @@ function DcaCard({ r }: { r: DcaResult }) {
         <span className="ml-auto text-sm font-mono text-gray-900">${r.price?.toFixed(2)}</span>
         <span className={`text-sm font-semibold ${up ? "text-emerald-600" : "text-[#F03A3E]"}`}>{signed(r.today_change)}</span>
       </div>
+
+      {/* 历史平均年回报(复合年化 CAGR,含分红)——用户最关心的数字,做醒目条 */}
+      {r.cagr != null && (
+        <div className="mt-2.5 flex items-baseline gap-2 rounded-lg bg-emerald-50/70 border border-emerald-100 px-3 py-2">
+          <span className="text-[11px] text-emerald-700/80">历史年化回报</span>
+          <span className="text-lg font-bold font-mono text-emerald-600">{signed(r.cagr)}</span>
+          {r.cagr_years != null && <span className="text-[10px] text-emerald-700/50">近 {r.cagr_years} 年 · 含分红 · 复合非算术</span>}
+        </div>
+      )}
 
       {/* 估值 + 目标权重 */}
       <div className="mt-2.5 grid grid-cols-3 gap-2 text-xs">
@@ -128,6 +138,11 @@ export default function DcaPage() {
           </div>
           <p className="mt-2 text-[11px] text-gray-500 leading-relaxed">{state.allocation.note}</p>
         </section>
+      )}
+
+      {/* 定投计算器 + 复利希望机(本机累计) */}
+      {state && Object.keys(weights).length > 0 && (
+        <DcaCalculator weights={weights} results={state.results} />
       )}
 
       {/* 卡片 */}

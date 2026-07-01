@@ -594,6 +594,8 @@ export interface DcaResult {
   today_change?:    number;
   pe?:              number | null;
   earnings_yield?:  number | null;  // 1/PE ≈ 粗略长期预期年化(实际)
+  cagr?:            number | null;  // 完整历史复合年化(含分红,总回报)
+  cagr_years?:      number | null;  // CAGR 覆盖的年数
   valuation:        string;      // 便宜 / 中性 / 偏贵 / —
   valuation_emoji:  string;
   drawdown_pct?:    number;      // from 52w high (≤ 0)

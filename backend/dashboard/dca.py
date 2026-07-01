@@ -107,6 +107,17 @@ def _compute_etf(ticker: str) -> dict:
         ey = (1.0 / pe) if (isinstance(pe, (int, float)) and pe and pe > 0) else None
         val, val_emoji = _valuation(ey)
 
+        # 完整历史复合年化(CAGR，含分红——mclose 已是 auto_adjust 总回报)。
+        # 这才是诚实的"平均年回报率":复合、非算术平均。数据已下载，零额外成本。
+        cagr = cagr_years = None
+        try:
+            yrs = (mclose.index[-1] - mclose.index[0]).days / 365.25
+            if yrs > 0.5 and float(mclose.iloc[0]) > 0:
+                cagr = (float(mclose.iloc[-1]) / float(mclose.iloc[0])) ** (1.0 / yrs) - 1.0
+                cagr_years = round(yrs, 1)
+        except Exception:
+            cagr = cagr_years = None
+
         # seasonality (kept as a minor secondary detail)
         mret = mclose.pct_change().dropna()
         by_month = mret.groupby(mret.index.month).mean()
@@ -120,6 +131,8 @@ def _compute_etf(ticker: str) -> dict:
             "pe": round(pe, 1) if isinstance(pe, (int, float)) else None,
             "earnings_yield": round(ey, 4) if ey is not None else None,
             "valuation": val, "valuation_emoji": val_emoji,
+            "cagr": round(cagr, 4) if cagr is not None else None,
+            "cagr_years": cagr_years,
             "drawdown_pct": round(drawdown, 4),
             "vs_200dma_pct": round(vs_200, 4),
             "below_200": below_200,
