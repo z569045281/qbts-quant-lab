@@ -51,6 +51,14 @@ function IconFactors() {  // 🏆 ranked bars / leaderboard
     </svg>
   );
 }
+function IconChallenge() {  // 🎰 target-hit / $1000→+$100 challenge
+  return (
+    <svg width="25" height="25" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 20V9M9 20V4M14 20v-7M19 20v-4" {...ico} />
+      <path d="M3.5 20.5h17" {...ico} />
+    </svg>
+  );
+}
 function IconMine() {  // ⛏️ sparkles / AI factor lab (local only)
   return (
     <svg width="25" height="25" viewBox="0 0 24 24" aria-hidden="true">
@@ -65,6 +73,7 @@ const tabs = [
   { href: "/watch",   label: "🔭 自选扫描",   short: "扫描", Icon: IconScan     },
   { href: "/dca",     label: "📥 定投专区",   short: "定投", Icon: IconDca      },
   { href: "/factors", label: "🏆 因子排行榜", short: "因子", Icon: IconFactors  },
+  { href: "/challenge", label: "🎰 千元挑战",  short: "挑战", Icon: IconChallenge },
   // The mining console only works against the local backend — hide it on the
   // read-only public deployment.
   ...(READONLY ? [] : [{ href: "/mine", label: "⛏️ 因子挖矿", short: "挖矿", Icon: IconMine }]),

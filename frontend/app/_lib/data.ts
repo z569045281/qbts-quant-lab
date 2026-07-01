@@ -611,6 +611,8 @@ export interface DcaState {
   generated_at: string;
   etfs:         string[];
   results:      DcaResult[];
+  watch?:       DcaResult[];   // 择机观察(不进核心配置,便宜了再买)
+  watch_note?:  string;
   allocation?:  { weights: Record<string, number>; note: string };
   macro?:       { us_cape: number; global_cape: number; as_of: string; note: string };
   ballast?:     string;
@@ -641,6 +643,37 @@ export async function getRetrospective(): Promise<Retrospective | null> {
     .from("retrospective").select("data").eq("id", "current").maybeSingle();
   if (error || !data) return null;
   return data.data as Retrospective;
+}
+
+/* ── 🎰 $1000→+$100 一个月挑战 (纸面盘, 无加密) ──────────────────────────────── */
+export interface ChallengePosition {
+  symbol: string; qty: number; entry_px: number; invested: number;
+  tp_px: number; stop_px: number; cur_px?: number; unreal?: number;
+}
+export interface CryptoChallenge {
+  status:       "running" | "won" | "halted";
+  sleeve_start: number;
+  sleeve_cash:  number;
+  equity:       number;
+  pnl:          number;
+  pnl_pct:      number;
+  peak_equity:  number;
+  win_line:     number;
+  floor_line:   number;
+  position:     ChallengePosition | null;
+  basket:       string[];
+  deadline:     string;
+  odds_note:    string;
+  history:      string[];
+  updated_at:   string;
+}
+
+/** Latest challenge state (single 'current' row; null until the bot first pushes). */
+export async function getCryptoChallenge(): Promise<CryptoChallenge | null> {
+  const { data, error } = await supabase
+    .from("crypto_challenge").select("data").eq("id", "current").maybeSingle();
+  if (error || !data) return null;
+  return data.data as CryptoChallenge;
 }
 
 /** Edit the watchlist + re-scan. Cloud → Lambda Function URL; local → FastAPI.
