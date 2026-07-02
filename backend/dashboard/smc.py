@@ -82,7 +82,7 @@ def analyze_structure(df: pd.DataFrame, swing_highs: list[dict], swing_lows: lis
     return {
         "trend": "bullish" if trend > 0 else ("bearish" if trend < 0 else "neutral"),
         "last_event": last_event,
-        "recent_events": events[-3:],
+        "recent_events": events[-40:],   # 窗口够 15m CHoCH 回看;下游 find_order_blocks 仍取 [-4:]
     }
 
 
@@ -207,14 +207,23 @@ def _ltf15_trigger(df_15m: pd.DataFrame | None, lock: str) -> dict | None:
     n15 = len(d15)
     want_dir = "bullish" if lock == "bull" else "bearish"
     bars_since = (n15 - 1 - le15["i"]) if le15 else None
-    choch_ok = bool(le15 and le15["kind"] == "CHoCH" and le15["dir"] == want_dir
-                    and bars_since is not None and bars_since <= 12)
-    if lock == "bull":
-        dot_ok = bool(wt and (wt["green_dot"] or (wt["cross_up"] and wt["zone"] == "oversold")))
-    else:
-        dot_ok = bool(wt and (wt["red_dot"] or (wt["cross_dn"] and wt["zone"] == "overbought")))
+    # CHoCH 是转瞬即逝的:性格转变后价格再破一个点就变成同向 BOS,一两根内就把
+    # last_event 覆盖成 BOS —— 所以"最新事件必须正好是 CHoCH"几乎永远不触发。
+    # 改判:近 12 根内是否出现过【想要方向】的 CHoCH(即便随后被 BOS 覆盖)。
+    # CHoCH→同向 BOS 恰是最理想的确认,不该算漏。
+    choch_ev = next((e for e in reversed(st15.get("recent_events") or [])
+                     if e["kind"] == "CHoCH" and e["dir"] == want_dir
+                     and (n15 - 1 - e["i"]) <= 12), None)
+    choch_ok = choch_ev is not None
+    choch_bars = (n15 - 1 - choch_ev["i"]) if choch_ev else None
+    # VMC 点同样是单根 bar 事件(仅穿越那一根 red_dot/green_dot=True)——只认最后一根
+    # 几乎不触发。改判:近 12 根内印出过对应方向的 VMC 点(与 ④ CHoCH 同窗口)。
+    # bars_since_red/green 由 analyze_wavetrend 已算好。
+    dot_bars = (wt.get("bars_since_green") if lock == "bull" else wt.get("bars_since_red")) if wt else None
+    dot_ok = dot_bars is not None and dot_bars <= 12
     return {"trend": st15["trend"], "last_event": le15, "bars_since_event": bars_since,
-            "choch_ok": choch_ok, "wt": wt, "dot_ok": dot_ok}
+            "choch_ok": choch_ok, "choch_bars": choch_bars,
+            "wt": wt, "dot_ok": dot_ok, "dot_bars": dot_bars}
 
 
 def _dealing_range(d: pd.DataFrame, swing_highs: list, swing_lows: list,
@@ -450,11 +459,15 @@ def build_playbook(price: float, structure: dict, pos: float,
         {"key": "relay", "label": "③ 触及次级别中继订单块 (4h/1h)", "ok": bool(touching_relay),
          "detail": relay_detail},
         {"key": "choch15", "label": f"④ 15m 出现{dir_cn} CHoCH", "ok": bool(ltf15 and ltf15["choch_ok"]),
-         "detail": (f"15m 最近 {le15['dir']} {le15['kind']}（{ltf15['bars_since_event']} 根前）"
-                    if le15 else ("无 15m 数据" if not ltf15 else "15m 暂无反转结构"))},
+         "detail": (f"15m {dir_cn} CHoCH 已现（{ltf15['choch_bars']} 根前）"
+                    if (ltf15 and ltf15["choch_ok"])
+                    else (f"近12根无{dir_cn} CHoCH（最近 {le15['dir']} {le15['kind']}，{ltf15['bars_since_event']} 根前）"
+                          if le15 else ("无 15m 数据" if not ltf15 else "15m 暂无反转结构")))},
         {"key": "vmc", "label": f"⑤ 15m VMC {dot_cn}（收盘确认）", "ok": bool(ltf15 and ltf15["dot_ok"]),
-         "detail": (f"WaveTrend wt1={wt['wt1']} / wt2={wt['wt2']}（{wt['zone']}）"
-                    if wt else ("无 15m 数据" if not ltf15 else "WaveTrend 未就绪"))},
+         "detail": (f"VMC {dot_cn}已现（{ltf15['dot_bars']} 根前）· wt2={wt['wt2']}（{wt['zone']}）"
+                    if (ltf15 and ltf15["dot_ok"] and wt)
+                    else (f"近12根无{dot_cn} · wt1={wt['wt1']}/wt2={wt['wt2']}（{wt['zone']}）"
+                          if wt else ("无 15m 数据" if not ltf15 else "WaveTrend 未就绪")))},
     ]
     n_ok = sum(1 for c in checklist if c["ok"])
 
