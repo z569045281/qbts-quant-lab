@@ -46,9 +46,11 @@ def _short_component() -> tuple[float, float, float | None, str]:
     mu, sd = float(win.mean()), float(win.std())
     z = float((sr - mu) / sd) if sd > 1e-9 else 0.0
 
-    # level: short_ratio 0.40→0, 0.65→~30. pressure: z up to +10.
-    level = np.clip((sr - 0.40) / 0.25, 0, 1) * 30
-    pressure = np.clip(z / 2.0, 0, 1) * 10
+    # 静态"绝对空量比"降权、动态"拥挤度突刺"(60日 z)加权:慢性高空头(常数)不再
+    # 锁死分数,而空头快速加仓(z 突刺)能真正把燃料拉高。总分仍 0-40。
+    # level: short_ratio 0.40→0, 0.65→~20。 pressure: z 0→2 → 0→20。
+    level = np.clip((sr - 0.40) / 0.25, 0, 1) * 20
+    pressure = np.clip(z / 2.0, 0, 1) * 20
     fuel = float(level + pressure)
     note = f"FINRA 空量比 {sr*100:.0f}%（60日 z={z:+.1f}）"
     return fuel, sr, round(z, 2), note
@@ -90,7 +92,9 @@ def _holdings_component(holdings_sig: dict | None) -> tuple[float, str]:
         return 0.0, "13F 数据缺失"
     s = holdings_sig["snapshot"]
     active_change = float(s.get("active_avg_change", 0))
-    fuel = np.clip(active_change / 0.15, 0, 1) * 25       # +15% net → full 25
+    # 满分门槛 +15%→+50%:否则任何有吸筹的季度都顶格 25、变成常数锁死总分。
+    # 13F 是季度滞后数据,这里只作"点火源在不在"的背景确认,不主导动态。
+    fuel = np.clip(active_change / 0.50, 0, 1) * 25       # +50% net → full 25
     note = f"主动管理人净变化 {active_change*100:+.0f}%"
     return float(fuel), note
 

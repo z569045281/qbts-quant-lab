@@ -24,7 +24,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-_LOOKBACK_DAYS = 60      # composite profile window (trading days)
+_LOOKBACK_DAYS = 60      # naked-POC / daily-POC scan window (long → magnet coverage)
+_VA_LOOKBACK   = 20      # value-area window (short → 现价 vs 价值区 判断灵敏、可被突破)
 _N_BINS        = 50      # price resolution
 _VALUE_AREA    = 0.70    # fraction of volume defining the value area
 
@@ -150,20 +151,30 @@ def _action_hint(where: str, val: float, vah: float,
 
 def analyze_volume_profile(df_h: pd.DataFrame, live_price: float | None = None,
                            lookback_days: int = _LOOKBACK_DAYS,
+                           va_lookback_days: int = _VA_LOOKBACK,
                            n_bins: int = _N_BINS) -> dict:
-    """Composite volume profile on the last ~lookback_days of hourly bars."""
+    """Composite volume profile on hourly bars.
+
+    Two decoupled windows: the value area (POC/VAH/VAL + HVN/LVN) is built on a
+    SHORT window (`va_lookback_days`) so "现价 vs 价值区" tracks CURRENT accepted
+    value and is actually breakable — a long window drags VAH up with weeks-old
+    volume from a different price regime, leaving price permanently "inside".
+    Naked/daily POC magnets keep the LONG window (`lookback_days`) so an old but
+    unfilled gap is still surfaced as a target.
+    """
     if df_h is None or len(df_h) < 10:
         return {"signal": 0, "label": "HOLD", "rationale": "1h 数据不足，无法构建成交量画像"}
 
-    w = _window(df_h, lookback_days)
+    w_va    = _window(df_h, va_lookback_days)     # value area (short, responsive)
+    w_daily = _window(df_h, lookback_days)        # daily POCs for naked magnets (long)
     price = float(live_price if live_price else df_h["close"].iloc[-1])
 
-    edges, centers, vol_at = _profile(w, n_bins)
+    edges, centers, vol_at = _profile(w_va, n_bins)
     poc_idx, vah, val = _value_area(vol_at, edges)
     poc = round(float(centers[poc_idx]), 2)
 
     hvn, lvn = _hvn_lvn(centers, vol_at)
-    naked_above, naked_below = _naked_pocs(df_h, _daily_pocs(df_h, w), price)
+    naked_above, naked_below = _naked_pocs(df_h, _daily_pocs(df_h, w_daily), price)
 
     where = "above" if price > vah else ("below" if price < val else "inside")
 
@@ -207,11 +218,11 @@ def analyze_volume_profile(df_h: pd.DataFrame, live_price: float | None = None,
         "naked_pocs_below": naked_below,
         "nearest_magnet_up":   nearest_up,
         "nearest_magnet_down": nearest_down,
-        "lookback_days":   lookback_days,
+        "lookback_days":   va_lookback_days,
         "stance":          stance,
         "action_hint":     action_hint,
         "rationale":       "；".join(notes),
-        "note":            "基于 1h bar 的成交量画像（近似，无 tick 数据）",
+        "note":            f"价值区取近 {va_lookback_days} 日(灵敏)、磁吸 naked POC 取近 {lookback_days} 日；1h bar 近似，无 tick 数据",
     }
 
 
