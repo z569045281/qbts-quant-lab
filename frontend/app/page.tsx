@@ -574,16 +574,38 @@ export default function Dashboard() {
                     {e.date.slice(5)} {e.time_et}ET{etMelbSuffix(e.date, e.time_et)}
                   </span>
                   <span className="font-medium text-gray-800">{e.title}</span>
-                  {typeof e.hours_until === "number" && e.hours_until >= 0 && e.hours_until <= 48 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-red-500 text-white">
-                      {e.hours_until < 1 ? "即将发布" : `${Math.round(e.hours_until)}小时后`}
-                    </span>
-                  )}
-                  {typeof e.hours_until === "number" && e.hours_until < 0 && e.hours_until > -24 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-gray-200 text-gray-600">
-                      已公布
-                    </span>
-                  )}
+                  {(() => {
+                    // Badge 按类型诚实:演讲天生没数值结果,别挂"已公布"让人以为缺数据;
+                    // 有预测的数据过期但没实际值(如免费源没有的 ISM/ADP,或覆盖内待下次补)
+                    // → 标"待结果",一眼看出是数据源局限而非 bug。
+                    const hu = e.hours_until;
+                    const isSpeech = /speaks|speech|testif/i.test(e.title)
+                      || (!e.forecast && !e.previous && !e.actual);
+                    const future = typeof hu === "number" && hu >= 0 && hu <= 48;
+                    const past = typeof hu === "number" && hu < 0 && hu > -24;
+                    if (isSpeech) {
+                      if (future) return (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-red-500 text-white">
+                          {hu! < 1 ? "即将开始" : `${Math.round(hu!)}小时后`}
+                        </span>);
+                      return (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-violet-100 text-violet-600">
+                          🎤 演讲{past ? "已结束" : ""}
+                        </span>);
+                    }
+                    if (future) return (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-red-500 text-white">
+                        {hu! < 1 ? "即将发布" : `${Math.round(hu!)}小时后`}
+                      </span>);
+                    if (past) return e.actual ? (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-gray-200 text-gray-600">已公布</span>
+                    ) : (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-700"
+                            title="发布时间已过,但实际值不在免费数据源里(如 ISM/ADP),或覆盖内数据将在下次更新时补上">
+                        已公布·待结果
+                      </span>);
+                    return null;
+                  })()}
                   {(() => {
                     const s = macroSurprise(e.title, e.forecast, e.actual);
                     if (!s) return null;
