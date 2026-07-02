@@ -768,6 +768,16 @@ export default function Dashboard() {
                 📊 {snap.relative_strength.rationale}
               </div>
             )}
+            {/* 散户情绪 — 弱信号小条(Adanos Reddit)。同步性>预测性,仅背景参考 */}
+            {snap.sentiment?.sentiment_score != null && (
+              <div className={`text-[11px] rounded-md px-2.5 py-1.5 mb-2 leading-snug ${
+                snap.sentiment.signal > 0 ? "bg-emerald-50 text-emerald-700"
+                : snap.sentiment.signal < 0 ? "bg-red-50 text-red-700"
+                : "bg-[#F6F6F8] text-[#525461]"}`}>
+                💬 {snap.sentiment.note}
+                <span className="text-gray-400"> · 弱信号,散户情绪多为同步反映、非方向依据</span>
+              </div>
+            )}
             {/* 关键区域 */}
             <div className="space-y-1.5 text-xs">
               {smc.supply_zones.map((z, i) => (

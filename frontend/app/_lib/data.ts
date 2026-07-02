@@ -101,6 +101,16 @@ export interface Snapshot {
   nw_envelope?:       NwEnvelope | null;
   squeeze?:           SqueezeFuel | null;
   relative_strength?: RelativeStrength | null;
+  sentiment?: {
+    buzz_score:      number | null;   // 0-100 attention/velocity
+    sentiment_score: number | null;   // -1..+1
+    trend:           string | null;   // rising / falling / stable
+    mentions?:       number | null;
+    bullish_pct?:    number | null;
+    bearish_pct?:    number | null;
+    signal:          -1 | 0 | 1;
+    note:            string;
+  } | null;
   journal?: DecisionJournal | null;
 }
 

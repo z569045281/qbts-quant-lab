@@ -544,6 +544,67 @@ def fetch_sec_dilution(ticker: str, offering_days: int = 120, shelf_days: int = 
             "note": note}
 
 
+# ── Adanos retail sentiment (Reddit buzz + sentiment) ─────────────────────────
+# Replaces the dead Reddit signal — Reddit's own API is approval-gated + bans AI use
+# since 2026-06, and keyless StockTwits/Reddit .json are 403-blocked. Adanos is a
+# free-tier aggregator: 250 req/mo (daily publish uses ~30). Needs ADANOS_API_KEY
+# (sk_live_…, free at adanos.org/register); returns None without it, so it degrades
+# cleanly. Fields: buzz_score 0-100 (attention/velocity), sentiment_score -1..+1.
+_ADANOS_BASE = "https://api.adanos.org"
+
+
+def fetch_adanos_sentiment(ticker: str = "QBTS") -> "dict | None":
+    """Reddit retail buzz + sentiment for `ticker` from Adanos.
+
+    Verified response is flat top-level: buzz_score 0-100 (attention/velocity),
+    sentiment_score -1..+1, trend rising/falling/stable, mentions, bullish_pct/
+    bearish_pct, period_days. Returns {buzz_score, sentiment_score, trend,
+    mentions, bullish_pct, bearish_pct, signal(-1/0/1), note} or None when no
+    ADANOS_API_KEY is set or the lookup fails (informational, not a trade
+    trigger — graded by the ledger like every other signal).
+    """
+    key = _os.getenv("ADANOS_API_KEY")
+    if not key:
+        return None
+    url = f"{_ADANOS_BASE}/reddit/stocks/v1/stock/{ticker.upper()}"
+    try:
+        req = urllib.request.Request(url, headers={
+            "X-API-Key": key, "Accept-Encoding": "gzip, deflate"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            raw = resp.read()
+            if resp.headers.get("Content-Encoding") == "gzip":
+                import gzip
+                raw = gzip.decompress(raw)
+        data = _json.loads(raw)
+    except Exception as e:
+        logging.warning(f"adanos fetch failed for {ticker}: {e}")
+        return None
+
+    def _num(k):
+        v = data.get(k)
+        return float(v) if isinstance(v, (int, float)) else None
+    buzz, sent = _num("buzz_score"), _num("sentiment_score")
+    mentions   = data.get("mentions")
+    bull, bear = data.get("bullish_pct"), data.get("bearish_pct")
+    trend      = data.get("trend")
+
+    # Mild directional tilt: sentiment sign gated by real attention (buzz), so a
+    # near-zero-buzz reading doesn't vote. Thresholds intentionally conservative.
+    signal = 0
+    if sent is not None and (buzz is None or buzz >= 20):
+        if sent >= 0.15:
+            signal = 1
+        elif sent <= -0.15:
+            signal = -1
+    bp = f"（多{bull}%/空{bear}%，{mentions}提及）" if bull is not None else ""
+    note = (f"散户情绪 {sent:+.2f}{bp}" if sent is not None else "情绪缺失") + \
+           (f" · 热度 {buzz:.0f}/100" if buzz is not None else "") + \
+           (f" · {trend}" if isinstance(trend, str) else "")
+    return {"buzz_score": buzz, "sentiment_score": sent, "trend": trend,
+            "mentions": mentions, "bullish_pct": bull, "bearish_pct": bear,
+            "signal": signal, "note": note}
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     status = altdata_health_check()

@@ -28,13 +28,12 @@ from fastapi.responses import StreamingResponse
 from data.fetcher import load_or_fetch, load_15m
 from data.sentiment import get_sentiment_context, get_fear_greed, sentiment_to_prompt_context
 from data.enricher import enrich
-from data.altdata import altdata_health_check, get_latest_etf_prices
+from data.altdata import altdata_health_check, get_latest_etf_prices, fetch_adanos_sentiment
 from dashboard.strategies import run_all_strategies, aggregate_consensus
 from dashboard.news       import get_news_snapshot
 from dashboard.edge        import compute_edge
 from dashboard.options     import get_options_signal
 from dashboard.intraday    import get_intraday_signal
-from dashboard.reddit      import fetch_reddit_signal
 from dashboard.holdings    import get_holdings_signal
 from dashboard.decision    import get_or_generate_decision, get_cached_decision
 from dashboard.macro       import get_macro_calendar
@@ -955,9 +954,10 @@ async def dashboard_snapshot(force_refresh: bool = False):
     except Exception:
         intr_sig = None
     try:
-        reddit_sig = await asyncio.to_thread(fetch_reddit_signal)
+        # 散户情绪:Adanos(Reddit buzz+sentiment)取代已死的 Reddit API
+        sentiment_sig = await asyncio.to_thread(fetch_adanos_sentiment, "QBTS")
     except Exception:
-        reddit_sig = None
+        sentiment_sig = None
     try:
         holdings_sig = await asyncio.to_thread(get_holdings_signal)
     except Exception:
@@ -1008,7 +1008,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
         journal = None
     payload["options"]        = opt_sig
     payload["intraday"]       = intr_sig
-    payload["reddit"]         = reddit_sig
+    payload["sentiment"]      = sentiment_sig
     payload["holdings"]       = holdings_sig
     payload["macro"]          = macro_cal
     payload["smc"]            = smc
@@ -1028,7 +1028,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
             return {"status": "active",   "label": sig.get("label", ""),
                     "rationale": sig.get("rationale", "")}
         # signal == 0 → HOLD; check why (no data vs neutral reading)
-        reason = sig.get("rationale", "")
+        reason = sig.get("rationale") or sig.get("note", "")
         if "OAuth" in reason or "缺失" in reason or "失败" in reason or "需要" in reason:
             return {"status": "needs_setup", "label": "未配置",
                     "rationale": reason}
@@ -1038,7 +1038,9 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["sources_status"] = {
         "options":  _src_status(opt_sig),
         "intraday": _src_status(intr_sig),
-        "reddit":   _src_status(reddit_sig),
+        "sentiment": (_src_status(sentiment_sig) if sentiment_sig else
+                      {"status": "needs_setup", "label": "未配置",
+                       "rationale": "设置 ADANOS_API_KEY 启用散户情绪(Adanos)"}),
         "holdings": _src_status(holdings_sig),
     }
 
@@ -1048,7 +1050,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
     ) else None
     try:
         payload["edge"] = compute_edge(
-            payload, today_cached, opt_sig, intr_sig, reddit_sig, holdings_sig,
+            payload, today_cached, opt_sig, intr_sig, holdings_sig,
         )
     except Exception as e:
         payload["edge"] = {"signal": 0, "label": "HOLD", "error": str(e)[:100]}

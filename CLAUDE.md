@@ -82,6 +82,15 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   feed only carries forecast/previous — never actual. Without the key the calendar still
   works (actual blank). The cloud daily-publish Lambda needs it too, so it's wired through
   `aws/template.yaml` (`FredApiKey`) + `deploy-aws.yml`.
+- **`ADANOS_API_KEY`** (optional, `sk_live_…`, in root `.env` + GitHub Actions secret +
+  `template.yaml` `AdanosApiKey` → `deploy-aws.yml`): retail Reddit **buzz + sentiment** via
+  `backend/data/altdata.py::fetch_adanos_sentiment` (Adanos free tier, 250 req/mo; register
+  at adanos.org/register). **Replaced the dead Reddit signal** — Reddit's own API is
+  approval-gated + bans AI use since 2026-06, and keyless StockTwits/Reddit `.json` are
+  403-blocked (see memory [[reddit-api-dead]]). Wired into `snapshot['sentiment']`, the edge
+  meta-model (`_SENTIMENT_WEIGHT=0.12`, low — retail sentiment is weak/laggy) and the decision
+  prompt. Blank key → signal simply off (degrades cleanly). Endpoint returns top-level
+  `buzz_score`/`sentiment_score`/`trend`/`bullish_pct`/`bearish_pct`; `X-API-Key` header.
 - **Models**: Opus 4.8 (decision) · Sonnet 4.6 (factor gen) · Haiku 4.5 (news / reflections).
 - **Big image push to ECR occasionally times out** in CI — just re-run "Deploy AWS jobs".
 - **Nadaraya-Watson 包络** (`backend/dashboard/nadaraya_watson.py::analyze_nw_envelope`):
@@ -213,6 +222,16 @@ Frontend tabs (`frontend/app/`): **🎯 决策仪表盘** (`/`) · **🔭 自选
   gate warns until ≥30 graded calls. Standing guidance given to the user: **don't size up
   real money until the track record shows an edge.** Treat the whole thing as a measurement
   tool for now; the next optimization should be driven by the accumulated results.
+- **⏰ REMINDER — re-derive the edge weights once calibration has samples.** Every weight in
+  `edge.py` is a **hardcoded prior, not derived from data**: `_MINED_WEIGHT_PER_SHARPE=0.8`,
+  `_CLASSIC_WEIGHT_BASE={high:0.40,medium:0.20,low:0.08}`, `_NEWS_WEIGHT=0.15`,
+  `_REL_STRENGTH_WEIGHT=0.20` (relative-strength, added 2026-07-02 — picked to match the
+  medium-classic tier, **no empirical basis**). They only self-correct via
+  `_learn_mult(src)` (load_learned_weights), which stays 1.0 until a source has enough graded
+  predictions. **When the calibration/journal record crosses ~30 graded calls per source,
+  tell the user and re-derive these weights (and each source's keep/drop) from the real
+  hit-rate table — don't keep trusting the hand-tuned priors.** Until then treat every edge
+  p_up as an unvalidated guess. (User explicitly asked to be reminded of this.)
 - **All Supabase migrations have been run** (decision_journal, calibration/predictions/
   source_weights, watchlist, scan_journal, finra_short, watchlist_scan, scan_paper,
   dca_state). Running cost ≈ **$20/mo**, almost all of it the one daily Opus decision at

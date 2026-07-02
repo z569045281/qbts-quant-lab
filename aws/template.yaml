@@ -25,6 +25,13 @@ Parameters:
     Description: >
       FRED (St. Louis Fed) API key — backfills macro-calendar actual values.
       Optional: blank just leaves actuals empty (forecast/previous still show).
+  AdanosApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: >
+      Adanos API key (sk_live_…) — retail Reddit buzz + sentiment for the
+      decision/edge. Optional: blank just leaves the sentiment signal off.
   AllowOrigin:
     Type: String
     Default: "*"
@@ -52,6 +59,7 @@ Globals:
         SUPABASE_URL: !Ref SupabaseUrl
         SUPABASE_SECRET_KEY: !Ref SupabaseSecretKey
         FRED_API_KEY: !Ref FredApiKey
+        ADANOS_API_KEY: !Ref AdanosApiKey
         NTFY_TOPIC: !Ref NtfyTopic
         NTFY_URL: !Ref NtfyUrl
 

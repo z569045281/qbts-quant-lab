@@ -53,6 +53,8 @@ class Contribution:
 _MINED_WEIGHT_PER_SHARPE = 0.8     # a Sharpe-1.5 mined factor contributes ~1.2 log-odds
 _CLASSIC_WEIGHT_BASE     = {"high": 0.40, "medium": 0.20, "low": 0.08}
 _NEWS_WEIGHT             = 0.15    # news barely moves p_up — usually already priced
+_REL_STRENGTH_WEIGHT     = 0.20    # leading/lagging the peer basket — a dynamic, price-responsive tell
+_SENTIMENT_WEIGHT        = 0.12    # retail Reddit sentiment (Adanos) — weak/laggy, small tilt only
 
 
 def compute_edge(
@@ -60,7 +62,6 @@ def compute_edge(
     today_signals: dict | None = None,
     options_signal: dict | None = None,
     intraday_signal: dict | None = None,
-    reddit_signal: dict | None = None,
     holdings_signal: dict | None = None,
 ) -> dict:
     """
@@ -166,17 +167,19 @@ def compute_edge(
             detail=intraday_signal.get("rationale", "")[:80],
         ))
 
-    # 6) Reddit mention velocity + sentiment (WSB / stocks / quantumcomputing)
-    if reddit_signal and reddit_signal.get("signal", 0) != 0:
-        sig = int(reddit_signal["signal"])
-        base_w = float(reddit_signal.get("log_odds_magnitude", 0.0))
-        w  = base_w * _learn_mult("Reddit 散户情绪")
-        lo = sig * w
+    # 6) Retail sentiment (Adanos Reddit buzz + sentiment) — a small, dynamic
+    #    tilt off the snapshot; weak/laggy so low weight. Replaces the dead Reddit
+    #    API signal (Reddit is approval-gated + bans AI use since 2026-06).
+    st = snapshot.get("sentiment") or {}
+    st_sig = int(st.get("signal", 0) or 0)
+    if st_sig != 0:
+        w  = _SENTIMENT_WEIGHT * _learn_mult("散户情绪")
+        lo = st_sig * w
         log_odds += lo
         contributions.append(Contribution(
-            source="Reddit 散户情绪", kind="news",
-            signal=sig, weight=w, log_odds=lo,
-            detail=reddit_signal.get("rationale", "")[:80],
+            source="散户情绪", kind="news",
+            signal=st_sig, weight=w, log_odds=lo,
+            detail=st.get("note", "")[:80],
         ))
 
     # 7) 13F institutional holdings — "smart money" tracking
@@ -190,6 +193,23 @@ def compute_edge(
             source="机构持仓 (13F)", kind="classic",
             signal=sig, weight=w, log_odds=lo,
             detail=holdings_signal.get("rationale", "")[:80],
+        ))
+
+    # 8) Relative strength vs peer basket — leading/lagging the quantum peers is
+    #    a genuinely price-RESPONSIVE directional tell (unlike the static quarterly
+    #    13F). It shifts daily with QBTS's relative performance, adding a dynamic
+    #    axis the meta-model otherwise lacks. Reads straight off the snapshot.
+    rs = snapshot.get("relative_strength") or {}
+    rs_sig = int(rs.get("signal", 0) or 0)
+    if rs_sig != 0:
+        w  = _REL_STRENGTH_WEIGHT * _learn_mult("相对强度")
+        lo = rs_sig * w
+        log_odds += lo
+        lead = {"leader": "领先", "laggard": "落后"}.get(rs.get("leadership", ""), rs.get("leadership", ""))
+        contributions.append(Contribution(
+            source="相对强度", kind="classic",
+            signal=rs_sig, weight=w, log_odds=lo,
+            detail=f"{lead}量子篮子 · {rs.get('rationale', '')[:60]}",
         ))
 
     # Probability and expected return

@@ -48,7 +48,7 @@ const KIND_COLOR: Record<EdgeContribution["kind"], string> = {
 const SOURCE_LABEL: Record<string, string> = {
   options:  "期权流",
   intraday: "盘中量能",
-  reddit:   "Reddit 散户情绪",
+  sentiment: "散户情绪 (Adanos)",
   holdings: "13F 机构持仓",
 };
 const STATUS_BADGE: Record<SourceStatus["status"], { emoji: string; cls: string; text: string }> = {

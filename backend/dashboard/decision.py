@@ -227,13 +227,11 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
     if intr:
         parts.append(f"## 盘中量能\n  {intr.get('rationale','')}")
 
-    # ── Reddit ────────────────────────────────────────────────
-    red = snapshot.get("reddit")
-    if red and red.get("auth_mode") == "oauth":
-        s = red.get("snapshot", {})
-        parts.append(f"## Reddit 散户讨论\n  {red.get('rationale','')}\n"
-                     f"  7日提及 {s.get('n_total_7d','?')} 条，24h {s.get('n_last_24h','?')} 条，"
-                     f"速度 {s.get('velocity','?')}×")
+    # ── 散户情绪(Adanos Reddit buzz + sentiment)────────────────
+    st = snapshot.get("sentiment")
+    if st and st.get("sentiment_score") is not None:
+        parts.append(f"## 散户情绪（Reddit，来自 Adanos）\n  {st.get('note','')}\n"
+                     f"  （散户情绪是偏弱信号、常滞后甚至反向 —— 作情绪背景与拥挤度参考，别当方向依据）")
 
     # ── SMC 聪明钱结构分析 ───────────────────────────────────
     smc = snapshot.get("smc")
