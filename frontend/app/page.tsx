@@ -6,6 +6,7 @@ import { ControlPanel } from "./_components/control-panel";
 import { RetrospectivePanel } from "./_components/retrospective-panel";
 import { getSnapshot, getLiveQuote, type Snapshot, type Decision, type LiveQuote } from "./_lib/data";
 import { fmtLocalDateTime, parseUtc, etMelbSuffix, epochMelbTime, macroSurprise } from "./_lib/format";
+import versionData from "../public/version.json";
 
 const SESSION_BADGE: Record<LiveQuote["session"], { label: string; cls: string }> = {
   pre:     { label: "盘前", cls: "bg-amber-100 text-amber-700"   },
@@ -51,8 +52,8 @@ function getActionMeta(action: Decision["action"], conviction: number) {
 /* 信心刻度图例 */
 const CONVICTION_LEGEND = "0-4 观望 · 5-6 轻仓试探 · 7-8 标准仓 · 9+ 重仓";
 
-/* 页面版本号 — 右下角显示，发版时手动 bump */
-const APP_VERSION = "1.0";
+/* 页面版本号 — 右下角显示。单一来源 public/version.json(版本守卫也读它);发版时 bump 那个文件 */
+const APP_VERSION = versionData.version;
 
 function fmtPx(n: number | null | undefined): string {
   return typeof n === "number" && isFinite(n) ? `$${n.toFixed(2)}` : "—";

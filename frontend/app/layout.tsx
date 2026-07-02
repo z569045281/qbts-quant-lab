@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { NavBar } from "./_components/nav";
+import { VersionGuard } from "./_components/version-guard";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -48,6 +49,7 @@ export default function RootLayout({
         {/* Pad past the fixed mobile tab bar (50px + home-indicator inset);
             desktop has no bottom bar so the padding collapses. */}
         <div className="flex-1 pb-[calc(50px_+_env(safe-area-inset-bottom))] md:pb-0">{children}</div>
+        <VersionGuard />
       </body>
     </html>
   );
