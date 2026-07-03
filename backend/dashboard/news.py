@@ -88,12 +88,17 @@ For each news headline below, return a JSON object with:
   - sentiment   : "bullish" | "bearish" | "neutral"
   - impact      : "high" | "medium" | "low" (price-move magnitude expected: high = 5%+, medium = 1-5%, low = <1%)
   - horizon     : "intraday" | "1-3d" | "1-2w" | "longer"
-  - reasoning   : ONE concise sentence explaining the mechanism (max 100 chars)
+  - reasoning   : ONE concise sentence explaining the mechanism (max 100 chars).
+                  Quote the concrete specifics (dollar amount, %, QBTS's exact role) when
+                  the headline/summary contains them.
 
 Rules:
 - QBTS is a quantum-computing pure-play with low float; news cuts hard in both directions.
 - IONQ / RGTI news matters for sector-wide regime but less per-name.
-- Earnings, government contracts, partnerships = high impact.
+- Earnings, government contracts, partnerships = high impact — BUT only when concrete
+  specifics (amount / counterparty / QBTS's role) are disclosed. A bullish headline with
+  NO concrete specifics = at most medium impact, and reasoning must say "no specifics
+  disclosed" (press-release name-dropping is indistinguishable from a real contract).
 - Analyst price target changes = medium impact.
 - General market commentary = low impact (often neutral).
 - Repeat / minor news = low impact.
@@ -111,8 +116,11 @@ def analyze_news_batch(items: list[dict]) -> list[dict]:
     if not items:
         return []
 
+    # 摘要一并喂给模型 — 金额/角色等实质细节多在 summary 里,只喂标题时模型
+    # 无法区分"实质合同"和"蹭名头公告"(AI 自检 2026-07-03 指出)。截断防 token 膨胀。
     headline_block = "\n".join(
         f"{i+1}. [{it['ticker']}] [{it['publisher']}] {it['title']}"
+        + (f" — {str(it['summary'])[:220]}" if it.get("summary") else "")
         for i, it in enumerate(items)
     )
     user_msg = headline_block + "\n\nReturn the JSON array now."

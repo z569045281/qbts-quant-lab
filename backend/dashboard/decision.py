@@ -165,10 +165,28 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
     lq = extras.get("live_quote")
     if lq and lq.get("quotes"):
         sess_cn = {"pre": "盘前", "regular": "盘中", "post": "盘后", "closed": "已收盘"}.get(lq.get("session"), "?")
+
+        # 各标的的"最后成交"并不同步:反向杠杆 ETF 盘后成交稀疏,QBTZ 的最后一笔可能比
+        # QBTS 旧几十分钟(实例 07-02:QBTS 19:59 -4.4% 而 QBTZ 停在 19:00 +5.0%,曾被
+        # AI 自检误判为"QBTZ 报价有误")。带上成交时间,滞后 >15 分钟的明确标"旧价"。
+        def _bt_min(q: dict) -> int | None:
+            bt = str(q.get("bar_time") or "")
+            try:
+                return int(bt[11:13]) * 60 + int(bt[14:16])
+            except (ValueError, IndexError):
+                return None
+        newest = max((m for m in (_bt_min(q) for q in lq["quotes"].values()) if m is not None),
+                     default=None)
         rows = []
         for sym, q in lq["quotes"].items():
             chg = f"{q['change_pct']*100:+.2f}%" if q.get("change_pct") is not None else "—"
-            rows.append(f"  {sym.upper()}: ${q['price']} ({chg} vs 上一收盘)")
+            bt, m = str(q.get("bar_time") or "")[11:16], _bt_min(q)
+            note = ""
+            if newest is not None and m is not None and newest - m > 15:
+                note = f"（⚠️ 旧价:最后成交 {bt},比最新报价旧 {newest - m} 分钟 — 薄流动性 ETF 盘后成交稀疏,勿据此核对 2× 换算关系）"
+            elif bt:
+                note = f"（最后成交 {bt}）"
+            rows.append(f"  {sym.upper()}: ${q['price']} ({chg} vs 上一收盘){note}")
         parts.append(
             f"## ⚡ 实时报价（{sess_cn}，{lq.get('asof_et','?')} ET）— 上方日线数据未包含此变动，"
             f"以此为最新现实定价\n" + "\n".join(rows)
@@ -368,7 +386,9 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
             else:
                 rows.append(f"  ⏳ {r['date']} {r['action']}(信心{r['conviction']}) → 待评判")
         acc = journal.get("accuracy")
-        acc_s = f"方向准确率 {acc*100:.0f}%（{journal['n_correct']}/{journal['n_graded']}）" if acc is not None else "暂无足够样本"
+        n_g = journal.get("n_graded") or 0
+        acc_s = (f"方向准确率 {acc*100:.0f}%（{journal['n_correct']}/{n_g};{_hit_ci(acc, n_g)}）"
+                 if acc is not None and n_g > 0 else "暂无足够样本")
         lessons = journal.get("lessons") or []
         lessons_s = ("\n  ⚠️ 近期错误的教训（认真吸取，避免重蹈覆辙）:\n"
                      + "\n".join(f"    - {x}" for x in lessons)) if lessons else ""
@@ -419,11 +439,25 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
     # ── 历史校准 ─────────────────────────────────────────────
     cal = extras.get("calibration")
     if cal and cal.get("n_graded", 0) >= 5:
+        hr = cal["overall_hit_rate"]
         parts.append(f"## 系统历史预测表现\n  {cal['n_graded']} 条已评判，"
-                     f"方向命中率 {cal['overall_hit_rate']*100:.0f}%")
+                     f"方向命中率 {hr*100:.0f}%（{_hit_ci(hr, cal['n_graded'])}）")
 
     parts.append("请综合以上全部证据，按 system prompt 的 JSON 格式输出今天的交易决定。")
     return "\n\n".join(parts)
+
+
+def _hit_ci(p: float, n: int) -> str:
+    """命中率的 Wilson 95% CI 表述 — 小样本命中率噪声极大(36%@13 → 16–62%,横跨50%),
+    不给区间,模型会把它当"显著低于抛硬币"来推理(AI 自检 2026-07-03 就这么错了)。"""
+    z = 1.96
+    den = 1 + z * z / n
+    ctr = (p + z * z / (2 * n)) / den
+    hw = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / den
+    lo, hi = (ctr - hw) * 100, (ctr + hw) * 100
+    sig = ("尚不构成统计显著（区间含50%）,仅作背景参考,勿据此大幅调整信心"
+           if lo < 50 < hi else "样本已具参考力")
+    return f"95%置信区间 {lo:.0f}–{hi:.0f}% — {sig}"
 
 
 def _num(x) -> float | None:

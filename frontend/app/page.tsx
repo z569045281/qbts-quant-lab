@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { MiniChart } from "./_components/mini-chart";
 import { ControlPanel } from "./_components/control-panel";
 import { RetrospectivePanel } from "./_components/retrospective-panel";
-import { getSnapshot, getLiveQuote, type Snapshot, type Decision, type LiveQuote } from "./_lib/data";
+import { getSnapshot, getLiveQuote, type Snapshot, type Decision, type LiveQuote, type LiveQuoteEntry } from "./_lib/data";
 import { fmtLocalDateTime, parseUtc, etMelbSuffix, epochMelbTime, macroSurprise } from "./_lib/format";
 import versionData from "../public/version.json";
 
@@ -332,9 +332,25 @@ export default function Dashboard() {
                       {epochMelbTime(live!.asof_epoch) ? ` (墨 ${epochMelbTime(live!.asof_epoch)})` : ""}
                     </span>
                   )}
-                  <span className="text-xs text-gray-400 font-mono">
-                    QBTX {fmtPx(lqx?.price ?? snap.etf_prices?.qbtx)} · QBTZ {fmtPx(lqz?.price ?? snap.etf_prices?.qbtz)}
-                  </span>
+                  {(() => {
+                    // 薄流动性 ETF 的最后成交常比 QBTS 旧几十分钟(QBTZ 盘后尤甚)——
+                    // 滞后 >15 分钟标 ⏱,免得并排的涨跌幅被当成同一时刻的 2× 关系核对
+                    const mins = (bt?: string | null) =>
+                      bt && bt.length >= 16 ? parseInt(bt.slice(11, 13)) * 60 + parseInt(bt.slice(14, 16)) : null;
+                    const ref = mins(lq?.bar_time);
+                    const stale = (e?: LiveQuoteEntry | null) => {
+                      const m = mins(e?.bar_time);
+                      return ref != null && m != null && ref - m > 15;
+                    };
+                    return (
+                      <span className="text-xs text-gray-400 font-mono">
+                        QBTX {fmtPx(lqx?.price ?? snap.etf_prices?.qbtx)}
+                        {stale(lqx) && <span title={`最后成交 ${lqx?.bar_time?.slice(11, 16)},比 QBTS 旧 >15 分钟(薄流动性),涨跌口径不同步`}>⏱</span>}
+                        {" · "}QBTZ {fmtPx(lqz?.price ?? snap.etf_prices?.qbtz)}
+                        {stale(lqz) && <span title={`最后成交 ${lqz?.bar_time?.slice(11, 16)},比 QBTS 旧 >15 分钟(薄流动性),涨跌口径不同步`}>⏱</span>}
+                      </span>
+                    );
+                  })()}
                 </div>
               );
             })()}
