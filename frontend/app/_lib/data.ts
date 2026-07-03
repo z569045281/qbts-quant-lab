@@ -196,6 +196,9 @@ export interface VolatilityRegime {
   gap_gt5_pct?: number;
   stop_hint?: string;
   rationale: string;
+  vol_target?: {            // 波动率目标仓位(0.6/vol,夹20-100%)— 回测验证的 sizing 规则
+    target_vol: number; position_pct: number; note: string;
+  } | null;
 }
 
 /* ── Nadaraya-Watson envelope (non-repainting mean-reversion band) ────────── */

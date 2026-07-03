@@ -69,6 +69,13 @@ def analyze_regime(df_d: pd.DataFrame) -> dict:
         f"近{_GAP_WIN}日平均隔夜跳空 {gap_mean*100:.1f}%，|跳空|>5% 占 {gap_gt5_pct*100:.0f}%。{stop_hint}"
     )
 
+    # 波动率目标仓位:pos = 目标波动 60% ÷ 当前 20 日年化波动,夹 20%–100%。
+    # QBTS 一年窗口实测(2025-07→2026-07,排除彩票日):+60.6%/-56%回撤 vs 买持 +41%/-71%,
+    # 三轮回测里唯一同时改善收益与回撤的规则 — 不预测方向,只声明"该拿几成"。
+    _TARGET_VOL = 0.60
+    vt_pct = (max(0.20, min(1.00, _TARGET_VOL / realized_vol_20d))
+              if realized_vol_20d > 0 else 0.50)
+
     return {
         "regime":             regime,
         "atr_pct":            round(atr_pct, 4),
@@ -78,6 +85,13 @@ def analyze_regime(df_d: pd.DataFrame) -> dict:
         "gap_gt5_pct":        round(gap_gt5_pct, 3),
         "stop_hint":          stop_hint,
         "rationale":          rationale,
+        "vol_target": {
+            "target_vol":   _TARGET_VOL,
+            "position_pct": round(vt_pct, 2),
+            "note": f"波动率目标仓位:以 20 日年化波动 {realized_vol_20d*100:.0f}% 计,"
+                    f"投机仓建议敞口 ≈{vt_pct*100:.0f}%(目标波动 60%,夹 20–100%)。"
+                    f"不预测方向,只管大小;每月复核、漂移大了再调。",
+        },
     }
 
 

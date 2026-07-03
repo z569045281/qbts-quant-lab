@@ -359,7 +359,14 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
     # ── 波动率 regime（决定止损宽度与仓位档位）────────────────
     reg = snapshot.get("regime")
     if reg and reg.get("rationale"):
-        parts.append(f"## 波动率 Regime\n  {reg['rationale']}")
+        vt = reg.get("vol_target") or {}
+        vt_s = ""
+        if vt.get("position_pct"):
+            # 一年窗口实测唯一同时改善收益与回撤的 sizing 规则 — 作为仓位上限参考
+            vt_s = (f"\n  {vt.get('note','')}\n"
+                    f"  纪律:你给的 suggested_position_pct 不应显著超过这个敞口参考"
+                    f"(它按波动自动缩放,是回测验证过的仓位天花板,不是方向观点)。")
+        parts.append(f"## 波动率 Regime\n  {reg['rationale']}{vt_s}")
 
     # ── Nadaraya-Watson 包络（非重绘均值回归带）────────────────
     nw = snapshot.get("nw_envelope")

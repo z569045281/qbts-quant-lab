@@ -429,6 +429,14 @@ export default function Dashboard() {
                   <div className="mt-1 text-xs">
                     满足入场条件(见下方「展开看细节」)后再按对应方向进场;在此之前没有入场 / 止损 / 目标价,仓位 0%。
                   </div>
+                  {/* HOLD 天也要看得到 sizing 规则 — 它管的是"整个投机仓该多大",与今日方向无关 */}
+                  {snap.regime?.vol_target?.position_pct != null && (
+                    <div className="mt-2 text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-md px-2.5 py-1.5 leading-snug"
+                         title={snap.regime.vol_target.note}>
+                      📐 <b>波动率目标敞口 ≤{(snap.regime.vol_target.position_pct * 100).toFixed(0)}%</b>
+                      ：以当前波动,投机仓整体别超过这个比例(一年回测:+60.6%/−56%回撤 vs 满仓买持 +41%/−71%;不预测方向,只管大小)。
+                    </div>
+                  )}
                 </div>
               ) : d.plan_valid === false ? (
                 /* Geometry check failed (stop/target on the wrong side) — never
@@ -463,6 +471,18 @@ export default function Dashboard() {
                           {d.trade_plan.suggested_position_pct}% 资金
                         </td>
                       </tr>
+                      {/* 波动率目标仓位 — 一年回测唯一同时改善收益与回撤的 sizing 规则(不预测方向) */}
+                      {snap.regime?.vol_target?.position_pct != null && (
+                        <tr>
+                          <td className="py-1.5 text-[#525461] text-xs" title={snap.regime.vol_target.note}>
+                            📐 波动率目标敞口
+                          </td>
+                          <td className="py-1.5 text-right font-mono font-semibold text-indigo-600"
+                              title={snap.regime.vol_target.note}>
+                            ≤{(snap.regime.vol_target.position_pct * 100).toFixed(0)}% 投机仓
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                   {/* 负 EV 软警告:用系统自己的胜率估计 × 盈亏比 */}
