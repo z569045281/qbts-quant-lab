@@ -94,6 +94,7 @@ export interface Snapshot {
   volume_profile?:    VolumeProfile | null;
   regime?:            VolatilityRegime | null;
   dip_buy?:           DipBuy | null;
+  champs?:            Champs | null;
   nw_envelope?:       NwEnvelope | null;
   squeeze?:           SqueezeFuel | null;
   relative_strength?: RelativeStrength | null;
@@ -200,6 +201,22 @@ export interface VolatilityRegime {
   vol_target?: {            // 波动率目标仓位(0.6/vol,夹20-100%)— 回测验证的 sizing 规则
     target_vol: number; position_pct: number; note: string;
   } | null;
+}
+
+/* ── 冠军策略陪跑(35套动物园前两名,纸面测量) ─────────────────────────── */
+export interface Champs {
+  risk_on?: boolean | null;        // QQQ 是否在 50 日线上
+  vt_pct: number;                  // 当前波动率目标敞口(未过滤)
+  volreg?: {                       // ① QQQ50×波动率目标 虚拟净值 vs 死拿
+    nav: number; bh_nav: number; start_date: string;
+    exposure: number; ret_pct: number; bh_ret_pct: number;
+  } | null;
+  swing: {                         // ② 5日swing×QQQ50 状态机
+    lo5: number; hi5: number; close: number; would_trigger: boolean;
+    open?: { entry_date: string; entry: number; days: number;
+             unreal: number; unreal_pct: number; hi5: number } | null;
+    n_closed: number; n_win: number; win_rate?: number | null; realized: number;
+  };
 }
 
 /* ── QBTS 深坑抄底纸面台账(测量用,策略动物园胜率冠军但未验证) ──────────── */

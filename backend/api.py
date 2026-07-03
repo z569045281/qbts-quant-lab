@@ -983,6 +983,13 @@ async def dashboard_snapshot(force_refresh: bool = False):
         dip_buy = None
         logger.warning(f"dip_buy failed: {e}")
     try:
+        # 冠军策略陪跑:QQQ50×波动率目标净值 + 5日swing(测量用,见 qbts_paper.py)
+        from dashboard.qbts_paper import analyze_champs
+        champs = await asyncio.to_thread(analyze_champs, df_d)
+    except Exception as e:
+        champs = None
+        logger.warning(f"qbts_paper failed: {e}")
+    try:
         nw_env = await asyncio.to_thread(analyze_nw_envelope, df_d)
     except Exception as e:
         nw_env = {"active": False, "signal": 0, "rationale": f"NW 包络失败: {str(e)[:80]}"}
@@ -1008,6 +1015,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["volume_profile"] = vol_profile
     payload["regime"]         = regime
     payload["dip_buy"]        = dip_buy
+    payload["champs"]         = champs
     payload["nw_envelope"]    = nw_env
     payload["relative_strength"] = rel_strength
     payload["squeeze"]        = squeeze

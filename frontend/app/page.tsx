@@ -1130,6 +1130,61 @@ export default function Dashboard() {
         </section>
       )}
 
+      {/* ══ 4.85 冠军策略陪跑 — 35套动物园前两名的实时纸面成绩(测量,不进决策) ═══ */}
+      {snap.champs && (
+        <section className="bg-white rounded-2xl border border-[#EDEDF0] p-4">
+          <div className="flex items-center justify-between mb-2.5">
+            <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+              🏁 冠军策略陪跑(纸面)
+            </span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+              snap.champs.risk_on ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+              大盘 QQQ50 {snap.champs.risk_on ? "✅ 顺风" : "🔴 逆风(两策略均空仓等)"}
+            </span>
+          </div>
+          <div className="space-y-2 text-sm leading-relaxed">
+            {/* ① QQQ50 × 波动率目标:虚拟净值 vs 死拿 */}
+            {snap.champs.volreg && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-[#FAFAFB] rounded-lg px-3 py-2">
+                <span className="text-xs font-semibold text-gray-700">🥇 QQQ50×波动率目标</span>
+                <span className={snap.champs.volreg.ret_pct >= 0 ? "text-emerald-700" : "text-[#F03A3E]"}>
+                  ${snap.champs.volreg.nav.toFixed(0)}({snap.champs.volreg.ret_pct >= 0 ? "+" : ""}{(snap.champs.volreg.ret_pct * 100).toFixed(1)}%)
+                </span>
+                <span className="text-gray-400 text-xs">
+                  vs 死拿 ${snap.champs.volreg.bh_nav.toFixed(0)}({snap.champs.volreg.bh_ret_pct >= 0 ? "+" : ""}{(snap.champs.volreg.bh_ret_pct * 100).toFixed(1)}%)
+                  · 当前敞口 {(snap.champs.volreg.exposure * 100).toFixed(0)}% · {snap.champs.volreg.start_date} 起 $1000
+                </span>
+              </div>
+            )}
+            {/* ② 5日swing × QQQ50 */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-[#FAFAFB] rounded-lg px-3 py-2">
+              <span className="text-xs font-semibold text-gray-700">🥈 5日swing×QQQ50</span>
+              {snap.champs.swing.open ? (
+                <span className="text-emerald-700">
+                  持仓中:{snap.champs.swing.open.entry_date} 入 ${snap.champs.swing.open.entry.toFixed(2)} →
+                  现 {snap.champs.swing.open.unreal_pct >= 0 ? "+" : ""}{(snap.champs.swing.open.unreal_pct * 100).toFixed(1)}%
+                  · 目标破 ${snap.champs.swing.open.hi5.toFixed(2)} · 第 {snap.champs.swing.open.days}/10 天
+                </span>
+              ) : snap.champs.swing.would_trigger && snap.champs.risk_on ? (
+                <span className="text-amber-700 font-semibold">⚡ 触发中!收盘 ${snap.champs.swing.close.toFixed(2)} = 5日新低(明日开虚拟仓)</span>
+              ) : (
+                <span className="text-gray-600">
+                  等待 · 现 ${snap.champs.swing.close.toFixed(2)},触发线 <b className="font-mono">${snap.champs.swing.lo5.toFixed(2)}</b>(5日新低)
+                </span>
+              )}
+              <span className="ml-auto text-[11px] text-gray-400">
+                战绩 {snap.champs.swing.n_win}/{snap.champs.swing.n_closed}
+                {snap.champs.swing.win_rate != null && ` (${(snap.champs.swing.win_rate * 100).toFixed(0)}%)`}
+                · 落袋 {snap.champs.swing.realized >= 0 ? "+" : ""}${snap.champs.swing.realized.toFixed(0)}
+              </span>
+            </div>
+          </div>
+          <div className="mt-2 text-[10px] text-gray-400">
+            回测出身:35 套里的前两名(🥇近1年+113%/回撤-40% · 🥈胜率72%),多重比较折扣照打 —— 纯纸面陪跑,不进决策;跑赢真实记录才算数
+          </div>
+        </section>
+      )}
+
       {/* ══ 4.9 AI 系统自检 — 决策模型以审计者身份报告的数据问题/改进建议(给维护者) ═══ */}
       {(d?.system_notes?.length ?? 0) > 0 && (
         <section className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
