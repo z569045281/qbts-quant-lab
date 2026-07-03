@@ -28,6 +28,7 @@ No new dependency: stdlib urllib only. Degrades to a no-op without FRED_API_KEY.
 
 from __future__ import annotations
 
+import datetime as _dt
 import logging
 import os
 import urllib.parse
@@ -75,7 +76,7 @@ _FRED_MAP: list[tuple[tuple[str, ...], str | None, str, str]] = [
 # Per-kind tolerance for the `previous`-match check: big enough to absorb routine
 # revisions/rounding between FF and FRED, small enough to reject a same-period
 # revision (whose feed `previous` is a whole period away from FRED's prior obs).
-_TOL = {"pct": 0.15, "claims": 5000.0, "jobs": 40000.0, "num": 1.0}
+_TOL = {"pct": 0.15, "claims": 5000.0, "num": 1.0}   # jobs 不走值容差 → 参考期日期精确校验
 
 
 def _match(title: str) -> tuple[str, str, str] | None:
@@ -114,8 +115,8 @@ def _num(s: str) -> float | None:
         return None
 
 
-def _fetch_obs(series: str, units: str) -> list[float]:
-    """Latest two observations (newest first), with the FRED transform applied."""
+def _fetch_obs(series: str, units: str) -> list[tuple[str, float]]:
+    """Latest two (obs_date, value) pairs (newest first), FRED transform applied."""
     qs = urllib.parse.urlencode({
         "series_id": series, "api_key": _KEY, "file_type": "json",
         "sort_order": "desc", "limit": 2, "units": units,
@@ -123,10 +124,10 @@ def _fetch_obs(series: str, units: str) -> list[float]:
     req = urllib.request.Request(f"{_BASE}?{qs}", headers={"User-Agent": _UA})
     with urllib.request.urlopen(req, timeout=10) as r:
         data = json.loads(r.read())
-    out: list[float] = []
+    out: list[tuple[str, float]] = []
     for o in data.get("observations", []):
         try:
-            out.append(float(o["value"]))   # FRED uses "." for missing → ValueError
+            out.append((str(o.get("date", "")), float(o["value"])))  # "." for missing → ValueError
         except (KeyError, ValueError):
             continue
     return out
@@ -156,7 +157,20 @@ def enrich_actuals(events: list[dict]) -> None:
                 cache[series] = obs
             if len(obs) < 2:
                 continue
-            latest, prev = obs[0], obs[1]
+            (latest_date, latest), (_, prev) = obs[0], obs[1]
+            if kind == "jobs":
+                # 非农月修 40-100K 是常态 — 值容差会把合法修正当错期拒掉
+                # (实例 2026-07:5月 172K 下修至 129K,43K > 40K 容差 → actual 永远空)。
+                # 改用参考期精确校验:M 月发布的非农必须是 (M-1) 月 1 号那期观测 —
+                # 修正多大都无所谓,期一错必拒(也天然挡住 FRED 未更新的过期数据)。
+                try:
+                    ev_date = _dt.date.fromisoformat(str(e.get("date", ""))[:10])
+                except ValueError:
+                    continue
+                ref = (ev_date.replace(day=1) - _dt.timedelta(days=1)).replace(day=1)
+                if latest_date == ref.isoformat():
+                    e["actual"] = _fmt(latest, kind)
+                continue
             ff_prev = _num(e.get("previous", ""))
             fred_prev = _num(_fmt(prev, kind))
             # Self-validation: FRED's previous obs must be close to the feed's

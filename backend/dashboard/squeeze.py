@@ -115,6 +115,10 @@ def analyze_squeeze(opt_sig: dict | None, holdings_sig: dict | None) -> dict:
         tail = "燃料充足且有点火源（机构吸筹/看涨期权）——挤空做多优先级提升，但仍需价格/结构确认触发"
     elif fuel_score >= 65:
         tail = "空头拥挤但缺点火源（无吸筹、无看涨期权）——是燃料不是信号，谨防价值陷阱"
+    elif fuel_score >= 40:
+        # 40-65 曾统一说"不足",和自己的「中」标签自相矛盾,也和经典策略里
+        # 用同一空量比给 BUY 的 Short Squeeze Detector 打架(AI 自检 2026-07-03 抓出)
+        tail = "挤空燃料中等——不构成独立驱动；若价格放量突破，可作上行放大器"
     else:
         tail = "挤空燃料不足"
 

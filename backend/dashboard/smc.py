@@ -131,18 +131,24 @@ def find_order_blocks(df: pd.DataFrame, structure_events: list[dict]) -> list[di
                 if c[j] < o[j]:
                     zone_lo, zone_hi = float(l[j]), float(max(o[j], c[j]))
                     if not any(c[k2] < zone_lo for k2 in range(i, n)):
-                        out.append({"type": "demand", "low": round(zone_lo, 2),
-                                    "high": round(zone_hi, 2),
-                                    "date": df.index[j].strftime("%m-%d")})
+                        zone = {"type": "demand", "low": round(zone_lo, 2),
+                                "high": round(zone_hi, 2),
+                                "date": df.index[j].strftime("%m-%d")}
+                        # 同一段行情里两个结构事件(如 CHoCH+BOS)常回溯到同一根蜡烛
+                        # → 同一 OB 原样出现两次;去重
+                        if zone not in out:
+                            out.append(zone)
                     break
         else:
             for j in range(i - 1, max(0, i - 10), -1):
                 if c[j] > o[j]:
                     zone_lo, zone_hi = float(min(o[j], c[j])), float(h[j])
                     if not any(c[k2] > zone_hi for k2 in range(i, n)):
-                        out.append({"type": "supply", "low": round(zone_lo, 2),
-                                    "high": round(zone_hi, 2),
-                                    "date": df.index[j].strftime("%m-%d")})
+                        zone = {"type": "supply", "low": round(zone_lo, 2),
+                                "high": round(zone_hi, 2),
+                                "date": df.index[j].strftime("%m-%d")}
+                        if zone not in out:   # 同上:两个事件共享同一根 OB 蜡烛 → 去重
+                            out.append(zone)
                     break
     return out
 
@@ -168,7 +174,12 @@ def find_sweeps(df: pd.DataFrame, swing_highs: list[dict], swing_lows: list[dict
                             "date": df.index[i].strftime("%m-%d"),
                             "note": f"扫过 {s['date']} 高点 ${s['price']:.2f} 后回落 — 多头流动性被收割"})
                 break
-    return out[-3:]
+    # 价格在同一被扫价位附近连续多日反复插针时,每根 bar 都会重报同一事件
+    # (实例:24.04 三天报三次)。同 (方向,价位) 只保留最新一次。
+    dedup: dict[tuple, dict] = {}
+    for sw in out:
+        dedup[(sw["dir"], sw["level"])] = sw   # 后面的 bar 覆盖前面 → 留最新
+    return list(dedup.values())[-3:]
 
 
 # ── multi-timeframe playbook (global lock → relay → 15m trigger → FVG) ───────
