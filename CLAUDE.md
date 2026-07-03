@@ -62,6 +62,9 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   "Deploy AWS jobs" auto-runs (also manual). Backend/prompt changes need this redeploy to
   reach the cloud image.
 - End commit messages with the `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>` line.
+- **每次 push 里只要含 `frontend/**` 的可见变更,必须同步升 `frontend/public/version.json`**
+  (feature → 次版本 1.x,小修/补漏 → 1.x.y)。这是版本守卫提示用户刷新的唯一依据——
+  不升版本,已打开的页面永远不知道有新构建(用户明确要求,2026-07-03)。
 
 ## Gotchas
 
