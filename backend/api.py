@@ -874,16 +874,8 @@ async def dashboard_snapshot(force_refresh: bool = False):
                      "score": 0, "n_bull": 0, "n_bear": 0, "n_neutral": 0, "n_items": 0},
                      "error": str(e)[:120]}
 
-    # 4. Combined verdict
-    strat_w = 2          # strategies carry more weight (data-driven)
-    news_w  = 1          # news is a soft tilt (sentiment / context)
-    total_score = strat_consensus["raw_score"] * strat_w + news_snap["aggregate"]["score"] * news_w
-    if total_score >= 4:
-        verdict_signal, verdict_label = 1,  "BUY"
-    elif total_score <= -4:
-        verdict_signal, verdict_label = -1, "SELL"
-    else:
-        verdict_signal, verdict_label = 0,  "HOLD"
+    # (legacy "combined verdict" removed 2026-07-03 — pre-edge/pre-decision score
+    #  published daily but never rendered; decision.py is THE user-facing verdict)
 
     # 5. 60-day chart data + key technical levels
     chart_df = df.tail(60).copy()
@@ -928,12 +920,6 @@ async def dashboard_snapshot(force_refresh: bool = False):
         "strategies":      strategies,
         "strategy_consensus": strat_consensus,
         "news":            news_snap,
-        "verdict": {
-            "signal":  verdict_signal,
-            "label":   verdict_label,
-            "score":   total_score,
-            "weights": {"strategies": strat_w, "news": news_w},
-        },
         "chart":           chart_data,
         "etf_prices":      etf_prices,            # {qbtx: float | None, qbtz: float | None}
     }

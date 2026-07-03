@@ -49,11 +49,6 @@ export interface Snapshot {
     aggregate: { label: string; signal: number; score: number;
       n_bull: number; n_bear: number; n_neutral: number; n_items: number };
   };
-  verdict: {
-    signal: -1 | 0 | 1;
-    label:  "BUY" | "SELL" | "HOLD";
-    score:  number;
-  };
   chart: {
     candles:  { time: number; open: number; high: number; low: number; close: number }[];
     sma20:    { time: number; value: number }[];
