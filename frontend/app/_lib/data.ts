@@ -93,6 +93,7 @@ export interface Snapshot {
   smc?: SmcAnalysis | null;
   volume_profile?:    VolumeProfile | null;
   regime?:            VolatilityRegime | null;
+  dip_buy?:           DipBuy | null;
   nw_envelope?:       NwEnvelope | null;
   squeeze?:           SqueezeFuel | null;
   relative_strength?: RelativeStrength | null;
@@ -199,6 +200,16 @@ export interface VolatilityRegime {
   vol_target?: {            // 波动率目标仓位(0.6/vol,夹20-100%)— 回测验证的 sizing 规则
     target_vol: number; position_pct: number; note: string;
   } | null;
+}
+
+/* ── QBTS 深坑抄底纸面台账(测量用,策略动物园胜率冠军但未验证) ──────────── */
+export interface DipBuy {
+  trigger_px: number; hi20: number; close: number;
+  triggered: boolean; distance_pct: number;   // 负数 = 还要跌这么多才触发
+  open?: { entry_date: string; entry: number; target: number; days: number;
+           unreal: number; unreal_pct: number } | null;
+  n_closed: number; n_win: number; win_rate?: number | null; realized: number;
+  recent?: { entry_date: string; exit_date: string; pnl_pct: number; reason: string }[];
 }
 
 /* ── Nadaraya-Watson envelope (non-repainting mean-reversion band) ────────── */

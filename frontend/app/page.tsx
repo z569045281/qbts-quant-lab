@@ -1096,6 +1096,40 @@ export default function Dashboard() {
         )}
       </section>
 
+      {/* ══ 4.8 恐慌深坑报警器 — 跌20%于20日高抄底(纸面测量,策略动物园胜率冠军但未验证) ═══ */}
+      {snap.dip_buy && (
+        <section className={`rounded-2xl border p-4 text-sm leading-relaxed ${
+          snap.dip_buy.open ? "bg-emerald-50 border-emerald-200"
+          : snap.dip_buy.triggered ? "bg-amber-50 border-amber-300"
+          : "bg-white border-[#EDEDF0]"}`}>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">🕳️ 恐慌深坑报警器</span>
+            {snap.dip_buy.open ? (
+              <span className="text-emerald-700">
+                虚拟持仓中:{snap.dip_buy.open.entry_date} 入 ${snap.dip_buy.open.entry.toFixed(2)} →
+                现 {snap.dip_buy.open.unreal_pct >= 0 ? "+" : ""}{(snap.dip_buy.open.unreal_pct * 100).toFixed(1)}%
+                · 目标 ${snap.dip_buy.open.target.toFixed(2)} · 第 {snap.dip_buy.open.days}/15 天
+              </span>
+            ) : snap.dip_buy.triggered ? (
+              <span className="text-amber-700 font-semibold">⚡ 已触发!现价 ${snap.dip_buy.close.toFixed(2)} ≤ 触发线 ${snap.dip_buy.trigger_px.toFixed(2)}(恐慌深坑,明日开仓虚拟单)</span>
+            ) : (
+              <span className="text-gray-600">
+                未触发 · 现价 ${snap.dip_buy.close.toFixed(2)},触发线 <b className="font-mono">${snap.dip_buy.trigger_px.toFixed(2)}</b>
+                (还差 {(Math.abs(snap.dip_buy.distance_pct) * 100).toFixed(0)}%)
+              </span>
+            )}
+            <span className="ml-auto text-[11px] text-gray-400">
+              战绩 {snap.dip_buy.n_win}/{snap.dip_buy.n_closed}
+              {snap.dip_buy.win_rate != null && ` (${(snap.dip_buy.win_rate * 100).toFixed(0)}%)`}
+              {" · 落袋 "}{snap.dip_buy.realized >= 0 ? "+" : ""}${snap.dip_buy.realized.toFixed(0)}
+            </span>
+          </div>
+          <div className="mt-1 text-[10px] text-gray-400">
+            规则:收盘跌破 20日高×0.80 虚拟买 $1000,回 95% 止盈 / 15 天到期 · 回测 64%@25 但近一年平庸+多重比较嫌疑 —— 纯纸面测量,不进决策,30 笔后见真章
+          </div>
+        </section>
+      )}
+
       {/* ══ 4.9 AI 系统自检 — 决策模型以审计者身份报告的数据问题/改进建议(给维护者) ═══ */}
       {(d?.system_notes?.length ?? 0) > 0 && (
         <section className="bg-white rounded-2xl border border-[#EDEDF0] p-5">

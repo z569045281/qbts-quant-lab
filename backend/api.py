@@ -976,6 +976,13 @@ async def dashboard_snapshot(force_refresh: bool = False):
     except Exception as e:
         regime = {"regime": "normal", "rationale": f"波动率 regime 失败: {str(e)[:80]}"}
     try:
+        # 深坑抄底纸面台账(测量用,不进 edge/决策 prompt — 见 dip_buy.py 出身注释)
+        from dashboard.dip_buy import analyze_dip_buy
+        dip_buy = await asyncio.to_thread(analyze_dip_buy, df_d)
+    except Exception as e:
+        dip_buy = None
+        logger.warning(f"dip_buy failed: {e}")
+    try:
         nw_env = await asyncio.to_thread(analyze_nw_envelope, df_d)
     except Exception as e:
         nw_env = {"active": False, "signal": 0, "rationale": f"NW 包络失败: {str(e)[:80]}"}
@@ -1000,6 +1007,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["smc"]            = smc
     payload["volume_profile"] = vol_profile
     payload["regime"]         = regime
+    payload["dip_buy"]        = dip_buy
     payload["nw_envelope"]    = nw_env
     payload["relative_strength"] = rel_strength
     payload["squeeze"]        = squeeze
