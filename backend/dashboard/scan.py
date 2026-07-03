@@ -271,7 +271,8 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
         elif pts >= 1:  stance, emoji = "接近买点", "🟡"
         elif pts >= -1: stance, emoji = "观望", "⚪"
         else:           stance, emoji = "偏空回避", "🔴"
-        score = round((pts + 7) / 14 * 100)
+        # pts 理论满配 +8(六项全绿 2+2+1+1+1+1),按 ±7 归一会算出 107% → 夹到 0-100
+        score = max(0, min(100, round((pts + 7) / 14 * 100)))
 
         # ── key levels ───────────────────────────────────────────────────────
         demand = smc.get("demand_zones") or []
