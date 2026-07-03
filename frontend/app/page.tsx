@@ -175,34 +175,40 @@ export default function Dashboard() {
   // A displayed plan whose invalidation has been breached is worse than no
   // plan — flag it dead in red instead of letting a stale "buy at $26" stand.
   const liveQbts = live?.quotes?.qbts;
-  const liveFresh = live && (Date.now() / 1000 - live.asof_epoch) < 180;
+  const decisionGenDate = parseUtc(snap.decision_generated_at);
+  // 数据源选择:谁新用谁,全页一个口径(价格 / SMC / 模拟浮盈都走它)。
+  // live 盘中每分钟写入、19:59 ET 停更;快照每天 09:00 ET 发布。收盘后 live 虽超过
+  // 3 分钟,但"最后报价"仍比快照新几小时 —— 旧闸门整夜回退到快照价,曾比真实收盘
+  // 高 1.8%($22.92 vs 收盘 $22.52)。3 分钟新鲜度现在只决定"盘中"徽章和脉冲;
+  // 若 quote 推送挂掉、每日重发布的快照反而更新,则自动回退快照 —— 谁新用谁。
+  const liveCurrent = !!(liveQbts && live &&
+    live.asof_epoch > (decisionGenDate ? decisionGenDate.getTime() / 1000 : 0));
+  const liveFresh = !!(live && (Date.now() / 1000 - live.asof_epoch) < 180);
   let planBreached = false;
-  if (d && liveFresh && liveQbts) {
+  if (d && liveCurrent && liveQbts) {
     const kill = d.invalidation_price ?? d.trade_plan?.qbts_stop;
     if (typeof kill === "number") {
       if (d.action === "LONG_QBTX"  && liveQbts.price <= kill) planBreached = true;
       if (d.action === "SHORT_QBTZ" && liveQbts.price >= kill) planBreached = true;
     }
   }
-  const decisionGenDate = parseUtc(snap.decision_generated_at);
   const decisionAgeH = decisionGenDate
     ? (Date.now() - decisionGenDate.getTime()) / 3_600_000
     : null;
   const planStale = decisionAgeH !== null && decisionAgeH > 36;
   // CHoCH 早期预警:最近一次结构事件是 CHoCH(性格转变)= 反转苗头但尚未被 BOS 确认。
   // 纯提示,不参与决策信号 —— 填补"等确认所以进场晚"的空窗。
-  // SMC 读数:盘中每 ~5min 刷新写进 live_quote,比每日快照新 → 优先用 live 那份。
-  // 但必须和上面的价格显示走【同一个 3 分钟新鲜度闸门】:实时报价过期时价格会回退到
-  // 快照价,SMC 也要一起回退到快照那份——否则会出现"页面显示 $24.43、但 SMC 卡用的是
-  // 上一条 live($23.94)算的",导致价格已在某区间内、对应勾却是灰色的自相矛盾。
-  const smc = (liveFresh && live?.smc) ? live.smc : (snap.smc ?? null);
-  const pbLive = !!(liveFresh && live?.smc);
+  // SMC 读数:盘中每 ~5min 刷新写进 live_quote → 和价格走同一个 liveCurrent 口径,
+  // 否则会出现"页面显示 $24.43、但 SMC 卡用的是另一份价算的"、价格在区间内而对应勾
+  // 却是灰色的自相矛盾(cross-source 老教训)。
+  const smc = (liveCurrent && live?.smc) ? live.smc : (snap.smc ?? null);
+  const pbLive = !!(liveFresh && live?.smc);   // 「盘中实时」脉冲只在 <3min 时亮
   const choch = smc?.last_event?.kind === "CHoCH" ? smc.last_event : null;
   const pb = smc?.playbook ?? null;
 
   // 模拟持仓:当前未平方向单的浮动盈亏(用实时 QBTS 价 vs 入场,按标的、未计 2× 杠杆)
   const jPaper = snap.journal?.paper ?? null;
-  const jLiveQ = live?.quotes?.qbts?.price;
+  const jLiveQ = liveCurrent ? live?.quotes?.qbts?.price : snap.price;  // 与页面价同源
   let jUnreal: number | null = null;
   if (jPaper?.open && typeof jLiveQ === "number" && jPaper.open.entry > 0) {
     const { action, entry } = jPaper.open;
@@ -286,13 +292,13 @@ export default function Dashboard() {
           <div className="p-6">
             {(() => {
               const lq = live?.quotes?.qbts;
-              const fresh = live && (Date.now() / 1000 - live.asof_epoch) < 180; // <3min
-              const price  = fresh && lq ? lq.price : snap.price;
-              const chgPct = fresh && lq && lq.change_pct != null ? lq.change_pct : snap.today_change;
+              const price  = liveCurrent && lq ? lq.price : snap.price;
+              const chgPct = liveCurrent && lq && lq.change_pct != null ? lq.change_pct : snap.today_change;
               const up = chgPct >= 0;
-              const badge = fresh && live ? SESSION_BADGE[live.session] : null;
-              const lqx = fresh ? live?.quotes?.qbtx : null;
-              const lqz = fresh ? live?.quotes?.qbtz : null;
+              // <3min → 实时 session 徽章;更旧但仍是最新数据 → 诚实标「已收盘」+最后报价时间
+              const badge = liveCurrent && live ? (liveFresh ? SESSION_BADGE[live.session] : SESSION_BADGE.closed) : null;
+              const lqx = liveCurrent ? live?.quotes?.qbtx : null;
+              const lqz = liveCurrent ? live?.quotes?.qbtz : null;
               return (
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <span className="text-xs text-[#525461] uppercase tracking-wider">QBTS</span>
@@ -639,8 +645,13 @@ export default function Dashboard() {
         {smc && (
           <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+              <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider flex items-center gap-2">
                 🧠 SMC 聪明钱结构
+                {/* 现价(与 SMC 数据同源:实时新鲜则用 live,否则回退快照)—— 省得上下拉页面 */}
+                <span className="normal-case font-mono font-bold text-gray-900 text-sm">
+                  ${(liveCurrent && liveQbts ? liveQbts.price : snap.price).toFixed(2)}
+                  {pbLive && <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse align-middle" />}
+                </span>
               </span>
               <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
                 smc.signal > 0 ? "bg-emerald-100 text-emerald-700"
