@@ -206,6 +206,26 @@ export default function Dashboard() {
   const choch = smc?.last_event?.kind === "CHoCH" ? smc.last_event : null;
   const pb = smc?.playbook ?? null;
 
+  // Playbook 的 QBTS 价位 → 实际下单的杠杆 ETF 价格(与 decision.py _conv_etf 同公式:
+  // ±2× 线性近似)。空头锁 → QBTZ(−2×),多头锁 → QBTX(+2×);价格与整页同一 liveCurrent
+  // 口径。用户曾把空头入场区误读成 QBTX 买点 —— 直接标出该买哪只、什么价,杜绝反向误读。
+  const pbEtf = (() => {
+    if (!pb || (pb.lock !== "bull" && pb.lock !== "bear")) return null;
+    const qbtsNow = liveCurrent && liveQbts ? liveQbts.price : snap.price;
+    const sym = pb.lock === "bull" ? ("qbtx" as const) : ("qbtz" as const);
+    const etfNow = (liveCurrent ? live?.quotes?.[sym]?.price : null) ?? snap.etf_prices?.[sym];
+    if (!qbtsNow || typeof etfNow !== "number") return null;
+    const sign = pb.lock === "bull" ? 2 : -2;
+    const conv = (level: number | null | undefined) =>
+      typeof level === "number" ? etfNow * (1 + sign * (level / qbtsNow - 1)) : null;
+    const [eA, eB] = [conv(pb.entry_zone?.low), conv(pb.entry_zone?.high)];
+    // 反向 ETF 换算后区间上下颠倒 → 重新排序
+    const entryLo = eA != null && eB != null ? Math.min(eA, eB) : (eA ?? eB);
+    const entryHi = eA != null && eB != null ? Math.max(eA, eB) : null;
+    return { ticker: sym.toUpperCase(), entryLo, entryHi,
+             stop: conv(pb.stop), tp1: conv(pb.tp1?.price), tp2: conv(pb.tp2?.price) };
+  })();
+
   // 模拟持仓:当前未平方向单的浮动盈亏(用实时 QBTS 价 vs 入场,按标的、未计 2× 杠杆)
   const jPaper = snap.journal?.paper ?? null;
   const jLiveQ = liveCurrent ? live?.quotes?.qbts?.price : snap.price;  // 与页面价同源
@@ -717,8 +737,30 @@ export default function Dashboard() {
                   <div className="grid grid-cols-2 gap-1.5 text-[11px] pt-2 border-t border-[#EDEDF0]">
                     {pb.entry_zone && (
                       <div className="col-span-2 flex items-center justify-between px-2 py-1 rounded-md bg-violet-50 text-violet-700">
-                        <span className="font-medium">🎯 共振入场 [{pb.entry_zone.basis}]</span>
+                        <span className="font-medium">
+                          🎯 共振入场
+                          <span className={`mx-1 px-1 py-0.5 rounded text-[10px] font-bold ${
+                            pb.lock === "bear" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
+                            {pb.lock === "bear" ? "做空↓" : "做多↑"}
+                          </span>
+                          [{pb.entry_zone.basis}]
+                        </span>
                         <span className="font-mono">${pb.entry_zone.low.toFixed(2)} – ${pb.entry_zone.high.toFixed(2)}</span>
+                      </div>
+                    )}
+                    {/* 💱 实际下单标的换算:QBTS 反弹到入场区时,对应 ETF 大约在这些价位 */}
+                    {pbEtf && (pbEtf.entryLo != null || pbEtf.tp1 != null) && (
+                      <div className="col-span-2 px-2 py-1.5 rounded-md bg-indigo-50 text-indigo-800 leading-snug">
+                        <span className="font-semibold">💱 实际下单 · {pbEtf.ticker}</span>
+                        <span className="font-mono">
+                          {pbEtf.entryLo != null && <>：买入 ≈${pbEtf.entryLo.toFixed(2)}{pbEtf.entryHi != null ? `–$${pbEtf.entryHi.toFixed(2)}` : ""}</>}
+                          {pbEtf.stop != null && <> · 止损 ≈${pbEtf.stop.toFixed(2)}</>}
+                          {pbEtf.tp1 != null && <> · 止盈 ≈${pbEtf.tp1.toFixed(2)}</>}
+                          {pbEtf.tp2 != null && <>/${pbEtf.tp2.toFixed(2)}</>}
+                        </span>
+                        <div className="text-[10px] opacity-70 mt-0.5">
+                          由左侧 QBTS 价位按 2× 实时换算(近似);ETF 每日再平衡,隔夜/多日会漂移,以当日盘中为准
+                        </div>
                       </div>
                     )}
                     {pb.stop != null && (
