@@ -144,6 +144,16 @@ function ScanCard({ r, editable, onRemove }: {
         </div>
       )}
 
+      {/* 基本面红旗 — "该不该碰"层:runway/负毛利/高负债失血(信息提示,不进打分) */}
+      {(r.fundamentals?.flags?.length ?? 0) > 0 && (
+        <div className="mt-2 text-[11px] leading-relaxed rounded-lg px-2.5 py-1.5 border bg-rose-50 text-rose-700 border-rose-200">
+          <b>基本面红旗</b>（技术信号再好也先想清楚该不该碰）
+          {r.fundamentals!.flags.map((f, i) => (
+            <span key={i} className="block opacity-90 mt-0.5">{f}</span>
+          ))}
+        </div>
+      )}
+
       <div className="mt-2.5 flex flex-wrap gap-1.5 text-[10px]">
         {r.trend && (
           <span className={`px-1.5 py-0.5 rounded ${

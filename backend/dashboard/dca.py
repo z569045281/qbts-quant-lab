@@ -179,9 +179,10 @@ def compute_dca(tickers: list[str] | None = None) -> dict:
         # macro valuation backdrop (CAPE — re-verify periodically; cross-country CAPE
         # should be judged vs each market's OWN history, not compared absolutely)
         "macro": {
-            "us_cape": 40, "global_cape": 27.7, "as_of": "2026-06",
-            "note": "美股 Shiller CAPE ≈40(近互联网泡沫极值,Shiller 模型预期未来十年年化仅 ~1–2%);"
-                    "全球整体 ≈27.7。便宜在非美/新兴。这是 7–10 年的弱倾斜信号、不是择时,数据需定期复核。",
+            "us_cape": 40.4, "global_cape": 27.7, "as_of": "2026-07",
+            "note": "美股 Shiller CAPE ≈40.4(GuruFocus 2026-07-01;近互联网泡沫极值,Shiller 模型"
+                    "预期未来十年年化仅 ~1–2%);全球整体 ≈27.7(Siblis 2026-01)。便宜在非美/新兴。"
+                    "这是 7–10 年的弱倾斜信号、不是择时,数据需定期复核。",
         },
         "ballast": "这 4 只全是股票(100% 权益),崩盘会一起腰斩。十年不用 + 扛得住 → 可全股;"
                    "否则加 10~30% 债券(BND)当压舱石。暴跌预备金 / 应急金放短债(如 SGOV)生息,别躺着。",

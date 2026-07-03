@@ -522,6 +522,9 @@ export interface ScanResult {
     risk: boolean; level: "high" | "warn"; note: string;
     recent: { form: string; date: string }[];
   } | null;
+  fundamentals?: {                                  // 基本面红旗("该不该碰"层:runway/负毛利/高负债)
+    flags: string[]; runway_years?: number | null; gross_margin?: number | null;
+  } | null;
   stance:        string;        // 买入区 / 接近买点 / 观望 / 偏空回避 / —
   stance_emoji:  string;
   trend?:        "bullish" | "bearish" | "neutral" | null;

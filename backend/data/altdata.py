@@ -450,6 +450,36 @@ _DILUTION_OFFERING = {"424B5", "424B4", "424B3", "424B2"}                  # act
 _DILUTION_SHELF    = {"S-3", "S-3/A", "S-3ASR", "S-1", "S-1/A", "EFFECT"}  # registered capacity
 _cik_map: "dict[str, int] | None" = None
 
+# 424B 表单号本身不区分「增发股票」和「发债券」— 大市值公司的 424B 绝大多数是发债
+# (实例:NVDA 2026-06 两份 424B5 是 notes,被误标「稀释 high·新股供给正在冲击」)。
+# 抓招股书封面文本嗅探证券类型:纯债剔除;可转债保留(转股即稀释)。
+# 只用特异性强的债短语("notes due 2036"类封面标题必含);泛化的 "debt securities"/
+# "senior notes" 会撞上股权招股书引用的货架证券类型清单(OKLO 增发书就含 "debt
+# securities" 样板字),已实测剔除。
+_DEBT_MARKERS = ("notes due", "% notes", "bonds due", "floating rate notes")
+
+
+def _sniff_424b_kind(cik: int, accession: str, primary_doc: str) -> str:
+    """'debt' | 'convertible' | 'equity' | 'unknown' — 嗅探 424B 招股书封面。
+
+    判定顺序经 NVDA(纯债)/OKLO(增发)实测:债券封面不含 "shares of common
+    stock",增发封面不含 "notes due" —— 强股权短语先判,再判特异性债短语。"""
+    if not accession or not primary_doc:
+        return "unknown"
+    url = (f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
+           f"{accession.replace('-', '')}/{primary_doc}")
+    raw = _sec_get(url)
+    if not raw:
+        return "unknown"
+    head = raw[:80_000].decode("utf-8", errors="ignore").lower()
+    if "convertible" in head and "notes" in head:
+        return "convertible"
+    if "shares of common stock" in head or "shares of our common stock" in head:
+        return "equity"
+    if any(m in head for m in _DEBT_MARKERS):
+        return "debt"
+    return "unknown"
+
 
 def _sec_get(url: str, timeout: int = 8) -> "bytes | None":
     try:
@@ -503,6 +533,8 @@ def fetch_sec_dilution(ticker: str, offering_days: int = 120, shelf_days: int = 
         recent = _json.loads(raw)["filings"]["recent"]
         forms = recent.get("form", [])
         dates = recent.get("filingDate", [])
+        accs  = recent.get("accessionNumber", [])
+        docs  = recent.get("primaryDocument", [])
     except Exception:
         return None
 
@@ -510,14 +542,24 @@ def fetch_sec_dilution(ticker: str, offering_days: int = 120, shelf_days: int = 
     off_cut   = today - timedelta(days=offering_days)
     shelf_cut = today - timedelta(days=shelf_days)
     hits: list[dict] = []
-    for form, ds in zip(forms, dates):
+    sniffed = 0
+    for idx, (form, ds) in enumerate(zip(forms, dates)):
         f = (form or "").upper()
         try:
             d = datetime.fromisoformat(ds).date()
         except Exception:
             continue
         if f in _DILUTION_OFFERING and d >= off_cut:
-            hits.append({"form": f, "date": ds, "kind": "offering"})
+            # 嗅探股/债(每票最多 3 份,SEC 限速友好):纯债不稀释 → 直接剔除
+            kind424 = "unknown"
+            if sniffed < 3:
+                acc = accs[idx] if idx < len(accs) else ""
+                doc = docs[idx] if idx < len(docs) else ""
+                kind424 = _sniff_424b_kind(cik, acc, doc)
+                sniffed += 1
+            if kind424 == "debt":
+                continue
+            hits.append({"form": f, "date": ds, "kind": "offering", "sec_type": kind424})
         elif f in _DILUTION_SHELF and d >= shelf_cut:
             hits.append({"form": f, "date": ds, "kind": "shelf"})
     if not hits:
@@ -530,9 +572,12 @@ def fetch_sec_dilution(ticker: str, offering_days: int = 120, shelf_days: int = 
     age_days = (today - latest).days
     mo = age_days / 30.0
     if has_offering:
-        note = (f"{age_days}天前实际增发定价(424B),新股供给正在/刚冲击 —— 买点上方真实稀释,做多打折"
+        top = next(h for h in hits if h["kind"] == "offering")
+        kind_cn = {"convertible": "可转债(转股即稀释)", "equity": "增发股票",
+                   "unknown": "424B·股/债未辨"}.get(top.get("sec_type", "unknown"))
+        note = (f"{age_days}天前实际发行定价({kind_cn}),新供给正在/刚冲击 —— 买点上方真实稀释压力,做多打折"
                 if age_days <= 30 else
-                f"{age_days}天前的增发(424B,约{mo:.0f}个月前),供给冲击多已消化,作背景")
+                f"{age_days}天前的发行({kind_cn},约{mo:.0f}个月前),供给冲击多已消化,作背景")
     else:
         note = (f"{age_days}天前刚登记货架(S-3 等),增发弹药新就位、随时可能发,关注"
                 if age_days <= 45 else

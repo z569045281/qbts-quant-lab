@@ -138,6 +138,36 @@ def _dilution_info(ticker: str) -> dict | None:
         return None
 
 
+def _fundamental_flags(ticker: str) -> dict | None:
+    """基本面红旗 —— "该不该碰"层(whether),把 2026-07-03 手工体检踢掉 MARA/EOSE
+    用的三个致命指标编码进扫描:现金 runway、毛利率正负、净债+失血组合。
+    informational only(与稀释徽章同层),不进买卖打分;失败安静返回 None。"""
+    try:
+        import yfinance as yf
+        info = yf.Ticker(ticker).info
+        cash = info.get("totalCash")
+        opcf = info.get("operatingCashflow")
+        debt = info.get("totalDebt")
+        gm = info.get("grossMargins")
+        flags: list[str] = []
+        runway = None
+        if cash and opcf and opcf < 0:
+            runway = cash / abs(opcf)
+            if runway < 1.5:
+                flags.append(f"🔴 现金仅撑 {runway:.1f} 年(烧钱速度下必增发/借债)")
+        if isinstance(gm, (int, float)) and gm < 0:
+            flags.append("🔴 负毛利(卖一件亏一件,商业模式未证明)")
+        if (cash is not None and debt and opcf and opcf < 0 and debt > 2 * cash):
+            flags.append("⚠️ 高负债+经营失血(债务是现金 2 倍以上且现金流为负)")
+        if not flags:
+            return None
+        return {"flags": flags,
+                "runway_years": round(runway, 1) if runway is not None else None,
+                "gross_margin": round(gm, 3) if isinstance(gm, (int, float)) else None}
+    except Exception:
+        return None
+
+
 def _market_context() -> dict | None:
     """Risk-on/off gate from SPY/QQQ vs their 50-day MA + VIX, computed once per scan.
     The per-name scan is otherwise blind to the broad tape — a buy signal in a market-
@@ -225,7 +255,7 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
     The daily df is returned so the caller can grade past calls without re-fetching."""
     base = {"ticker": ticker, "theme": THEME.get(ticker, "其他"),
             "lockup": _lockup_info(ticker), "earnings": _earnings_info(ticker),
-            "dilution": _dilution_info(ticker)}
+            "dilution": _dilution_info(ticker), "fundamentals": _fundamental_flags(ticker)}
     df_d = None
     try:
         df_d, df_h = _fetch(ticker)
