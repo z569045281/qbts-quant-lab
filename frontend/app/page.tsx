@@ -1018,6 +1018,32 @@ export default function Dashboard() {
         )}
       </section>
 
+      {/* ══ 4.9 AI 系统自检 — 决策模型以审计者身份报告的数据问题/改进建议(给维护者) ═══ */}
+      {(d?.system_notes?.length ?? 0) > 0 && (
+        <section className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+              🔬 AI 系统自检 · 今日发现
+            </span>
+            {d?.model && <span className="text-[10px] text-gray-400 font-mono">{d.model}</span>}
+          </div>
+          <div className="space-y-2">
+            {d!.system_notes!.map((n, i) => (
+              <div key={i} className="flex items-start gap-2 text-sm leading-relaxed">
+                <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-semibold mt-0.5 ${
+                  n.kind === "数据问题" ? "bg-amber-100 text-amber-700" : "bg-sky-100 text-sky-700"}`}>
+                  {n.kind}
+                </span>
+                <span className="text-gray-700">{n.note}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2.5 text-[10px] text-gray-400">
+            决策模型顺带审计当日数据后主动提出,不影响交易决定 · 修不修由你定
+          </div>
+        </section>
+      )}
+
       {/* ══ 5. 今日要闻 + 60日小图 ═══════════════════════════════════════ */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">

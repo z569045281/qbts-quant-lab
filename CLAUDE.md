@@ -33,8 +33,10 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
 
 - **backend/** — FastAPI (`backend/api.py`): builds the dashboard snapshot, runs classic +
   mined factor strategies, SMC, macro, journal, and the AI decision.
-- **backend/dashboard/decision.py** — THE brain: one **Opus 4.8** (`claude-opus-4-8`) call →
-  trade-plan JSON. (Was `claude-fable-5` until Fable was disabled.)
+- **backend/dashboard/decision.py** — THE brain: one **Fable 5** (`claude-fable-5`) call →
+  trade-plan JSON, with **auto-fallback to Opus 4.8** on any primary failure (`decision.model`
+  records who actually answered — Fable was disabled for us once, publish must survive that).
+  The same call returns `system_notes`(AI 每日自检:数据问题/改进建议 → 仪表盘「AI 系统自检」卡).
 - **publish.py** — full pipeline + fresh decision → writes Supabase (`dashboard_state` +
   `factors`). The deployed site reads Supabase, so the site only updates when this runs.
 - **quote_pusher.py** — live pre/post quotes → Supabase `live_quote` (`--once` = single push).
@@ -91,7 +93,7 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   meta-model (`_SENTIMENT_WEIGHT=0.12`, low — retail sentiment is weak/laggy) and the decision
   prompt. Blank key → signal simply off (degrades cleanly). Endpoint returns top-level
   `buzz_score`/`sentiment_score`/`trend`/`bullish_pct`/`bearish_pct`; `X-API-Key` header.
-- **Models**: Opus 4.8 (decision) · Sonnet 4.6 (factor gen) · Haiku 4.5 (news / reflections).
+- **Models**: Fable 5 (decision, fallback Opus 4.8) · Sonnet 4.6 (factor gen) · Haiku 4.5 (news / reflections).
 - **Big image push to ECR occasionally times out** in CI — just re-run "Deploy AWS jobs".
 - **Nadaraya-Watson 包络** (`backend/dashboard/nadaraya_watson.py::analyze_nw_envelope`):
   non-repainting Gaussian-kernel mean-reversion band (causal one-sided kernel — does

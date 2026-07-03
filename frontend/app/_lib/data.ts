@@ -352,6 +352,8 @@ export interface Decision {
   vivienne_note?:     string;    // plain-language, no-jargon note for a non-expert reader
   intraday_unstable?: boolean;   // true = today's call flip-flopped across regenerations
   intraday_actions?:  ("LONG_QBTX" | "SHORT_QBTZ" | "HOLD")[];  // actions seen today, in order
+  model?:             string;    // which model actually produced this decision (fable-5 or fallback)
+  system_notes?:      { kind: "数据问题" | "改进建议"; note: string }[];  // AI 每日自检:数据问题/改进建议(给维护者)
 }
 
 /* ── /dashboard/calibration payload ──────────────────────────────────────── */

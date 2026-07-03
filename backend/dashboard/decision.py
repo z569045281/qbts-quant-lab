@@ -43,11 +43,14 @@ _CLIENT = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 _CACHE_PATH = Path(__file__).parent.parent / "data" / "cache" / "daily_decision.json"
 _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-# Opus 4.8 — the strongest reasoning model available to us. This is THE call
-# that decides whether real money moves today; everything else (news triage,
-# factor generation) stays on cheaper models. (Was claude-fable-5 until that
-# model was disabled for us; Opus 4.8 is the current top-tier replacement.)
-_MODEL = "claude-opus-4-8"
+# Fable 5 — Anthropic's most capable model. This is THE call that decides
+# whether real money moves today; everything else (news triage, factor
+# generation) stays on cheaper models. Fable was disabled for us once before
+# (we ran Opus 4.8 in between), so the call falls back to Opus 4.8 on ANY
+# primary-model failure (access revoked / safety refusal / no text) — the
+# daily publish must never die because model access changed overnight.
+_MODEL = "claude-fable-5"
+_FALLBACK_MODEL = "claude-opus-4-8"
 
 _SYSTEM = """你是一名管理自有资金的资深对冲基金经理，专精高波动小盘股的事件驱动交易。
 你只交易一只股票：QBTS（D-Wave Quantum，量子计算）。执行工具：
@@ -100,6 +103,12 @@ _SYSTEM = """你是一名管理自有资金的资深对冲基金经理，专精�
    - 讲清三件事：①今天我们打算做什么（买一点 / 先不买不卖 / 把手里的卖掉）；②为什么（用她能懂的
      生活化说法，一句话）；③再简单安一下她的心（为什么不用太担心 / 为什么要这么谨慎）。
    - 3-5 句话，温暖、简短、不说教，不要堆数字和价格。
+15. system_notes —— 每日「系统自检」，写给这套系统的维护者看（不是交易内容）：以外部
+   审计者的挑剔眼光审视你收到的这份数据本身，报告 0-4 条：
+   - 数据问题：互相矛盾的数字、明显过期还在被当新鲜用的数据、缺失/可疑的值、说不通的信号。
+   - 改进建议：这套系统当下最值得做的改进（新数据源/该删的噪声信号/流程缺陷），说清为什么值得。
+   有一说一：真没有就给空数组，绝不为凑数硬写；每条一句话，必须点名具体字段或数字。
+   这些内容不影响今天的交易决定本身。
 
 输出格式：只输出一个 JSON 对象（不要 markdown 代码块，不要其他文字）：
 {
@@ -126,7 +135,10 @@ _SYSTEM = """你是一名管理自有资金的资深对冲基金经理，专精�
   "invalidation": "<什么情况下本计划作废，含具体价位>",
   "invalidation_price": <使计划作废的 QBTS 关键价位（数字）。LONG 时=跌破即作废的价位；
                          SHORT 时=涨破即作废的价位；HOLD 时=两个触发位中更接近现价的那个>,
-  "vivienne_note": "<写给完全不懂股票的女朋友 Vivienne 看的一段大白话，要求见上面规则 14>"
+  "vivienne_note": "<写给完全不懂股票的女朋友 Vivienne 看的一段大白话，要求见上面规则 14>",
+  "system_notes": [
+    {"kind": "数据问题"|"改进建议", "note": "<一句话，点名具体字段/数字，见规则 15；没有就给空数组>"}
+  ]
 }
 HOLD 时 trade_plan 里 etf_ticker 用 null，但仍给出"若突破 $X 买 QBTX / 跌破 $Y 买 QBTZ"
 的双向触发写进 entry_condition，让用户知道盘中该盯什么位。"""
@@ -528,7 +540,7 @@ _DECISION_SCHEMA = {
     "additionalProperties": False,
     "required": ["action", "conviction", "p_up_5d", "summary", "trade_plan",
                  "key_drivers", "risks", "upcoming_catalysts", "invalidation",
-                 "invalidation_price", "vivienne_note"],
+                 "invalidation_price", "vivienne_note", "system_notes"],
     "properties": {
         "action": {"type": "string", "enum": ["LONG_QBTX", "SHORT_QBTZ", "HOLD"]},
         "conviction": {"type": "integer"},
@@ -577,6 +589,17 @@ _DECISION_SCHEMA = {
         "invalidation": {"type": "string"},
         "invalidation_price": _NUM,
         "vivienne_note": {"type": "string"},
+        "system_notes": {   # 每日系统自检:AI 主动报告数据问题/改进建议(给维护者,非交易内容)
+            "type": "array",
+            "items": {
+                "type": "object", "additionalProperties": False,
+                "required": ["kind", "note"],
+                "properties": {
+                    "kind": {"type": "string", "enum": ["数据问题", "改进建议"]},
+                    "note": {"type": "string"},
+                },
+            },
+        },
     },
 }
 
@@ -589,25 +612,38 @@ def generate_decision(snapshot: dict, extras: dict | None = None) -> dict:
     """
     user_msg = _build_user_msg(snapshot, extras)
 
-    resp = _CLIENT.messages.create(
-        model=_MODEL,
-        max_tokens=8000,   # thinking + JSON answer share the budget — leave headroom
-        # Opus 4.8 has thinking OFF by default; turn it on so this decision gets
-        # the same deliberate reasoning the old always-on model gave it.
-        thinking={"type": "adaptive"},
-        system=_SYSTEM,
-        messages=[{"role": "user", "content": user_msg}],
-        output_config={"format": {"type": "json_schema", "schema": _DECISION_SCHEMA}},
-    )
-    # Thinking blocks stream first; the text block is now guaranteed valid JSON.
-    text = next(
-        (b.text for b in resp.content if getattr(b, "type", "") == "text"),
-        "",
-    ).strip()
-    if not text:
-        # A safety refusal (stop_reason="refusal") yields no schema-shaped text.
-        raise ValueError(f"no text block in model response (stop_reason={resp.stop_reason})")
+    def _one_call(model: str) -> str:
+        resp = _CLIENT.messages.create(
+            model=model,
+            max_tokens=16000,  # Fable 的 thinking 更长;thinking + JSON 共享预算,留足头房
+            # Fable 5 thinking 常开,adaptive 是唯一合法的显式配置(Opus 4.8 同样接受,
+            # 所以主/备两个模型可以共用这一套参数)。
+            thinking={"type": "adaptive"},
+            system=_SYSTEM,
+            messages=[{"role": "user", "content": user_msg}],
+            output_config={"format": {"type": "json_schema", "schema": _DECISION_SCHEMA}},
+        )
+        # Thinking blocks stream first; the text block is guaranteed valid JSON.
+        text = next(
+            (b.text for b in resp.content if getattr(b, "type", "") == "text"),
+            "",
+        ).strip()
+        if not text:
+            # A safety refusal (stop_reason="refusal") yields no schema-shaped text.
+            raise ValueError(f"no text block in model response (stop_reason={resp.stop_reason})")
+        return text
+
+    # 主模型任何失败(权限被收回 / 安全拒答 / 空响应)→ 立即用 Opus 4.8 重打同一发。
+    # Fable 曾经被禁用过一次;每日 publish 不允许因为模型可用性变化而死掉。
+    try:
+        text, model_used = _one_call(_MODEL), _MODEL
+    except (anthropic.APIError, ValueError) as e:
+        logger.warning("decision: %s failed (%s) — falling back to %s",
+                       _MODEL, str(e)[:200], _FALLBACK_MODEL)
+        text, model_used = _one_call(_FALLBACK_MODEL), _FALLBACK_MODEL
     decision = json.loads(text)
+    decision["model"] = model_used            # observability:实际是谁做的决策
+    decision["system_notes"] = (decision.get("system_notes") or [])[:4]
 
     # Minimal guard — structured outputs already enforces the shape.
     if decision.get("action") not in ("LONG_QBTX", "SHORT_QBTZ", "HOLD"):
