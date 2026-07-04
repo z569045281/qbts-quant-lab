@@ -67,3 +67,4 @@ Format (newest at top):
 
 - [done] 2026-07-04 · mining-round4 · 第四轮 32 套变体回测(榜首压力测试/BTC领先/委员会扩容/LGBM等),结果归档 · files: mining.md
 - [done] 2026-07-04 · btc-lead-tracker · 冠军陪跑第三匹马:BTC昨日绿×QQQ50×波目 纸面净值 · files: backend/dashboard/qbts_paper.py, frontend/app/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json
+- [done] 2026-07-04 · mining-round5 · 第五轮 27 变体(VIX期限结构/52周高/TOM/FINRA短卖比/TLT),归档 · files: mining.md
