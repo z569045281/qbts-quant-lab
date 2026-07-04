@@ -70,3 +70,4 @@ Format (newest at top):
 - [done] 2026-07-04 · mining-round5 · 第五轮 27 变体(VIX期限结构/52周高/TOM/FINRA短卖比/TLT),归档 · files: mining.md
 - [done] 2026-07-04 · short-flow-flip · 挤空燃料模块依第五轮实证整体翻转为空头动向(偏空信号) · files: backend/dashboard/squeeze.py, backend/dashboard/strategies.py, backend/dashboard/decision.py, frontend/app/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, mining.md
 - [done] 2026-07-04 · mining-round6 · 第六轮 41 变体:在产经典策略审判(反向腿全面暴雷)+ CLV强收盘/BTC多日/迟滞带 · files: mining.md
+- [done] 2026-07-04 · kill-inverted-legs+clv-horse · 在产策略反向腿静音 + CLV强收盘第四匹纸面马(v1.11) · files: backend/dashboard/strategies.py, backend/dashboard/qbts_paper.py, frontend/app/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, mining.md

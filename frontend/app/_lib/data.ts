@@ -215,6 +215,10 @@ export interface Champs {
     nav: number; start_date: string; exposure: number;
     btc_green?: boolean | null; ret_pct: number;
   } | null;
+  clv?: {                          // ④ CLV强收盘×QQQ50×波目 虚拟净值(2026-07 第六轮)
+    nav: number; start_date: string; exposure: number;
+    clv?: number | null; ret_pct: number;
+  } | null;
   swing: {                         // ② 5日swing×QQQ50 状态机
     lo5: number; hi5: number; close: number; would_trigger: boolean;
     open?: { entry_date: string; entry: number; days: number;

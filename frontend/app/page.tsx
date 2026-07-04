@@ -1201,9 +1201,24 @@ export default function Dashboard() {
                 </span>
               </div>
             )}
+            {/* ④ CLV强收盘 × QQQ50 × 波目(第六轮新增) */}
+            {snap.champs.clv && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-[#FAFAFB] rounded-lg px-3 py-2">
+                <span className="text-xs font-semibold text-gray-700">🆕 CLV强收盘×QQQ50</span>
+                <span className={snap.champs.clv.ret_pct >= 0 ? "text-emerald-700" : "text-[#F03A3E]"}>
+                  ${snap.champs.clv.nav.toFixed(0)}({snap.champs.clv.ret_pct >= 0 ? "+" : ""}{(snap.champs.clv.ret_pct * 100).toFixed(1)}%)
+                </span>
+                <span className="text-gray-400 text-xs">
+                  今日收盘位置 {snap.champs.clv.clv != null
+                    ? `${snap.champs.clv.clv >= 0 ? "+" : ""}${snap.champs.clv.clv.toFixed(2)}${snap.champs.clv.clv > 0.3 ? " 💪 强 → 明日持仓" : " 弱 → 空仓"}`
+                    : "?"}
+                  · 敞口 {(snap.champs.clv.exposure * 100).toFixed(0)}% · {snap.champs.clv.start_date} 起 $1000
+                </span>
+              </div>
+            )}
           </div>
           <div className="mt-2 text-[10px] text-gray-400">
-            回测出身:🥇近1年+113%/回撤-40% · 🥈胜率72% · 🆕近1年+120%/回撤-20%(79套第四轮),多重比较折扣照打 —— 纯纸面陪跑,不进决策;跑赢真实记录才算数
+            回测出身:🥇近1年+113%/回撤-40% · 🥈胜率72% · 🆕BTC 近1年+120%/回撤-20% · 🆕CLV 近1年+189%/回撤-18%(147套第六轮),多重比较折扣照打 —— 纯纸面陪跑,不进决策;跑赢真实记录才算数
           </div>
         </section>
       )}

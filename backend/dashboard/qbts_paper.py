@@ -11,6 +11,10 @@ QBTS 冠军策略陪跑(纸面测量)—— 2026-07-03 两轮策略动物园(35 
      在 50 日线上 → 按波目敞口持有,否则空仓。回测:全期 +611% / 近1年 +120% /
      回撤 -20%(全场最浅),阈值/去过滤/切半全正。BTC 取最近一根**已完成** UTC
      日线;当日 BTC 拉取失败则该台账当天不动(净值口径同 ①,漏日由 prev_close 跨越)。
+  ④ CLV强收盘 × QQQ50 × 波目(2026-07-04 第六轮新增)—— CLV=(2C−H−L)/(H−L),
+     收盘收在当日区间上部(>0.3)且 QQQ50 顺风 → 按波目敞口持明天,否则空仓。
+     回测:近1年 +189% / 回撤 -18%,阈值 0/0.3/0.6 全稳、成本加倍仍 +162%;
+     弱点:前半段仅 +47%,偏近期 regime(吃 1d 延续 DNA)。
 
 定位与 dip_buy 相同:**纯纸面测量,不进 edge、不进决策 prompt**,多重比较
 折扣照打(35 选 2),攒够样本后用真实成绩决定去留。
@@ -157,6 +161,24 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
                               "shares": round(shares, 4), "days": 0}
             st["swing"] = sw
 
+            # ── ④ CLV强收盘 × QQQ50 × 波目 净值 ──
+            if {"high", "low"}.issubset(d.columns):
+                hi_t, lo_t = float(d["high"].iloc[-1]), float(d["low"].iloc[-1])
+                clv_val = (2 * close - hi_t - lo_t) / (hi_t - lo_t) if hi_t > lo_t else 0.0
+                c_exp = vt if (risk_on and clv_val > 0.3) else 0.0
+                cv = st.get("clv")
+                if cv is None:
+                    cv = {"nav": _USD, "start_date": today,
+                          "prev_close": close, "exposure": c_exp}
+                else:
+                    r = close / cv["prev_close"] - 1 if cv.get("prev_close") else 0.0
+                    cv["nav"] = cv["nav"] * (1 + cv.get("exposure", 0.0) * r) \
+                        - cv["nav"] * abs(c_exp - cv.get("exposure", 0.0)) * _COST
+                    cv["prev_close"] = close
+                    cv["exposure"] = c_exp
+                cv["clv"] = round(clv_val, 2)
+                st["clv"] = cv
+
             # ── ③ BTC昨日绿 × QQQ50 × 波目 净值 ──
             btc_green = _btc_green()
             if btc_green is not None:
@@ -193,6 +215,13 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
                 "ret_pct": round(vr["nav"] / _USD - 1, 4),
                 "bh_ret_pct": round(vr["bh_nav"] / _USD - 1, 4),
             } if vr else None),
+            "clv": ({
+                "nav": round(cv["nav"], 2),
+                "start_date": cv["start_date"],
+                "exposure": round(cv.get("exposure", 0.0), 2),
+                "clv": cv.get("clv"),
+                "ret_pct": round(cv["nav"] / _USD - 1, 4),
+            } if (cv := st.get("clv")) else None),
             "btc": ({
                 "nav": round(bt["nav"], 2),
                 "start_date": bt["start_date"],
