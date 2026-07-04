@@ -84,15 +84,16 @@ def strategy_connors_rsi2(df: pd.DataFrame) -> StrategySignal:
     sma200 = float(sma200_val) if pd.notna(sma200_val) else close
     above_lt_trend = bool(close > sma200)
 
+    # 2026-07-04 第六轮审判(mining.md):BUY-high 验证有效(后5d +9.2%/胜率60%,n=40);
+    # BUY-med 不及基线(+4.1% vs +5.2%)降为 low;SELL-med(75-90)方向反了
+    # (后5d +8.2%,近1年仍 +7.8%)→ 杀;SELL-high(>90)方向对(−2.3%)保留。
     signal, confidence = 0, "low"
     if last < 10 and above_lt_trend:
         signal, confidence = +1, "high"
     elif last < 25 and above_lt_trend:
-        signal, confidence = +1, "medium"
+        signal, confidence = +1, "low"
     elif last > 90 and not above_lt_trend:
         signal, confidence = -1, "high"
-    elif last > 75 and not above_lt_trend:
-        signal, confidence = -1, "medium"
 
     rationale = (
         f"RSI(2) = {last:.1f}; price {'above' if above_lt_trend else 'below'} 200-day SMA. "
@@ -178,13 +179,14 @@ def strategy_vix_contrarian(df: pd.DataFrame) -> StrategySignal:
     rsi  = float(df["rsi_14"].iloc[-1])
     mom20= float(df["momentum_20"].iloc[-1])
 
+    # 2026-07-04 第六轮审判(mining.md):SELL 腿(自满+过热做空)灾难级反向——
+    # 6 次信号后5d 平均 +32.4%(全是疯牛主升浪日),杀;其反向="追60d过热"
+    # 属已判死对照组,亦不翻转。BUY-med 不及基线,降为 low。
     signal, confidence = 0, "low"
     if vix > 30 and rsi < 30:
         signal, confidence = +1, "high"
     elif vix > 22 and rsi < 35:
-        signal, confidence = +1, "medium"
-    elif vix < 14 and rsi > 70 and mom20 > 0.15:
-        signal, confidence = -1, "medium"
+        signal, confidence = +1, "low"
 
     rationale = (
         f"VIX = {vix:.1f}, RSI(14) = {rsi:.0f}, 20d momentum {mom20:+.1%}. "
@@ -217,11 +219,11 @@ def strategy_pre_earnings_drift(df: pd.DataFrame) -> StrategySignal:
     dte   = int(df["days_to_earnings"].iloc[-1])
     mom10 = float(df["momentum_10"].iloc[-1])
 
+    # 2026-07-04 第六轮审判(mining.md):BUY 腿弱有效(后5d +8.7%,n=15)保留;
+    # SELL 腿(财报前跌势做空)反向(后5d +11.6%,n=36)→ 杀。
     signal, confidence = 0, "low"
     if 3 <= dte <= 14 and mom10 > 0.05:
         signal, confidence = +1, "medium"
-    elif 3 <= dte <= 14 and mom10 < -0.05:
-        signal, confidence = -1, "medium"
     elif dte == 0 or dte == 60:
         return StrategySignal(
             "Pre-Earnings Drift", "event", 0, "HOLD", "low",
@@ -262,13 +264,14 @@ def strategy_peer_lead_lag(df: pd.DataFrame) -> StrategySignal:
 
     peer_avg = (ionq + rgti) / 2
 
+    # 2026-07-04 第六轮审判(mining.md):BUY-high 全系统最硬(后5d +11.7%,
+    # 近1年 +9.2% vs 基线 +2.0%,n=62 双窗口验证)保留;BUY-med 不及基线降 low;
+    # SELL-med 只有 1 天寿命(后1d −1.1% 对、后5d +4.6% 反)→ 杀。
     signal, confidence = 0, "low"
     if peer_avg > 0.03 and rel_ionq < -0.01:
         signal, confidence = +1, "high"     # peers rally hard, QBTS lags → catch-up
     elif peer_avg > 0.02 and rel_ionq < 0:
-        signal, confidence = +1, "medium"
-    elif peer_avg < -0.03 and rel_ionq > 0.01:
-        signal, confidence = -1, "medium"   # peers selling, QBTS overextended → revert
+        signal, confidence = +1, "low"
 
     rationale = (
         f"Peers (IONQ {ionq:+.1%}, RGTI {rgti:+.1%}, avg {peer_avg:+.1%}), "
@@ -303,14 +306,13 @@ def strategy_gap_fade(df: pd.DataFrame) -> StrategySignal:
     vol   = float(df["vol_ratio"].iloc[-1])
     hl    = float(df["hl_pct"].iloc[-1])
 
+    # 2026-07-04 第六轮审判(mining.md):高开缩量 FADE 腿反向(后5d +15.7%,
+    # 近1年仍反)→ 杀;其反向="高开追涨"第四轮已判死(近1年 −25%),亦不翻转。
+    # 巨口无跟随 FADE-high 两年 0 次触发,死条款一并删。低开抄底腿胜率 73% 但
+    # 幅度不及基线(+3.3% vs +5.2%)→ 降为 low 保留。
     signal, confidence = 0, "low"
-    if gap > 0.05 and vol < 1.2:
-        signal, confidence = -1, "medium"   # gap up on low volume = trap, fade
-    elif gap < -0.05 and vol < 1.2:
-        signal, confidence = +1, "medium"   # gap down on low volume = panic, buy
-    elif abs(gap) > 0.08 and hl < 0.04:
-        # huge gap + narrow intraday range = no follow-through, fade
-        signal, confidence = (-1 if gap > 0 else +1), "high"
+    if gap < -0.05 and vol < 1.2:
+        signal, confidence = +1, "low"      # gap down on low volume = panic, buy
 
     rationale = (
         f"Gap {gap:+.1%}, volume {vol:.1f}x avg, intraday range {hl:.1%}. "
@@ -342,13 +344,12 @@ def strategy_52w_breakout(df: pd.DataFrame) -> StrategySignal:
     pct_from_low  = (close / low52 - 1)  if low52  > 0 else 0
     mom20 = float(df["momentum_20"].iloc[-1])
 
+    # 2026-07-04 第六轮审判(mining.md):触252日新高后5d −1.0%(近1年 −1.5%,
+    # 均低于基线)——QBTS 上新高日=短线顶;52周高锚定家族第五轮亦判死。BUY 两档
+    # 全杀。52周低+跌势 SELL 腿无样本可验,降为 low 留观。
     signal, confidence = 0, "low"
-    if pct_from_high > -0.02 and mom20 > 0.05:
-        signal, confidence = +1, "high"     # at or near 52-wk high + uptrend
-    elif pct_from_high > -0.05 and mom20 > 0:
-        signal, confidence = +1, "medium"
-    elif pct_from_low < 0.02 and mom20 < -0.05:
-        signal, confidence = -1, "medium"   # at 52-wk low + downtrend = continuation
+    if pct_from_low < 0.02 and mom20 < -0.05:
+        signal, confidence = -1, "low"      # at 52-wk low + downtrend = continuation
     rationale = (
         f"Distance from 52-wk high {pct_from_high:+.1%}, from low {pct_from_low:+.1%}, "
         f"20d momentum {mom20:+.1%}. "
