@@ -7,6 +7,10 @@ QBTS 冠军策略陪跑(纸面测量)—— 2026-07-03 两轮策略动物园(35 
   ② 5日swing × QQQ50     事件式 → 同 dip_buy 的状态机。收盘≤5日最低 且 QQQ 在
      50日线上 → $1000 虚拟买入;收盘≥5日最高 → 止盈;10 个交易日到期平仓。
      回测:72%(23/32) / 全期 +554% / 近1年 +75% / 回撤 -39%。
+  ③ BTC昨日绿 × QQQ50 × 波目(2026-07-04 第四轮新增)—— BTC 昨天收涨 且 QQQ
+     在 50 日线上 → 按波目敞口持有,否则空仓。回测:全期 +611% / 近1年 +120% /
+     回撤 -20%(全场最浅),阈值/去过滤/切半全正。BTC 取最近一根**已完成** UTC
+     日线;当日 BTC 拉取失败则该台账当天不动(净值口径同 ①,漏日由 prev_close 跨越)。
 
 定位与 dip_buy 相同:**纯纸面测量,不进 edge、不进决策 prompt**,多重比较
 折扣照打(35 选 2),攒够样本后用真实成绩决定去留。
@@ -81,6 +85,20 @@ def _qqq_risk_on() -> "bool | None":
         return None
 
 
+def _btc_green() -> "bool | None":
+    """最近一根已完成 UTC 日线的 BTC 涨跌;失败返回 None(该台账当日不动)。"""
+    try:
+        import yfinance as yf
+        b = yf.download("BTC-USD", period="1mo", progress=False)["Close"].squeeze()
+        b = b[b.index.date < pd.Timestamp.now(tz="UTC").date()]  # 去掉今天的半根
+        if len(b) < 2:
+            return None
+        return bool(float(b.iloc[-1]) > float(b.iloc[-2]))
+    except Exception as e:
+        logger.warning(f"qbts_paper: BTC fetch failed — {e}")
+        return None
+
+
 def analyze_champs(df_d: pd.DataFrame) -> dict | None:
     """每日调用:推进两个台账一步 + 返回展示块。df_d 需含 close(大小写均可)。"""
     try:
@@ -138,6 +156,24 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
                 sw["open"] = {"entry_date": today, "entry": round(close, 2),
                               "shares": round(shares, 4), "days": 0}
             st["swing"] = sw
+
+            # ── ③ BTC昨日绿 × QQQ50 × 波目 净值 ──
+            btc_green = _btc_green()
+            if btc_green is not None:
+                b_exp = vt if (risk_on and btc_green) else 0.0
+                bt = st.get("btc")
+                if bt is None:
+                    bt = {"nav": _USD, "start_date": today,
+                          "prev_close": close, "exposure": b_exp}
+                else:
+                    r = close / bt["prev_close"] - 1 if bt.get("prev_close") else 0.0
+                    bt["nav"] = bt["nav"] * (1 + bt.get("exposure", 0.0) * r) \
+                        - bt["nav"] * abs(b_exp - bt.get("exposure", 0.0)) * _COST
+                    bt["prev_close"] = close
+                    bt["exposure"] = b_exp
+                bt["btc_green"] = btc_green
+                st["btc"] = bt
+
             st["last_date"] = today
             st["risk_on"] = risk_on
             _save(st)
@@ -157,6 +193,13 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
                 "ret_pct": round(vr["nav"] / _USD - 1, 4),
                 "bh_ret_pct": round(vr["bh_nav"] / _USD - 1, 4),
             } if vr else None),
+            "btc": ({
+                "nav": round(bt["nav"], 2),
+                "start_date": bt["start_date"],
+                "exposure": round(bt.get("exposure", 0.0), 2),
+                "btc_green": bt.get("btc_green"),
+                "ret_pct": round(bt["nav"] / _USD - 1, 4),
+            } if (bt := st.get("btc")) else None),
             "swing": {
                 "lo5": round(lo5, 2), "hi5": round(hi5, 2), "close": round(close, 2),
                 "would_trigger": bool(close <= lo5),

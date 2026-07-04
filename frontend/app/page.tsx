@@ -1193,9 +1193,22 @@ export default function Dashboard() {
                 · 落袋 {snap.champs.swing.realized >= 0 ? "+" : ""}${snap.champs.swing.realized.toFixed(0)}
               </span>
             </div>
+            {/* ③ BTC昨日绿 × QQQ50 × 波目(第四轮新增) */}
+            {snap.champs.btc && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-[#FAFAFB] rounded-lg px-3 py-2">
+                <span className="text-xs font-semibold text-gray-700">🆕 BTC昨日绿×QQQ50</span>
+                <span className={snap.champs.btc.ret_pct >= 0 ? "text-emerald-700" : "text-[#F03A3E]"}>
+                  ${snap.champs.btc.nav.toFixed(0)}({snap.champs.btc.ret_pct >= 0 ? "+" : ""}{(snap.champs.btc.ret_pct * 100).toFixed(1)}%)
+                </span>
+                <span className="text-gray-400 text-xs">
+                  BTC 昨日{snap.champs.btc.btc_green == null ? "?" : snap.champs.btc.btc_green ? "🟢 涨 → 持仓" : "🔴 跌 → 空仓"}
+                  · 当前敞口 {(snap.champs.btc.exposure * 100).toFixed(0)}% · {snap.champs.btc.start_date} 起 $1000
+                </span>
+              </div>
+            )}
           </div>
           <div className="mt-2 text-[10px] text-gray-400">
-            回测出身:35 套里的前两名(🥇近1年+113%/回撤-40% · 🥈胜率72%),多重比较折扣照打 —— 纯纸面陪跑,不进决策;跑赢真实记录才算数
+            回测出身:🥇近1年+113%/回撤-40% · 🥈胜率72% · 🆕近1年+120%/回撤-20%(79套第四轮),多重比较折扣照打 —— 纯纸面陪跑,不进决策;跑赢真实记录才算数
           </div>
         </section>
       )}
