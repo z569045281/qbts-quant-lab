@@ -245,6 +245,25 @@ export default function Dashboard() {
       {/* ══ 控制台：出决策 / 实时报价按钮（仅本地后端可达时显示）═══════════ */}
       <ControlPanel onPublished={refresh} />
 
+      {/* ══ 0-. 周一开盘·周末BTC 信号(仅周一显示;第七轮实证,验证期)═══════ */}
+      {live?.btc_weekend && (
+        <div className={`rounded-xl px-5 py-3.5 flex items-start gap-3 shadow-sm border ${
+          live.btc_weekend.green
+            ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
+          <span className="text-xl leading-none mt-0.5">🌉</span>
+          <div className="text-sm leading-relaxed">
+            <span className="font-bold">周一开盘信号 · 周末 BTC {(live.btc_weekend.weekend_ret * 100) >= 0 ? "+" : ""}{(live.btc_weekend.weekend_ret * 100).toFixed(1)}%</span>
+            {live.btc_weekend.green ? (
+              <span className="text-emerald-800"> 🟢 → 开盘买、收盘卖(QBTX 亦可,1天衰减忽略)。
+                回测近1年此信号周一日内均值 +2.9%、胜率 60%</span>
+            ) : (
+              <span className="text-red-800"> 🔴 → 今天开盘不做多(历史此情形周一日内均值 −3.0%)</span>
+            )}
+            <span className="text-gray-400 text-xs"> · n=55 验证期,小仓 · 已推送{live.btc_weekend.pushed ? "✅" : "…"}</span>
+          </div>
+        </div>
+      )}
+
       {/* ══ 0. 计划状态警报 ═══════════════════════════════════════════════ */}
       {planBreached && d && (
         <div className="bg-red-600 text-white rounded-xl px-5 py-3.5 flex items-start gap-3 shadow-md">

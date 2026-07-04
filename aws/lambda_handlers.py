@@ -54,15 +54,26 @@ def quote_handler(event, context):
     sb = quote_pusher.get_supabase()
     payload = quote_pusher.build_payload()
 
-    # Previous SMC block (for rising-edge dedup + carry-forward between recomputes).
-    prev_smc = None
+    # Previous live data (SMC rising-edge dedup + btc_weekend push dedup + carry-forward).
+    prev_data = {}
     try:
         r = sb.table("live_quote").select("data").eq("id", 1).single().execute()
-        prev_smc = ((r.data or {}).get("data") or {}).get("smc")
+        prev_data = ((r.data or {}).get("data") or {})
     except Exception:
-        prev_smc = None
+        prev_data = {}
+    prev_smc = prev_data.get("smc")
 
     now_et = datetime.now(ZoneInfo("America/New_York"))
+
+    # 周一开盘·周末BTC 信号(mining.md 核心事实 #9):仅周一有值,算一次随
+    # live_quote carry,08:00 ET 起 ntfy 一次(pushed 标记读回去重)。
+    try:
+        from dashboard.btc_weekend import maybe_btc_weekend
+        bw = maybe_btc_weekend(prev_data.get("btc_weekend"), now_et)
+        if bw:
+            payload["btc_weekend"] = bw
+    except Exception as e:
+        print(f"! btc_weekend skipped: {type(e).__name__}: {e}")
     recompute = payload.get("session") in ("pre", "regular", "post") and now_et.minute % 5 == 0
     if recompute:
         try:

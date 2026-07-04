@@ -72,3 +72,4 @@ Format (newest at top):
 - [done] 2026-07-04 · mining-round6 · 第六轮 41 变体:在产经典策略审判(反向腿全面暴雷)+ CLV强收盘/BTC多日/迟滞带 · files: mining.md
 - [done] 2026-07-04 · kill-inverted-legs+clv-horse · 在产策略反向腿静音 + CLV强收盘第四匹纸面马(v1.11) · files: backend/dashboard/strategies.py, backend/dashboard/qbts_paper.py, frontend/app/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, mining.md
 - [done] 2026-07-04 · mining-round7 · 第七轮 31 变体(执行层专题:QBTX/QBTZ衰减实测/出场工程/周一开盘周末BTC新发现),归档 · files: mining.md
+- [done] 2026-07-04 · btc-weekend-signal · 周一开盘·周末BTC信号:quote_handler周一盘前算+08:00ET ntfy推送+页面横幅(v1.12) · files: backend/dashboard/btc_weekend.py(new), aws/lambda_handlers.py, frontend/app/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json

@@ -504,6 +504,11 @@ export interface LiveQuote {
   // read (structure/zones/sweeps + playbook) so the page renders the whole SMC card
   // from one live source. Fresher than the daily snapshot, so the page prefers it.
   smc?: (SmcAnalysis & { asof?: string }) | null;
+  // 周一开盘·周末BTC 信号(仅周一有值;mining.md 核心事实 #9,验证期)
+  btc_weekend?: {
+    date: string; weekend_ret: number; green: boolean;
+    last_utc_day?: string; pushed?: boolean;
+  } | null;
 }
 
 /** Live quote — Supabase row in deployed mode, local backend in dev. Null on failure. */
