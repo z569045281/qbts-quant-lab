@@ -15,6 +15,13 @@ QBTS 冠军策略陪跑(纸面测量)—— 2026-07-03 两轮策略动物园(35 
      收盘收在当日区间上部(>0.3)且 QQQ50 顺风 → 按波目敞口持明天,否则空仓。
      回测:近1年 +189% / 回撤 -18%,阈值 0/0.3/0.6 全稳、成本加倍仍 +162%;
      弱点:前半段仅 +47%,偏近期 regime(吃 1d 延续 DNA)。
+  ⑤ 配对超涨 veto(2026-07-04 第八轮新增)—— QQQ50×波目 照常,但 QBTS 对
+     IONQ 的 log 价差 40日 z>1(贵出 1σ)时清仓等。回测:近1年 +176% /
+     回撤 -22%,z 阈值 1.0/1.5/2.0 全部改善;与榜首配对同结构反用。
+  ⑥ QTUM昨日绿 × QQQ50 × 波目(2026-07-04 第八轮新增)—— 量子板块 ETF 昨日
+     收涨 → 按波目持有。回测:全期 +1102% / 近1年 +228% / 回撤 -19%(领先家
+     族最强);注意 QTUM 自含 QBTS 权重,部分是自延续,单次扫描打折看待。
+     IONQ / QTUM 拉取失败 → 对应台账当日不动(同 ③ 的 prev_close 跨日口径)。
 
 定位与 dip_buy 相同:**纯纸面测量,不进 edge、不进决策 prompt**,多重比较
 折扣照打(35 选 2),攒够样本后用真实成绩决定去留。
@@ -89,6 +96,44 @@ def _qqq_risk_on() -> "bool | None":
         return None
 
 
+def _ionq_z40(qbts_close: pd.Series) -> "float | None":
+    """QBTS/IONQ log 价差的 40 日 z;失败返回 None(veto 台账当日不动)。"""
+    try:
+        import numpy as np
+        import yfinance as yf
+        i = yf.download("IONQ", period="6mo", progress=False)["Close"].squeeze()
+        if i.index.tz is not None:
+            i.index = i.index.tz_localize(None)
+        qc = qbts_close.copy()
+        if getattr(qc.index, "tz", None) is not None:
+            qc.index = qc.index.tz_localize(None)
+        qc.index = qc.index.normalize()
+        i = i.reindex(qc.index).ffill()
+        spread = (np.log(qc) - np.log(i)).dropna()
+        win = spread.tail(40)
+        if len(win) < 30 or float(win.std()) < 1e-9:
+            return None
+        return float((spread.iloc[-1] - win.mean()) / win.std())
+    except Exception as e:
+        logger.warning(f"qbts_paper: IONQ fetch failed — {e}")
+        return None
+
+
+def _qtum_green() -> "bool | None":
+    """QTUM 最近一个已完成交易日的涨跌;失败返回 None。"""
+    try:
+        import yfinance as yf
+        g = yf.download("QTUM", period="1mo", progress=False)["Close"].squeeze()
+        today_et = pd.Timestamp.now(tz="America/New_York").date()
+        g = g[[d.date() < today_et for d in g.index]]
+        if len(g) < 2:
+            return None
+        return bool(float(g.iloc[-1]) > float(g.iloc[-2]))
+    except Exception as e:
+        logger.warning(f"qbts_paper: QTUM fetch failed — {e}")
+        return None
+
+
 def _btc_green() -> "bool | None":
     """最近一根已完成 UTC 日线的 BTC 涨跌;失败返回 None(该台账当日不动)。"""
     try:
@@ -120,6 +165,21 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
 
         st = _load()
         risk_on = _qqq_risk_on()
+
+        def _advance(key: str, exposure: float) -> dict:
+            """净值台账推进一步(与 ①③④ 同口径:昨日敞口吃今日收益,再调仓计费)。"""
+            x = st.get(key)
+            if x is None:
+                x = {"nav": _USD, "start_date": today,
+                     "prev_close": close, "exposure": exposure}
+            else:
+                r = close / x["prev_close"] - 1 if x.get("prev_close") else 0.0
+                x["nav"] = x["nav"] * (1 + x.get("exposure", 0.0) * r) \
+                    - x["nav"] * abs(exposure - x.get("exposure", 0.0)) * _COST
+                x["prev_close"] = close
+                x["exposure"] = exposure
+            st[key] = x
+            return x
 
         if st.get("last_date") != today and risk_on is not None:
             exposure = vt if risk_on else 0.0
@@ -196,6 +256,18 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
                 bt["btc_green"] = btc_green
                 st["btc"] = bt
 
+            # ── ⑤ 配对超涨 veto:QBTS 比 IONQ 贵 1σ 时清仓 ──
+            z40 = _ionq_z40(c)
+            if z40 is not None:
+                x = _advance("veto", vt if (risk_on and z40 <= 1.0) else 0.0)
+                x["z40"] = round(z40, 2)
+
+            # ── ⑥ QTUM昨日绿 × QQQ50 × 波目 ──
+            qg = _qtum_green()
+            if qg is not None:
+                x = _advance("qtum", vt if (risk_on and qg) else 0.0)
+                x["qtum_green"] = qg
+
             st["last_date"] = today
             st["risk_on"] = risk_on
             _save(st)
@@ -229,6 +301,21 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
                 "btc_green": bt.get("btc_green"),
                 "ret_pct": round(bt["nav"] / _USD - 1, 4),
             } if (bt := st.get("btc")) else None),
+            "veto": ({
+                "nav": round(vx["nav"], 2),
+                "start_date": vx["start_date"],
+                "exposure": round(vx.get("exposure", 0.0), 2),
+                "z40": vx.get("z40"),
+                "vetoed": bool((vx.get("z40") or 0) > 1.0),
+                "ret_pct": round(vx["nav"] / _USD - 1, 4),
+            } if (vx := st.get("veto")) else None),
+            "qtum": ({
+                "nav": round(qx["nav"], 2),
+                "start_date": qx["start_date"],
+                "exposure": round(qx.get("exposure", 0.0), 2),
+                "qtum_green": qx.get("qtum_green"),
+                "ret_pct": round(qx["nav"] / _USD - 1, 4),
+            } if (qx := st.get("qtum")) else None),
             "swing": {
                 "lo5": round(lo5, 2), "hi5": round(hi5, 2), "close": round(close, 2),
                 "would_trigger": bool(close <= lo5),

@@ -219,6 +219,14 @@ export interface Champs {
     nav: number; start_date: string; exposure: number;
     clv?: number | null; ret_pct: number;
   } | null;
+  veto?: {                         // ⑤ 配对超涨veto(QBTS贵IONQ 1σ清仓,第八轮)
+    nav: number; start_date: string; exposure: number;
+    z40?: number | null; vetoed?: boolean; ret_pct: number;
+  } | null;
+  qtum?: {                         // ⑥ QTUM昨日绿×QQQ50×波目(第八轮)
+    nav: number; start_date: string; exposure: number;
+    qtum_green?: boolean | null; ret_pct: number;
+  } | null;
   swing: {                         // ② 5日swing×QQQ50 状态机
     lo5: number; hi5: number; close: number; would_trigger: boolean;
     open?: { entry_date: string; entry: number; days: number;
