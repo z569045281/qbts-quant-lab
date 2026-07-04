@@ -1142,6 +1142,21 @@ export default function Dashboard() {
               大盘 QQQ50 {snap.champs.risk_on ? "✅ 顺风" : "🔴 逆风(两策略均空仓等)"}
             </span>
           </div>
+          {/* 每天30秒 · 四条军规(47套回测的最终提炼,数字全实时)— 详见 mining.md */}
+          <div className="mb-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[12px] leading-snug">
+            <div className="bg-[#F6F6F8] rounded-lg px-2.5 py-1.5">
+              <b>① 红绿灯</b>:大盘{snap.champs.risk_on ? "✅ 顺风 → 可玩" : "🔴 逆风 → 清仓等,别买任何东西"}
+            </div>
+            <div className="bg-[#F6F6F8] rounded-lg px-2.5 py-1.5">
+              <b>② 买</b>:跌到 5日新低 <b className="font-mono">${snap.champs.swing.lo5.toFixed(2)}</b> 才买,永不追涨
+            </div>
+            <div className="bg-[#F6F6F8] rounded-lg px-2.5 py-1.5">
+              <b>③ 卖</b>:弹回 5日新高 <b className="font-mono">${(snap.champs.swing.open?.hi5 ?? snap.champs.swing.hi5).toFixed(2)}</b> 就卖,最多拿 10 天
+            </div>
+            <div className="bg-[#F6F6F8] rounded-lg px-2.5 py-1.5">
+              <b>④ 量</b>:投机仓最多 <b className="font-mono">{((snap.regime?.vol_target?.position_pct ?? snap.champs.vt_pct) * 100).toFixed(0)}%</b>(波动率目标),其余现金
+            </div>
+          </div>
           <div className="space-y-2 text-sm leading-relaxed">
             {/* ① QQQ50 × 波动率目标:虚拟净值 vs 死拿 */}
             {snap.champs.volreg && (

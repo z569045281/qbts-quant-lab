@@ -166,6 +166,12 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   bug that kept the intraday block from ever landing). `live_quote.data['smc_err']` surfaces any
   recompute exception (only set on failure) so you can debug from Supabase without CloudWatch.
 
+## Strategy research archive
+
+**[mining.md](mining.md)** — 2026-07 三轮 47 套策略回测的完整档案:收益 DNA、最终排行、
+**已判死家族清单**(经典指标独立系统/折价买溢价卖/做空暴涨/日内隔夜翻仓/N=3 swing 等)。
+再测策略前先读它;判死的家族没有新证据不得重提(同 qbts-range-trading-no-edge 待遇)。
+
 ## Lessons learned (append new ones here)
 
 Mistakes worth not repeating — when you learn one, add a dated bullet here.
