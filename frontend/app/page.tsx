@@ -1055,43 +1055,38 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* 挤空燃料 */}
-        {snap.squeeze?.fuel_score != null && (
+        {/* 空头动向(原挤空燃料,2026-07-04 依第五轮实证翻转:空头=聪明钱) */}
+        {snap.squeeze?.short_z != null && (
           <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
-                🔥 挤空燃料
+                🩳 空头动向
               </span>
               <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-                snap.squeeze.fuel_label === "高" ? "bg-emerald-100 text-emerald-700"
-                : snap.squeeze.fuel_label === "中" ? "bg-amber-100 text-amber-700"
+                snap.squeeze.stance === "crowded" ? "bg-red-100 text-red-700"
+                : snap.squeeze.stance === "retreat" ? "bg-emerald-100 text-emerald-700"
                 : "bg-gray-100 text-gray-500"}`}>
-                燃料{snap.squeeze.fuel_label}
+                {snap.squeeze.stance_cn}
               </span>
             </div>
-            {/* 燃料计量条 */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-lg font-bold font-mono text-gray-800">{snap.squeeze.fuel_score.toFixed(0)}</span>
-              <span className="text-[10px] text-gray-400">/100</span>
-              <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
-                <div className={`h-full rounded-full ${
-                  snap.squeeze.fuel_label === "高" ? "bg-emerald-500"
-                  : snap.squeeze.fuel_label === "中" ? "bg-amber-400" : "bg-gray-300"}`}
-                  style={{ width: `${Math.min(100, snap.squeeze.fuel_score)}%` }} />
-              </div>
-            </div>
-            {/* 三个分量 */}
-            <div className="grid grid-cols-3 gap-2 mb-3 text-center">
-              {([["空仓", snap.squeeze.components.short, 40],
-                 ["期权", snap.squeeze.components.options, 35],
-                 ["13F", snap.squeeze.components.holdings, 25]] as const).map(([lbl, v, max]) => (
-                <div key={lbl} className="bg-[#F6F6F8] rounded-lg py-1.5">
-                  <div className="text-[10px] text-gray-400">{lbl}</div>
-                  <div className="text-xs font-mono font-semibold text-gray-700">{v.toFixed(0)}<span className="text-gray-300">/{max}</span></div>
-                </div>
-              ))}
+            <div className="flex items-baseline gap-3 mb-2">
+              <span className="text-lg font-bold font-mono text-gray-800">
+                {snap.squeeze.short_ratio != null ? `${(snap.squeeze.short_ratio * 100).toFixed(0)}%` : "—"}
+              </span>
+              <span className="text-[10px] text-gray-400">空量比</span>
+              <span className={`text-sm font-mono font-semibold ${
+                snap.squeeze.short_z > 1 ? "text-red-600"
+                : snap.squeeze.short_z < -1 ? "text-emerald-600" : "text-gray-500"}`}>
+                60日 z {snap.squeeze.short_z >= 0 ? "+" : ""}{snap.squeeze.short_z.toFixed(1)}
+              </span>
             </div>
             <div className="text-[11px] text-[#525461] leading-snug">{snap.squeeze.rationale}</div>
+            {snap.squeeze.context && (
+              <div className="mt-1.5 text-[10px] text-gray-400">{snap.squeeze.context}</div>
+            )}
+            <div className="mt-1.5 text-[10px] text-gray-400">
+              实证:空量比飙升后 5 日均值 +2.7% vs 平时 +5.2%(空头=聪明钱,第五轮 mining.md)· 证据弱,只当风向
+            </div>
           </div>
         )}
       </section>

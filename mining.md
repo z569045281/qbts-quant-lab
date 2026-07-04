@@ -88,6 +88,11 @@
 - **🕳️ 恐慌深坑报警器**(v1.6):跌20%抄底纸面台账(scan_paper 行 qbts_dip20)
 - **🏁 冠军策略陪跑**(v1.7):QQQ50×波目虚拟净值 vs 死拿 + 5日swing 状态机(scan_paper 行 qbts_champs)
 - 全部**测量用,不进 edge/决策 prompt 的信号权重**;跑赢真实记录才升级
+- **🩳 空头动向翻转**(v1.10,2026-07-04):第五轮「空头=聪明钱」实证直接改了生产信号——
+  `squeeze.py` 从"挤空燃料 0-100 合成分"重写为空量比 60日z 方向读数(z>1 偏空 / z<−1 顺风),
+  经典策略 "Short Squeeze Detector"(空量比高+动量→BUY,连引用的 Diether 2009 都用反了)
+  翻转重命名为 "Short Flow (Informed Shorts)",calibration 按新名重新攒记录;决策 prompt 同步。
+  置信度封顶 medium(t≈1.1),prompt 里明写"只当风向不当扳机"
 
 ## 给用户的最终提炼(每天30秒,四条)
 

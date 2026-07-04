@@ -114,47 +114,55 @@ def strategy_connors_rsi2(df: pd.DataFrame) -> StrategySignal:
     )
 
 
-# ── Strategy 2: Short Squeeze Detector ──────────────────────────────────────
-# Reference: Diether, Lee & Werner (2009) — short interest dynamics
-# Pattern: extreme short ratio + price strength = forced covering rally
+# ── Strategy 2: Short Flow (informed shorts) ─────────────────────────────────
+# Reference: Diether, Lee & Werner (2009) — short-selling spikes predict NEGATIVE
+# short-horizon returns (shorts are informed). 第五轮实测同向(mining.md):
+# QBTS 空量比 60日z>1 后5日均值 +2.7% vs 全样本 +5.2%;z<-1 → +7.7%。t≈1.1。
+# 前身 "Short Squeeze Detector" 把同一数据当挤空燃料给 BUY,方向与文献和实测
+# 都相反,2026-07-04 翻转重命名 —— calibration 按新名重新攒记录,旧史不继承。
 
-def strategy_short_squeeze(df: pd.DataFrame) -> StrategySignal:
+def strategy_short_flow(df: pd.DataFrame) -> StrategySignal:
+    refs = ["Diether, Lee & Werner (2009) — Short-Sale Strategies and Return Predictability",
+            "本仓 mining.md 第五轮实测 (2026-07-04)"]
     if "short_ratio" not in df.columns:
         return StrategySignal(
-            "Short Squeeze Detector", "microstructure", 0, "HOLD", "low",
-            "Short interest data unavailable.",
-            ["Diether, Lee & Werner (2009)"],
-            {},
+            "Short Flow (Informed Shorts)", "microstructure", 0, "HOLD", "low",
+            "Short volume data unavailable.", refs, {},
         )
-    sr   = float(df["short_ratio"].iloc[-1])
-    sr5  = float(df["short_ratio_5d"].iloc[-1]) if "short_ratio_5d" in df.columns else sr
-    mom5 = float(df["momentum_5"].iloc[-1])
-    vol  = float(df["vol_ratio"].iloc[-1])
+    srs = df["short_ratio"].dropna()
+    sr = float(srs.iloc[-1])
+    win = srs.tail(60)
+    if len(win) < 30 or float(win.std()) < 1e-9:
+        return StrategySignal(
+            "Short Flow (Informed Shorts)", "microstructure", 0, "HOLD", "low",
+            f"Short ratio {sr:.0%} but <30d of history for the 60d z-score.", refs,
+            {"short_ratio_today": round(sr, 4)},
+        )
+    z = float((sr - win.mean()) / win.std())
 
+    # 证据弱(t≈1.1)→ 置信度封顶 medium,永不 high
     signal, confidence = 0, "low"
-    if sr5 > 0.55 and mom5 > 0.03 and vol > 1.3:
-        signal, confidence = +1, "high"
-    elif sr5 > 0.45 and mom5 > 0.02:
+    if z > 2.0:
+        signal, confidence = -1, "medium"
+    elif z > 1.0:
+        signal, confidence = -1, "low"
+    elif z < -2.0:
         signal, confidence = +1, "medium"
-    elif sr5 < 0.30 and mom5 < -0.05:
-        signal, confidence = -1, "medium"  # exhausted shorts + downward momentum
+    elif z < -1.0:
+        signal, confidence = +1, "low"
 
     rationale = (
-        f"5d short ratio {sr5:.0%} (today {sr:.0%}), 5d momentum {mom5:+.1%}, vol {vol:.1f}x. "
-        + ("Heavy short pressure + rising price + volume confirmation = squeeze fuel loaded."
-            if signal == +1 and confidence == "high" else
-           "Elevated short pressure + price strength = potential squeeze setup."
-            if signal == +1 else
-           "Shorts already covered + price weakening = downside continuation risk."
+        f"Short-volume ratio {sr:.0%}, 60d z={z:+.1f}. "
+        + ("Shorts crowding in — informed flow, historically precedes below-average returns."
             if signal == -1 else
-           "No squeeze setup — short ratio or price action insufficient.")
+           "Shorts retreating — historically precedes above-average returns."
+            if signal == +1 else
+           "Short flow neutral — no directional information.")
     )
     return StrategySignal(
-        "Short Squeeze Detector", "microstructure", signal, _label(signal), confidence,
-        rationale,
-        ["Diether, Lee & Werner (2009) — Short-Sale Strategies and Return Predictability"],
-        {"short_ratio_today": round(sr, 4), "short_ratio_5d": round(sr5, 4),
-         "momentum_5d": round(mom5, 4), "vol_ratio": round(vol, 2)},
+        "Short Flow (Informed Shorts)", "microstructure", signal, _label(signal), confidence,
+        rationale, refs,
+        {"short_ratio_today": round(sr, 4), "short_z": round(z, 2)},
     )
 
 
@@ -411,7 +419,7 @@ def strategy_news_overreaction(df: pd.DataFrame) -> StrategySignal:
 
 ALL_STRATEGIES: list[Callable[[pd.DataFrame], StrategySignal]] = [
     strategy_connors_rsi2,
-    strategy_short_squeeze,
+    strategy_short_flow,
     strategy_vix_contrarian,
     strategy_pre_earnings_drift,
     strategy_peer_lead_lag,

@@ -17,8 +17,8 @@ Why this design:
     short volume, ETF flow, earnings calendar, mined factors).
   - Mechanical weight-voting of weak signals produced mush ("BUY but HOLD").
   - A strong reasoning model, given ALL the evidence at once, weighs
-    interactions a linear combiner can't (e.g. "high short ratio is bullish
-    ONLY because 13F shows institutions accumulating — squeeze fuel").
+    interactions a linear combiner can't (e.g. "the SMC lock is bearish but
+    the macro calendar clears tomorrow — wait for the event, not the level").
 
 Cost: one claude-sonnet call per publish (~$0.05). Cached by date.
 """
@@ -339,16 +339,16 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
             f"  → 设目标优先用 naked POC / 邻近 HVN；止损放在 LVN 之外；入场参考价值区边缘"
         )
 
-    # ── 挤空燃料（合成短仓+期权+13F）──────────────────────────
+    # ── 空头动向（原挤空燃料，2026-07-04 依第五轮实证翻转）────
     sq = snapshot.get("squeeze")
-    if sq and sq.get("fuel_score") is not None:
+    if sq and sq.get("rationale"):
+        ctx = f"\n  背景：{sq['context']}" if sq.get("context") else ""
         parts.append(
-            f"## 挤空燃料（合成指标，勿重复计数）\n  {sq.get('rationale','')}\n"
-            f"  （注：本分数由上面的「期权流」+「13F 机构持仓」合成而来，不是独立证据——"
-            f"权衡时把它和那两项当作同一条线索，不要当成三个独立确认。"
-            f"另：经典策略里若有 Short Squeeze Detector 给 BUY，它和本指标用的是同一个"
-            f"FINRA 空量比，但它额外要求了价格动量确认（角色=扳机），本指标只量弹药多少"
-            f"（角色=燃料）——两者相左时以燃料档位约束其权重，不要当成两个独立的挤空确认。）"
+            f"## 空头动向（FINRA 空量比，方向已实证翻转）\n  {sq['rationale']}{ctx}\n"
+            f"  （注：QBTS 的空头实测是聪明钱——空量比飙升(z>1)是**偏空**信号，不是挤空燃料；"
+            f"空头撤退(z<-1)是顺风。证据强度 t≈1.1 未过显著性门槛，只作风向参考、"
+            f"永远不要单凭它给方向。经典策略 Short Flow (Informed Shorts) 与本节同一数据源"
+            f"同一方向，勿当成两个独立确认。）"
         )
 
     # ── 相对强度 / 领先落后 ───────────────────────────────────

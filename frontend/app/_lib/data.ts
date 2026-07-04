@@ -96,7 +96,7 @@ export interface Snapshot {
   dip_buy?:           DipBuy | null;
   champs?:            Champs | null;
   nw_envelope?:       NwEnvelope | null;
-  squeeze?:           SqueezeFuel | null;
+  squeeze?:           ShortFlow | null;
   relative_strength?: RelativeStrength | null;
   sentiment?: {
     buzz_score:      number | null;   // 0-100 attention/velocity
@@ -259,15 +259,15 @@ export interface NwEnvelope {
   rationale:    string;
 }
 
-/* ── squeeze fuel composite ──────────────────────────────────────────────── */
-export interface SqueezeFuel {
-  signal: 0 | 1;
-  label:  "BUY" | "HOLD";
-  fuel_score: number;
-  fuel_label: "高" | "中" | "低";
-  components: { short: number; options: number; holdings: number };
-  short_ratio: number;
-  short_pressure_z: number | null;
+/* ── 空头动向(原挤空燃料,2026-07-04 依第五轮实证翻转:空头=聪明钱) ──────── */
+export interface ShortFlow {
+  signal: -1 | 0 | 1;             // -1 空头拥挤=偏空 · +1 空头撤退=顺风
+  label:  "BUY" | "HOLD" | "SELL";
+  stance: "crowded" | "neutral" | "retreat";
+  stance_cn: string;
+  short_ratio: number | null;
+  short_z: number | null;
+  context?: string | null;        // 期权 PCR / 13F 注脚
   rationale: string;
 }
 
