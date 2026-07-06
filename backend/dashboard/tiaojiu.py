@@ -75,19 +75,27 @@ def maybe_tiaojiu_push(prev: dict | None, now_et: datetime) -> dict | None:
         return prev
     out = {"date": today, **sig, "pushed": False}
 
-    if sig["buy_base"] or sig["sell_trim"]:
-        from dashboard.intraday_smc import _ntfy
-        if sig["buy_base"]:
-            title, tags, body = "QBTS TeDiao BUY signal", "dart", (
-                f"特调·抄底建仓 触发(今日收盘确认)\n"
-                f"快%R {sig['fast']} 上穿-80,慢%R {sig['slow']} 仍弱\n"
-                f"回测:触发后5天平均 +17.4%(基线+5.2%),n=15\n"
-                f"(验证期信号,小仓;≤5天可用QBTX)")
-        else:
-            title, tags, body = "QBTS TeDiao TRIM signal", "scissors", (
-                f"特调·止盈减仓 触发(今日收盘确认)\n"
-                f"快%R {sig['fast']} 跌穿-20,慢%R {sig['slow']} 仍高\n"
-                f"回测:触发后20天平均 −10.0%(基线+24.9%),n=15 —— 历史标顶信号\n"
-                f"(持仓者考虑减半;验证期信号)")
-        out["pushed"] = _ntfy(title, body, tags=tags, priority="high")
+    closes = df.rename(columns=str.lower)["close"]
+    px, chg = float(closes.iloc[-1]), float(closes.iloc[-1] / closes.iloc[-2] - 1)
+
+    # 每日必推一条(心跳):无信号=低优先级不响铃;有信号=高优先级。
+    # 哪天 22:05(墨尔本冬令时,16:05 ET)后没收到任何推送 = 系统挂了,来找我。
+    from dashboard.intraday_smc import _ntfy
+    if sig["buy_base"]:
+        out["pushed"] = _ntfy("QBTS TeDiao BUY signal", (
+            f"特调·抄底建仓 触发(今日收盘确认)\n"
+            f"收盘 ${px:.2f}({chg:+.1%}) · 快%R {sig['fast']} 上穿-80,慢%R {sig['slow']} 仍弱\n"
+            f"回测:触发后5天平均 +17.4%(基线+5.2%),n=15\n"
+            f"(验证期信号,小仓;≤5天可用QBTX)"), tags="dart", priority="high")
+    elif sig["sell_trim"]:
+        out["pushed"] = _ntfy("QBTS TeDiao TRIM signal", (
+            f"特调·止盈减仓 触发(今日收盘确认)\n"
+            f"收盘 ${px:.2f}({chg:+.1%}) · 快%R {sig['fast']} 跌穿-20,慢%R {sig['slow']} 仍高\n"
+            f"回测:触发后20天平均 −10.0%(基线+24.9%),n=15 —— 历史标顶信号\n"
+            f"(持仓者考虑减半;验证期信号)"), tags="scissors", priority="high")
+    else:
+        out["pushed"] = _ntfy("QBTS daily check OK", (
+            f"✓ 系统正常 · QBTS 收盘 ${px:.2f}({chg:+.1%})\n"
+            f"特调无触发(快%R {sig['fast']} / 慢%R {sig['slow']})· 七马明晨结算"),
+            tags="white_check_mark", priority="low")
     return out

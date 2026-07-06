@@ -80,3 +80,4 @@ Format (newest at top):
 - [done] 2026-07-06 · v2.0-redesign · 特调双腿(⑦马+ntfy) + 决策提示词重写(十轮验证分层) + 页面iOS风重构 · files: backend/dashboard/tiaojiu.py(new), backend/dashboard/qbts_paper.py, backend/dashboard/decision.py, aws/lambda_handlers.py, frontend/app/page.tsx, frontend/app/layout.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, mining.md
 - [done] 2026-07-06 · mining-round11-freeze · 第十一轮姐妹票交叉验证(27变体)+ 冻结令生效(至2026-08-15) · files: mining.md
 - [done] 2026-07-06 · mining-round12 · 用户实战组合审计(NW×特调,10变体):重绘欺骗81- [done] 2026-07-06 · mining-round12 · 用户实战组合审计(NW×特调,10变体):重绘欺骗81%量化,NW底部区=负alpha,特调进+NW顶出5/5 · files: mining.md
+- [done] 2026-07-06 · heartbeat+cap · 每日收盘心跳推送(无信号=低优先级摘要,缺席=系统故障)+ 军规卡⓪总闸(投机仓≤总资产10%)(v2.0.1) · files: backend/dashboard/tiaojiu.py, frontend/app/page.tsx, frontend/public/version.json

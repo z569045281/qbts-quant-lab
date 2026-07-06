@@ -426,6 +426,10 @@ export default function Dashboard() {
               最多用 <b className="font-mono">{((snap.regime?.vol_target?.position_pct ?? snap.champs.vt_pct) * 100).toFixed(0)}%</b> 的投机资金,其余现金;拿 5 天以内用 QBTX,更久用 QBTS 正股
             </div>
           </div>
+          <div className="mt-2 bg-amber-50 rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed text-amber-900">
+            <b>⓪ 总闸(先于一切)</b>:QBTS 投机仓总额 ≤ 你全部资产的 <b>10%</b>——这只票可能单日 −40%、可能增发腰斩,
+            止损保护不了隔夜跳空,<b>仓位小是唯一真防御</b>。DCA 核心仓(📥定投专区)永远另册,两边不许挪钱。
+          </div>
         </section>
       )}
 
