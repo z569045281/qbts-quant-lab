@@ -184,6 +184,17 @@ Mistakes worth not repeating — when you learn one, add a dated bullet here.
   The dashboard's numbers are already computed from live fetched data — only off-hand
   factual claims I make from memory risk being stale.
 
+- **2026-07-07 · Never gate prompt/signal readouts behind a ledger's "new daily bar"
+  idempotence.** The 09:00 ET publish runs *premarket*, so `today` = the previous session's
+  date; after a holiday weekend there is no new bar for days → any `last_date != today`
+  update block silently skips → on Monday 07-06 the decision prompt lost ALL first-tier
+  readouts (BTC/QTUM/IONQ z40/CLV/特调 all null) exactly when 周末BTC定周一 mattered most
+  (the AI self-check caught it). Ledger *accounting* must stay once-per-bar idempotent, but
+  *readouts* are pure functions of current data — compute them fresh on every call
+  (`analyze_champs` now returns them in a `today` block). Corollary: a signal that only
+  rides ntfy/live_quote (btc_weekend was) is invisible to the decision — wire it into the
+  snapshot too.
+
 - **2026-06-24 · For ANY stock/market topic, lead with WebSearch (+ `yfinance`), never
   memory** *(user's standing instruction)*. When a question touches a specific stock —
   lockups / IPO terms / float / catalysts / earnings dates / valuation / "how low can it
