@@ -990,6 +990,13 @@ async def dashboard_snapshot(force_refresh: bool = False):
         champs = None
         logger.warning(f"qbts_paper failed: {e}")
     try:
+        # 周末BTC定周一(第七轮一级信号):周日夜盘/周一才非 None,喂决策 prompt
+        from dashboard.btc_weekend import weekend_signal
+        btc_wknd = await asyncio.to_thread(weekend_signal)
+    except Exception as e:
+        btc_wknd = None
+        logger.warning(f"btc_weekend failed: {e}")
+    try:
         nw_env = await asyncio.to_thread(analyze_nw_envelope, df_d)
     except Exception as e:
         nw_env = {"active": False, "signal": 0, "rationale": f"NW 包络失败: {str(e)[:80]}"}
@@ -1016,6 +1023,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["regime"]         = regime
     payload["dip_buy"]        = dip_buy
     payload["champs"]         = champs
+    payload["btc_weekend"]    = btc_wknd
     payload["nw_envelope"]    = nw_env
     payload["relative_strength"] = rel_strength
     payload["squeeze"]        = squeeze

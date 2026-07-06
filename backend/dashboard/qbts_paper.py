@@ -27,8 +27,12 @@ QBTS 冠军策略陪跑(纸面测量)—— 2026-07-03 两轮策略动物园(35 
      族最强);注意 QTUM 自含 QBTS 权重,部分是自延续,单次扫描打折看待。
      IONQ / QTUM 拉取失败 → 对应台账当日不动(同 ③ 的 prev_close 跨日口径)。
 
-定位与 dip_buy 相同:**纯纸面测量,不进 edge、不进决策 prompt**,多重比较
-折扣照打(35 选 2),攒够样本后用真实成绩决定去留。
+定位与 dip_buy 相同:**纸面测量,不进 edge**,多重比较折扣照打(35 选 2),
+攒够样本后用真实成绩决定去留。台账净值只作展示;但**当日信号读数**
+(BTC/QTUM 昨日绿、IONQ z40、CLV、特调%R)自 v2.0 起进决策 prompt 的
+「一级信号即时读数」——它们在每次调用时新算并放进返回值 `today` 块,
+**不依赖台账是否推进**(2026-07-07 修:节后周一无新 bar → 更新块跳过 →
+读数全空的失明 bug)。
 持久化:scan_paper 表独立行 id='qbts_champs'(零迁移;本地文件回退);
 last_date 幂等,每个交易日只推进一步,漏跑不回填。
 QQQ 数据:yfinance 现拉 6mo(publish 每日一次,失败则该日跳过、状态不动)。
@@ -170,6 +174,24 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
         st = _load()
         risk_on = _qqq_risk_on()
 
+        # ── 当日信号即时读数:每次调用都新算,不被台账 last_date 幂等挡住 ──
+        # (2026-07-07 修:节后周一无新日线 bar → 下面的更新块整体跳过 →
+        #  决策 prompt 的 BTC/QTUM/IONQ/CLV/特调读数全空,恰在这些一级信号
+        #  最有权重的周一失明。台账记账保持幂等,读数不需要幂等。)
+        btc_green = _btc_green()
+        qg = _qtum_green()
+        z40 = _ionq_z40(c)
+        clv_val = None
+        if {"high", "low"}.issubset(d.columns):
+            hi_t, lo_t = float(d["high"].iloc[-1]), float(d["low"].iloc[-1])
+            clv_val = (2 * close - hi_t - lo_t) / (hi_t - lo_t) if hi_t > lo_t else 0.0
+        try:
+            from dashboard.tiaojiu import compute_signals
+            ts = compute_signals(d)
+        except Exception as e:
+            logger.warning(f"qbts_paper: tiaojiu signals failed — {e}")
+            ts = None
+
         def _advance(key: str, exposure: float) -> dict:
             """净值台账推进一步(与 ①③④ 同口径:昨日敞口吃今日收益,再调仓计费)。"""
             x = st.get(key)
@@ -226,9 +248,7 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
             st["swing"] = sw
 
             # ── ④ CLV强收盘 × QQQ50 × 波目 净值 ──
-            if {"high", "low"}.issubset(d.columns):
-                hi_t, lo_t = float(d["high"].iloc[-1]), float(d["low"].iloc[-1])
-                clv_val = (2 * close - hi_t - lo_t) / (hi_t - lo_t) if hi_t > lo_t else 0.0
+            if clv_val is not None:
                 c_exp = vt if (risk_on and clv_val > 0.3) else 0.0
                 cv = st.get("clv")
                 if cv is None:
@@ -244,7 +264,6 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
                 st["clv"] = cv
 
             # ── ③ BTC昨日绿 × QQQ50 × 波目 净值 ──
-            btc_green = _btc_green()
             if btc_green is not None:
                 b_exp = vt if (risk_on and btc_green) else 0.0
                 bt = st.get("btc")
@@ -261,8 +280,6 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
                 st["btc"] = bt
 
             # ── ⑦ 特调双腿 事件式台账 ──
-            from dashboard.tiaojiu import compute_signals
-            ts = compute_signals(d)
             if ts is not None:
                 tj = st.get("tj") or {"open": None, "closed": []}
                 pos_t = tj.get("open")
@@ -285,13 +302,11 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
                 st["tj"] = tj
 
             # ── ⑤ 配对超涨 veto:QBTS 比 IONQ 贵 1σ 时清仓 ──
-            z40 = _ionq_z40(c)
             if z40 is not None:
                 x = _advance("veto", vt if (risk_on and z40 <= 1.0) else 0.0)
                 x["z40"] = round(z40, 2)
 
             # ── ⑥ QTUM昨日绿 × QQQ50 × 波目 ──
-            qg = _qtum_green()
             if qg is not None:
                 x = _advance("qtum", vt if (risk_on and qg) else 0.0)
                 x["qtum_green"] = qg
@@ -361,6 +376,16 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
                 "win_rate": round(wins / n, 3) if n else None,
                 "realized": round(sum(t["pnl"] for t in closed), 2),
             },
+        }
+        # 当日新算的信号读数(不依赖台账是否推进 —— 决策 prompt 优先读这里)
+        out["today"] = {
+            "btc_green": btc_green,
+            "qtum_green": qg,
+            "z40": round(z40, 2) if z40 is not None else None,
+            "clv": round(clv_val, 2) if clv_val is not None else None,
+            "tj_sig": ({k: ts[k] for k in ("fast", "slow", "buy_base",
+                                           "sell_trim", "sell_clear")}
+                       if ts is not None else None),
         }
         if pos:
             unreal = pos["shares"] * close * (1 - _COST) - _USD

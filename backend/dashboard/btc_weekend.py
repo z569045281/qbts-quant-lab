@@ -60,6 +60,27 @@ def _compute(now_et: datetime, friday, live_fallback: bool = False) -> dict | No
     }
 
 
+def weekend_signal(now_et: "datetime | None" = None) -> dict | None:
+    """周日 ≥20:00 ET / 周一:纯计算周末BTC信号(不推送、无去重副作用),
+    供 dashboard snapshot / 决策 prompt 用;其余日子或失败 → None。
+    (2026-07-07 加:此前该一级信号只走 ntfy+横幅,决策 prompt 周一看不见它。)"""
+    if now_et is None:
+        from zoneinfo import ZoneInfo
+        now_et = datetime.now(ZoneInfo("America/New_York"))
+    wd = now_et.weekday()
+    if wd == 6 and now_et.hour >= _NIGHT_OPEN_HOUR_ET:
+        friday = (now_et - timedelta(days=2)).date()
+    elif wd == 0:
+        friday = (now_et - timedelta(days=3)).date()
+    else:
+        return None
+    try:
+        return _compute(now_et, friday, live_fallback=(wd == 6))
+    except Exception as e:
+        logger.warning(f"btc_weekend weekend_signal failed: {e}")
+        return None
+
+
 def maybe_btc_weekend(prev: dict | None, now_et: datetime) -> dict | None:
     """周日 ≥20:00 ET 与周一返回信号 dict(其余 None);算一次后经 live_quote
     carry,算完立即推一次 ntfy(friday 键去重)。"""

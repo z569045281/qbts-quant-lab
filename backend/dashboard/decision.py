@@ -356,27 +356,41 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
     if rs and rs.get("rationale"):
         parts.append(f"## 相对强度（vs 量子篮子 + 风险偏好）\n  {rs['rationale']}")
 
-    # ── 一级信号即时读数（来自纸面马厩的当日状态,与系统提示 B 级清单一一对应）──
+    # ── 一级信号即时读数（当日新算 champs['today'] 优先;台账字段仅兜底旧快照）──
     ch = snapshot.get("champs") or {}
+    td = ch.get("today") or {}
+
+    def _fresh(key, ledger, field):
+        v = td.get(key)
+        return v if v is not None else (ch.get(ledger) or {}).get(field)
+
     lv1 = []
-    tj = (ch.get("tj") or {}).get("sig") or {}
+    bw = snapshot.get("btc_weekend")
+    if bw and bw.get("weekend_ret") is not None:
+        lv1.append(f"周末BTC定周一: 周末BTC {bw['weekend_ret']*100:+.1f}% "
+                   + ("🟢 → 周一顺风(回测开→收+2.9%、t=3.57;当日收盘前了结,不过夜)"
+                      if bw.get("green") else
+                      "🔴 → 周一不做多,夜盘也不(历史此情形周一日内均值−3.0%)"))
+    tj = td.get("tj_sig") or (ch.get("tj") or {}).get("sig") or {}
     if tj:
         legs = [nm for k, nm in (("buy_base", "🟢抄底建仓触发"), ("sell_trim", "🔴止盈减仓触发"),
                                  ("sell_clear", "⚠️破位清仓触发")) if tj.get(k)]
         lv1.append(f"特调双腿: 快%R {tj.get('fast')} / 慢%R {tj.get('slow')} → "
                    + ("、".join(legs) if legs else "无触发"))
-    if (ch.get("veto") or {}).get("z40") is not None:
-        v = ch["veto"]
-        lv1.append(f"相对估值: QBTS vs IONQ 价差 40日z={v['z40']:+.1f}"
-                   + "(贵1σ+,一级逆风)" if v.get("vetoed") else
-                   f"相对估值: QBTS vs IONQ 价差 40日z={v['z40']:+.1f}(未超贵)")
-    if (ch.get("btc") or {}).get("btc_green") is not None:
-        lv1.append(f"BTC 昨日{'🟢涨(顺风)' if ch['btc']['btc_green'] else '🔴跌(逆风)'}")
-    if (ch.get("qtum") or {}).get("qtum_green") is not None:
-        lv1.append(f"QTUM 量子板块昨日{'🟢涨' if ch['qtum']['qtum_green'] else '🔴跌'}")
-    if (ch.get("clv") or {}).get("clv") is not None:
-        lv1.append(f"昨日收盘位置 CLV={ch['clv']['clv']:+.2f}"
-                   f"({'强收盘,今日顺风' if ch['clv']['clv'] > 0.3 else '非强收盘'})")
+    z40 = _fresh("z40", "veto", "z40")
+    if z40 is not None:
+        lv1.append(f"相对估值: QBTS vs IONQ 价差 40日z={z40:+.1f}"
+                   + ("(贵1σ+,一级逆风)" if z40 > 1.0 else "(未超贵)"))
+    btc_green = _fresh("btc_green", "btc", "btc_green")
+    if btc_green is not None:
+        lv1.append(f"BTC 昨日{'🟢涨(顺风)' if btc_green else '🔴跌(逆风)'}")
+    qtum_green = _fresh("qtum_green", "qtum", "qtum_green")
+    if qtum_green is not None:
+        lv1.append(f"QTUM 量子板块昨日{'🟢涨' if qtum_green else '🔴跌'}")
+    clv = _fresh("clv", "clv", "clv")
+    if clv is not None:
+        lv1.append(f"昨日收盘位置 CLV={clv:+.2f}"
+                   f"({'强收盘,今日顺风' if clv > 0.3 else '非强收盘'})")
     if lv1:
         parts.append("## 一级信号即时读数（回测验证过的高权重信号,与决策纪律 B 级清单对应）\n  "
                      + "\n  ".join(lv1))
