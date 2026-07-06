@@ -75,3 +75,4 @@ Format (newest at top):
 - [done] 2026-07-04 · btc-weekend-signal · 周一开盘·周末BTC信号:quote_handler周一盘前算+08:00ET ntfy推送+页面横幅(v1.12) · files: backend/dashboard/btc_weekend.py(new), aws/lambda_handlers.py, frontend/app/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json
 - [done] 2026-07-04 · mining-round8 · 第八轮 21 变体(隔夜BTC日频化过不了成本关/配对超涨veto与QTUM领先进观察名单/躲周末反证),归档 · files: mining.md
 - [done] 2026-07-04 · veto-qtum-horses · 第五六匹纸面马:配对超涨veto + QTUM昨日绿(v1.13) · files: backend/dashboard/qbts_paper.py, frontend/app/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, mining.md
+- [done] 2026-07-06 · mining-round9 · 第九轮 %R Trend Exhaustion 专题(30 变体):日线信号稀但带骑乘吃到两波大涨,1h ▼破裂=唯一显著离场腿 · files: mining.md
