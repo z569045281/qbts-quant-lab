@@ -286,22 +286,8 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ══ CHoCH 早期反转预警 — 结构性格转变但未被 BOS 确认时提示，不发交易信号 ═══ */}
-      {choch && (
-        <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-xl px-5 py-3 text-sm leading-relaxed flex items-start gap-2">
-          <span className="text-base leading-none mt-0.5">🔭</span>
-          <div>
-            <span className="font-semibold">早期{choch.dir === "bullish" ? "见底" : "见顶"}预警</span>
-            ：{choch.date} 在 ${choch.level.toFixed(2)} 出现
-            <span className="font-semibold">{choch.dir === "bullish" ? "看涨" : "看跌"} CHoCH</span>
-            （结构性格转变，可能{choch.dir === "bullish" ? "见底转涨" : "见顶转跌"}的苗头）。
-            <span className="text-indigo-500"> 这是早期提示、<b>尚未被 BOS 确认</b>，系统不会据此发交易信号 —— 仅供你提前留意，要不要抢跑自己定。</span>
-          </div>
-        </div>
-      )}
-
       {/* ══ 💌 给 Vivienne 的（大白话，无术语）══════════════════════════════ */}
-      <section className="rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50/40 p-5 shadow-sm">
+      <section className="rounded-3xl border border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50/40 p-5 shadow-sm">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-base">💌</span>
           <span className="text-sm font-semibold text-rose-700">给 Vivienne 的</span>
@@ -325,7 +311,7 @@ export default function Dashboard() {
       </section>
 
       {/* ══ 1. HERO：价格 + 行动 ══════════════════════════════════════════ */}
-      <section className="bg-white rounded-2xl border border-[#EDEDF0] overflow-hidden shadow-sm">
+      <section className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] overflow-hidden shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] items-stretch">
           {/* 价格区 — live quote preferred, snapshot fallback */}
           <div className="p-6">
@@ -408,6 +394,41 @@ export default function Dashboard() {
         </div>
       </section>
 
+      {/* ══ 1.5 🚦 今天怎么做 — 四条军规(254套回测的最终提炼,数字全实时)══════ */}
+      {snap.champs && (
+        <section className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+              🚦 今天怎么做(四条军规)
+            </span>
+            <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold ${
+              snap.champs.risk_on ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+              大盘{snap.champs.risk_on ? "🟢 顺风" : "🔴 逆风"}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[13px] leading-relaxed">
+            <div className="bg-[#F6F6F8] rounded-xl px-3.5 py-2.5">
+              <div className="text-[11px] text-gray-400 mb-0.5">① 先看大盘红绿灯</div>
+              {snap.champs.risk_on
+                ? <span>🟢 顺风 → <b>可以玩</b>(看下面三条)</span>
+                : <span>🔴 逆风 → <b>今天什么都不买</b>,现金等灯变绿</span>}
+            </div>
+            <div className="bg-[#F6F6F8] rounded-xl px-3.5 py-2.5">
+              <div className="text-[11px] text-gray-400 mb-0.5">② 什么价买</div>
+              跌到 <b className="font-mono text-emerald-700">${snap.champs.swing.lo5.toFixed(2)}</b>(5日新低)才买,<b>永不追涨</b>
+            </div>
+            <div className="bg-[#F6F6F8] rounded-xl px-3.5 py-2.5">
+              <div className="text-[11px] text-gray-400 mb-0.5">③ 什么价卖</div>
+              弹回 <b className="font-mono text-red-600">${(snap.champs.swing.open?.hi5 ?? snap.champs.swing.hi5).toFixed(2)}</b>(5日新高)就卖,最多拿 10 天
+            </div>
+            <div className="bg-[#F6F6F8] rounded-xl px-3.5 py-2.5">
+              <div className="text-[11px] text-gray-400 mb-0.5">④ 买多少</div>
+              最多用 <b className="font-mono">{((snap.regime?.vol_target?.position_pct ?? snap.champs.vt_pct) * 100).toFixed(0)}%</b> 的投机资金,其余现金;拿 5 天以内用 QBTX,更久用 QBTS 正股
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* 当日一致性护栏 — 今天多次生成结果反复 → 视为无明确优势 */}
       {d?.intraday_unstable && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -427,7 +448,7 @@ export default function Dashboard() {
           {/* ══ 2. 交易计划 + 3. 关键驱动 ══════════════════════════════════ */}
           <section className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4">
             {/* 交易计划 */}
-            <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
+            <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
               <div className="text-xs font-semibold text-[#525461] uppercase tracking-wider mb-3">
                 📋 交易计划
               </div>
@@ -565,7 +586,7 @@ export default function Dashboard() {
             </div>
 
             {/* 关键驱动 + 风险 */}
-            <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
+            <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
               <div className="text-xs font-semibold text-[#525461] uppercase tracking-wider mb-3">
                 🧭 为什么 — 关键驱动
               </div>
@@ -603,7 +624,7 @@ export default function Dashboard() {
 
           {/* ══ 4. 未来催化剂 ═══════════════════════════════════════════════ */}
           {d.upcoming_catalysts?.length > 0 && (
-            <section className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
+            <section className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
               <div className="text-xs font-semibold text-[#525461] uppercase tracking-wider mb-3">
                 📅 接下来盯什么
               </div>
@@ -627,6 +648,31 @@ export default function Dashboard() {
             </section>
           )}
         </>
+      )}
+
+      {/* ══ 🔬 进阶分析抽屉 — 结构/宏观等技术细节,小白可整块跳过(AI 决策已替你读过) ═══ */}
+      <details className="group">
+        <summary className="cursor-pointer list-none bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] px-5 py-4 flex items-center justify-between select-none">
+          <span className="text-sm font-semibold text-[#525461]">🔬 进阶分析(SMC 结构 · 宏观日历 · 技术细节)</span>
+          <span className="text-[11px] text-gray-400">
+            上面的决策已替你读过这些 · 想深挖再点开
+            <span className="ml-2 inline-block transition-transform group-open:rotate-90">›</span>
+          </span>
+        </summary>
+        <div className="mt-4 space-y-4">
+
+      {/* CHoCH 早期反转预警 — 结构性格转变但未被 BOS 确认,不发交易信号 */}
+      {choch && (
+        <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-xl px-5 py-3 text-sm leading-relaxed flex items-start gap-2">
+          <span className="text-base leading-none mt-0.5">🔭</span>
+          <div>
+            <span className="font-semibold">早期{choch.dir === "bullish" ? "见底" : "见顶"}预警</span>
+            ：{choch.date} 在 ${choch.level.toFixed(2)} 出现
+            <span className="font-semibold">{choch.dir === "bullish" ? "看涨" : "看跌"} CHoCH</span>
+            （结构性格转变，可能{choch.dir === "bullish" ? "见底转涨" : "见顶转跌"}的苗头）。
+            <span className="text-indigo-500"> 这是早期提示、<b>尚未被 BOS 确认</b>，系统不会据此发交易信号。</span>
+          </div>
+        </div>
       )}
 
       {/* ══ 4.5 宏观日历（原始数据直显，独立于 AI 决策）═══════════════════ */}
@@ -718,7 +764,7 @@ export default function Dashboard() {
 
         {/* SMC 聪明钱结构 */}
         {smc && (
-          <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
+          <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider flex items-center gap-2">
                 🧠 SMC 聪明钱结构
@@ -910,7 +956,7 @@ export default function Dashboard() {
         )}
 
         {/* 历史战绩 */}
-        <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
+        <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
               📒 历史决策战绩
@@ -1014,7 +1060,7 @@ export default function Dashboard() {
 
         {/* 成交量画像 / POC */}
         {snap.volume_profile?.poc != null && (
-          <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
+          <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
                 📊 成交量画像 / POC
@@ -1076,7 +1122,7 @@ export default function Dashboard() {
 
         {/* 空头动向(原挤空燃料,2026-07-04 依第五轮实证翻转:空头=聪明钱) */}
         {snap.squeeze?.short_z != null && (
-          <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
+          <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
             <div className="flex items-center justify-between mb-3">
               <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
                 🩳 空头动向
@@ -1109,6 +1155,9 @@ export default function Dashboard() {
           </div>
         )}
       </section>
+
+        </div>
+      </details>
 
       {/* ══ 4.8 恐慌深坑报警器 — 跌20%于20日高抄底(纸面测量,策略动物园胜率冠军但未验证) ═══ */}
       {snap.dip_buy && (
@@ -1146,30 +1195,12 @@ export default function Dashboard() {
 
       {/* ══ 4.85 冠军策略陪跑 — 35套动物园前两名的实时纸面成绩(测量,不进决策) ═══ */}
       {snap.champs && (
-        <section className="bg-white rounded-2xl border border-[#EDEDF0] p-4">
+        <section className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-4">
           <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
-              🏁 冠军策略陪跑(纸面)
+              🐎 策略马厩 — 7 套策略的实盘模拟(每套虚拟 $1000)
             </span>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-              snap.champs.risk_on ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
-              大盘 QQQ50 {snap.champs.risk_on ? "✅ 顺风" : "🔴 逆风(两策略均空仓等)"}
-            </span>
-          </div>
-          {/* 每天30秒 · 四条军规(47套回测的最终提炼,数字全实时)— 详见 mining.md */}
-          <div className="mb-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[12px] leading-snug">
-            <div className="bg-[#F6F6F8] rounded-lg px-2.5 py-1.5">
-              <b>① 红绿灯</b>:大盘{snap.champs.risk_on ? "✅ 顺风 → 可玩" : "🔴 逆风 → 清仓等,别买任何东西"}
-            </div>
-            <div className="bg-[#F6F6F8] rounded-lg px-2.5 py-1.5">
-              <b>② 买</b>:跌到 5日新低 <b className="font-mono">${snap.champs.swing.lo5.toFixed(2)}</b> 才买,永不追涨
-            </div>
-            <div className="bg-[#F6F6F8] rounded-lg px-2.5 py-1.5">
-              <b>③ 卖</b>:弹回 5日新高 <b className="font-mono">${(snap.champs.swing.open?.hi5 ?? snap.champs.swing.hi5).toFixed(2)}</b> 就卖,最多拿 10 天
-            </div>
-            <div className="bg-[#F6F6F8] rounded-lg px-2.5 py-1.5">
-              <b>④ 量</b>:投机仓最多 <b className="font-mono">{((snap.regime?.vol_target?.position_pct ?? snap.champs.vt_pct) * 100).toFixed(0)}%</b>(波动率目标),其余现金
-            </div>
+            <span className="text-[10px] text-gray-400">谁真赚钱,数字说话</span>
           </div>
           <div className="space-y-2 text-sm leading-relaxed">
             {/* ① QQQ50 × 波动率目标:虚拟净值 vs 死拿 */}
@@ -1262,16 +1293,39 @@ export default function Dashboard() {
                 </span>
               </div>
             )}
+            {/* ⑦ 特调双腿(用户自创,第十轮新增) */}
+            {snap.champs.tj && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-[#FAFAFB] rounded-lg px-3 py-2">
+                <span className="text-xs font-semibold text-gray-700">🎯 特调双腿(你的作品)</span>
+                {snap.champs.tj.open ? (
+                  <span className="text-emerald-700">
+                    持仓中:{snap.champs.tj.open.entry_date} 抄底 ${snap.champs.tj.open.entry.toFixed(2)} →
+                    现 {(snap.champs.tj.unreal ?? 0) >= 0 ? "+" : ""}{(((snap.champs.tj.unreal ?? 0) / 1000) * 100).toFixed(1)}%
+                    · 等止盈/破位信号离场
+                  </span>
+                ) : snap.champs.tj.sig?.buy_base ? (
+                  <span className="text-amber-700 font-semibold">⚡ 抄底建仓触发!(明日开虚拟仓)</span>
+                ) : (
+                  <span className="text-gray-600">
+                    等待 · 快%R {snap.champs.tj.sig?.fast ?? "?"} / 慢%R {snap.champs.tj.sig?.slow ?? "?"}(快线上穿-80 且慢线弱才买)
+                  </span>
+                )}
+                <span className="ml-auto text-[11px] text-gray-400">
+                  战绩 {snap.champs.tj.n_win}/{snap.champs.tj.n_closed}
+                  · 落袋 {snap.champs.tj.realized >= 0 ? "+" : ""}${snap.champs.tj.realized.toFixed(0)}
+                </span>
+              </div>
+            )}
           </div>
           <div className="mt-2 text-[10px] text-gray-400">
-            回测出身:🥇近1年+113%/-40% · 🥈胜率72% · BTC +120%/-20% · CLV +189%/-18% · veto +176%/-22% · QTUM +228%/-19%(199套八轮),多重比较折扣照打 —— 纯纸面陪跑,不进决策;跑赢真实记录才算数
+            回测出身(近1年/最大回撤):🥇+113%/-40% · 🥈胜率72% · BTC +120%/-20% · CLV +189%/-18% · veto +176%/-22% · QTUM +228%/-19% · 🎯抄底腿5天+17.4%(254套十轮)—— 纯纸面陪跑,不进决策;跑赢真实记录才算数
           </div>
         </section>
       )}
 
       {/* ══ 4.9 AI 系统自检 — 决策模型以审计者身份报告的数据问题/改进建议(给维护者) ═══ */}
       {(d?.system_notes?.length ?? 0) > 0 && (
-        <section className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
+        <section className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
               🔬 AI 系统自检 · 今日发现
@@ -1297,7 +1351,7 @@ export default function Dashboard() {
 
       {/* ══ 5. 今日要闻 + 60日小图 ═══════════════════════════════════════ */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white rounded-2xl border border-[#EDEDF0] p-5">
+        <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
           <div className="text-xs font-semibold text-[#525461] uppercase tracking-wider mb-3">
             📰 今日要闻
           </div>

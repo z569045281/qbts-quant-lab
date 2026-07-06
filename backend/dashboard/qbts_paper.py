@@ -15,6 +15,10 @@ QBTS 冠军策略陪跑(纸面测量)—— 2026-07-03 两轮策略动物园(35 
      收盘收在当日区间上部(>0.3)且 QQQ50 顺风 → 按波目敞口持明天,否则空仓。
      回测:近1年 +189% / 回撤 -18%,阈值 0/0.3/0.6 全稳、成本加倍仍 +162%;
      弱点:前半段仅 +47%,偏近期 regime(吃 1d 延续 DNA)。
+  ⑦ 特调双腿(2026-07-06 第十轮新增,用户自创)—— 事件式台账(同 ② 的状态机):
+     「抄底建仓」触发(快%R上穿-80且慢<-50)→ $1000 虚拟买入;「止盈减仓」触发
+     (快下穿-20且慢≥-20)→ 止盈离场;「破位清仓」(快下穿-50且慢<-20)→ 保险丝
+     离场。回测:进场腿 n=15 后5天 +17.4%(十轮最强);离场腿真能标顶。
   ⑤ 配对超涨 veto(2026-07-04 第八轮新增)—— QQQ50×波目 照常,但 QBTS 对
      IONQ 的 log 价差 40日 z>1(贵出 1σ)时清仓等。回测:近1年 +176% /
      回撤 -22%,z 阈值 1.0/1.5/2.0 全部改善;与榜首配对同结构反用。
@@ -256,6 +260,30 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
                 bt["btc_green"] = btc_green
                 st["btc"] = bt
 
+            # ── ⑦ 特调双腿 事件式台账 ──
+            from dashboard.tiaojiu import compute_signals
+            ts = compute_signals(d)
+            if ts is not None:
+                tj = st.get("tj") or {"open": None, "closed": []}
+                pos_t = tj.get("open")
+                if pos_t:
+                    reason = ("止盈减仓" if ts["sell_trim"]
+                              else "破位清仓" if ts["sell_clear"] else None)
+                    if reason:
+                        pnl = pos_t["shares"] * close * (1 - _COST) - _USD
+                        tj["closed"] = (tj.get("closed") or [])[-49:] + [{
+                            "entry_date": pos_t["entry_date"], "entry": pos_t["entry"],
+                            "exit_date": today, "exit": round(close, 2),
+                            "reason": reason, "pnl": round(pnl, 2),
+                            "pnl_pct": round(pnl / _USD, 4)}]
+                        tj["open"] = None
+                elif ts["buy_base"]:
+                    tj["open"] = {"entry_date": today, "entry": round(close, 2),
+                                  "shares": round(_USD * (1 - _COST) / close, 4)}
+                tj["sig"] = {k: ts[k] for k in ("fast", "slow", "buy_base",
+                                                "sell_trim", "sell_clear")}
+                st["tj"] = tj
+
             # ── ⑤ 配对超涨 veto:QBTS 比 IONQ 贵 1σ 时清仓 ──
             z40 = _ionq_z40(c)
             if z40 is not None:
@@ -301,6 +329,15 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
                 "btc_green": bt.get("btc_green"),
                 "ret_pct": round(bt["nav"] / _USD - 1, 4),
             } if (bt := st.get("btc")) else None),
+            "tj": ({
+                "open": tjx.get("open"),
+                "sig": tjx.get("sig"),
+                "n_closed": len(tjx.get("closed") or []),
+                "n_win": sum(1 for t in (tjx.get("closed") or []) if t["pnl"] > 0),
+                "realized": round(sum(t["pnl"] for t in (tjx.get("closed") or [])), 2),
+                "unreal": (round(tjx["open"]["shares"] * close * (1 - _COST) - _USD, 2)
+                           if tjx.get("open") else None),
+            } if (tjx := st.get("tj")) else None),
             "veto": ({
                 "nav": round(vx["nav"], 2),
                 "start_date": vx["start_date"],

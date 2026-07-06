@@ -227,6 +227,13 @@ export interface Champs {
     nav: number; start_date: string; exposure: number;
     qtum_green?: boolean | null; ret_pct: number;
   } | null;
+  tj?: {                           // ⑦ 特调双腿 事件式台账(第十轮,用户自创)
+    open?: { entry_date: string; entry: number; shares: number } | null;
+    sig?: { fast: number; slow: number; buy_base: boolean;
+            sell_trim: boolean; sell_clear: boolean } | null;
+    n_closed: number; n_win: number; realized: number;
+    unreal?: number | null;
+  } | null;
   swing: {                         // ② 5日swing×QQQ50 状态机
     lo5: number; hi5: number; close: number; would_trigger: boolean;
     open?: { entry_date: string; entry: number; days: number;

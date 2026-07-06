@@ -74,6 +74,15 @@ def quote_handler(event, context):
             payload["btc_weekend"] = bw
     except Exception as e:
         print(f"! btc_weekend skipped: {type(e).__name__}: {e}")
+
+    # 特调双腿(收盘后 16:05 起每日一算,触发→ntfy;date 标记去重)。
+    try:
+        from dashboard.tiaojiu import maybe_tiaojiu_push
+        tj = maybe_tiaojiu_push(prev_data.get("tiaojiu"), now_et)
+        if tj:
+            payload["tiaojiu"] = tj
+    except Exception as e:
+        print(f"! tiaojiu skipped: {type(e).__name__}: {e}")
     recompute = payload.get("session") in ("pre", "regular", "post") and now_et.minute % 5 == 0
     if recompute:
         try:

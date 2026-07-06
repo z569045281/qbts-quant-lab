@@ -77,3 +77,4 @@ Format (newest at top):
 - [done] 2026-07-04 · veto-qtum-horses · 第五六匹纸面马:配对超涨veto + QTUM昨日绿(v1.13) · files: backend/dashboard/qbts_paper.py, frontend/app/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, mining.md
 - [done] 2026-07-06 · mining-round9 · 第九轮 %R Trend Exhaustion 专题(30 变体):日线信号稀但带骑乘吃到两波大涨,1h ▼破裂=唯一显著离场腿 · files: mining.md
 - [done] 2026-07-06 · mining-round10 · 用户自改版特调指标审判(25 变体):抄底腿=十轮最强进场信号,止盈腿真能标顶,总账输在资金利用率 · files: mining.md
+- [done] 2026-07-06 · v2.0-redesign · 特调双腿(⑦马+ntfy) + 决策提示词重写(十轮验证分层) + 页面iOS风重构 · files: backend/dashboard/tiaojiu.py(new), backend/dashboard/qbts_paper.py, backend/dashboard/decision.py, aws/lambda_handlers.py, frontend/app/page.tsx, frontend/app/layout.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, mining.md
