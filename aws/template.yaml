@@ -114,6 +114,15 @@ Resources:
             ScheduleExpression: "cron(* 4-19 ? * MON-FRI *)"  # 04:00–19:59 ET
             ScheduleExpressionTimezone: America/New_York
             Description: Push QBTS/QBTX/QBTZ quotes every minute (pre+regular+post).
+        SundayNightBtc:
+          Type: ScheduleV2
+          Properties:
+            # 周日 20:00 ET = 美股夜盘开门 = BTC 周日 UTC 线定案 → 周末BTC信号
+            # 最早可推时刻(墨尔本周一上午 ~10 点)。分钟取 1/10 避开 %5==0
+            # 的 SMC 重算分支。
+            ScheduleExpression: "cron(1/10 20-23 ? * SUN *)"
+            ScheduleExpressionTimezone: America/New_York
+            Description: Weekend-BTC signal at US overnight-session open (Sun 20:00 ET).
 
 Outputs:
   PublishUrl:

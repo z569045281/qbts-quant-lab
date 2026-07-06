@@ -81,3 +81,4 @@ Format (newest at top):
 - [done] 2026-07-06 · mining-round11-freeze · 第十一轮姐妹票交叉验证(27变体)+ 冻结令生效(至2026-08-15) · files: mining.md
 - [done] 2026-07-06 · mining-round12 · 用户实战组合审计(NW×特调,10变体):重绘欺骗81- [done] 2026-07-06 · mining-round12 · 用户实战组合审计(NW×特调,10变体):重绘欺骗81%量化,NW底部区=负alpha,特调进+NW顶出5/5 · files: mining.md
 - [done] 2026-07-06 · heartbeat+cap · 每日收盘心跳推送(无信号=低优先级摘要,缺席=系统故障)+ 军规卡⓪总闸(投机仓≤总资产10%)(v2.0.1) · files: backend/dashboard/tiaojiu.py, frontend/app/page.tsx, frontend/public/version.json
+2026-07-06 15:41 [session-btc-early] 周末BTC推送提前到周日20:00 ET(夜盘开门/墨尔本周一上午10点): backend/dashboard/btc_weekend.py + aws/template.yaml(SundayNightBtc调度) + page.tsx横幅文案 + version 2.0.2 [done]

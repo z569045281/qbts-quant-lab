@@ -245,7 +245,7 @@ export default function Dashboard() {
       {/* ══ 控制台：出决策 / 实时报价按钮（仅本地后端可达时显示）═══════════ */}
       <ControlPanel onPublished={refresh} />
 
-      {/* ══ 0-. 周一开盘·周末BTC 信号(仅周一显示;第七轮实证,验证期)═══════ */}
+      {/* ══ 0-. 周一开盘·周末BTC 信号(周日夜盘 20:00 ET 起显示;第七轮实证)══ */}
       {live?.btc_weekend && (
         <div className={`rounded-xl px-5 py-3.5 flex items-start gap-3 shadow-sm border ${
           live.btc_weekend.green
@@ -254,10 +254,10 @@ export default function Dashboard() {
           <div className="text-sm leading-relaxed">
             <span className="font-bold">周一开盘信号 · 周末 BTC {(live.btc_weekend.weekend_ret * 100) >= 0 ? "+" : ""}{(live.btc_weekend.weekend_ret * 100).toFixed(1)}%</span>
             {live.btc_weekend.green ? (
-              <span className="text-emerald-800"> 🟢 → 开盘买、收盘卖(QBTX 亦可,1天衰减忽略)。
-                回测近1年此信号周一日内均值 +2.9%、胜率 60%</span>
+              <span className="text-emerald-800"> 🟢 → 夜盘/盘前可先建仓(QBTS 现货限价单,点差大勿追),或开盘买 QBTX;周一收盘前全部卖出,不过夜。
+                回测:开→收 +2.9%、胜率 60%;收→收含跳空 +3.9%</span>
             ) : (
-              <span className="text-red-800"> 🔴 → 今天开盘不做多(历史此情形周一日内均值 −3.0%)</span>
+              <span className="text-red-800"> 🔴 → 周一不做多,夜盘也不(历史此情形周一日内均值 −3.0%)</span>
             )}
             <span className="text-gray-400 text-xs"> · n=55 验证期,小仓 · 已推送{live.btc_weekend.pushed ? "✅" : "…"}</span>
           </div>
