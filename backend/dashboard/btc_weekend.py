@@ -22,6 +22,7 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 _NIGHT_OPEN_HOUR_ET = 20   # 周日 20:00 ET = 美股夜盘开门 = BTC 周日 UTC 线定案
+_CLOSE_HOUR_ET = 16        # 周一 16:00 ET 收盘 = 日内单窗口关闭 = 信号过期
 
 
 def _compute(now_et: datetime, friday, live_fallback: bool = False) -> dict | None:
@@ -70,7 +71,7 @@ def weekend_signal(now_et: "datetime | None" = None) -> dict | None:
     wd = now_et.weekday()
     if wd == 6 and now_et.hour >= _NIGHT_OPEN_HOUR_ET:
         friday = (now_et - timedelta(days=2)).date()
-    elif wd == 0:
+    elif wd == 0 and now_et.hour < _CLOSE_HOUR_ET:   # 周一收盘后信号过期(日内单已结束)
         friday = (now_et - timedelta(days=3)).date()
     else:
         return None
@@ -89,7 +90,7 @@ def maybe_btc_weekend(prev: dict | None, now_et: datetime) -> dict | None:
         if now_et.hour < _NIGHT_OPEN_HOUR_ET:
             return None
         friday = (now_et - timedelta(days=2)).date()
-    elif wd == 0:                                 # 周一:carry / 补算
+    elif wd == 0 and now_et.hour < _CLOSE_HOUR_ET:  # 周一 carry/补算,收盘后过期
         friday = (now_et - timedelta(days=3)).date()
     else:
         return None

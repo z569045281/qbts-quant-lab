@@ -86,3 +86,4 @@ Format (newest at top):
 2026-07-06 15:41 [session-btc-early] 周末BTC推送提前到周日20:00 ET(夜盘开门/墨尔本周一上午10点): backend/dashboard/btc_weekend.py + aws/template.yaml(SundayNightBtc调度) + page.tsx横幅文案 + version 2.0.2 [done]
 2026-07-06 16:18 [session-btc-early] 第十三轮(冻结豁免纯研究): 周一信号深挖+空头终审 → mining.md [done]
 2026-07-06 16:37 [session-btc-early] 会话交接归档: mining.md(实盘案例/彩票日审计/v2.0.2/交接检查点) + 记忆库更新 [done]
+2026-07-07 12:53 [opus] 修AI自检#1数据问题: 周末BTC信号周一16:00 ET收盘后过期(日内单窗口关闭): btc_weekend.py [done]
