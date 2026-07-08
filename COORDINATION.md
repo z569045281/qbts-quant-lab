@@ -87,3 +87,4 @@ Format (newest at top):
 2026-07-06 16:18 [session-btc-early] 第十三轮(冻结豁免纯研究): 周一信号深挖+空头终审 → mining.md [done]
 2026-07-06 16:37 [session-btc-early] 会话交接归档: mining.md(实盘案例/彩票日审计/v2.0.2/交接检查点) + 记忆库更新 [done]
 2026-07-07 12:53 [opus] 修AI自检#1数据问题: 周末BTC信号周一16:00 ET收盘后过期(日内单窗口关闭): btc_weekend.py [done]
+2026-07-08 11:37 [fable] 进阶分析抽屉开关改成显眼的 iOS 蓝色按钮(展开深挖/收起): page.tsx + version 2.0.3 [done]

@@ -656,11 +656,15 @@ export default function Dashboard() {
 
       {/* ══ 🔬 进阶分析抽屉 — 结构/宏观等技术细节,小白可整块跳过(AI 决策已替你读过) ═══ */}
       <details className="group">
-        <summary className="cursor-pointer list-none bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] px-5 py-4 flex items-center justify-between select-none">
-          <span className="text-sm font-semibold text-[#525461]">🔬 进阶分析(SMC 结构 · 宏观日历 · 技术细节)</span>
-          <span className="text-[11px] text-gray-400">
-            上面的决策已替你读过这些 · 想深挖再点开
-            <span className="ml-2 inline-block transition-transform group-open:rotate-90">›</span>
+        <summary className="cursor-pointer list-none bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] px-5 py-4 flex items-center justify-between gap-3 select-none">
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-[#525461]">🔬 进阶分析(SMC 结构 · 宏观日历 · 技术细节)</span>
+            <span className="block text-[11px] text-gray-400 mt-0.5">上面的决策已替你读过这些 · 想深挖再展开</span>
+          </span>
+          <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#007AFF] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_1px_3px_rgba(0,122,255,0.4)] transition-opacity active:opacity-70 group-open:bg-[#E5E5EA] group-open:text-[#525461] group-open:shadow-none">
+            <span className="group-open:hidden">展开深挖</span>
+            <span className="hidden group-open:inline">收起</span>
+            <span className="inline-block transition-transform group-open:rotate-90">›</span>
           </span>
         </summary>
         <div className="mt-4 space-y-4">
