@@ -1020,6 +1020,13 @@ async def dashboard_snapshot(force_refresh: bool = False):
     except Exception as e:
         user_positions = []
         logger.warning(f"user positions load failed: {e}")
+    try:
+        # 🏇 策略战绩复算(/factors 页;按 bar 日期文件缓存,每交易日只算一次)
+        from dashboard.replay import compute_replay
+        strategy_replay = await asyncio.to_thread(compute_replay, df_d)
+    except Exception as e:
+        strategy_replay = None
+        logger.warning(f"strategy replay failed: {e}")
     payload["options"]        = opt_sig
     payload["intraday"]       = intr_sig
     payload["sentiment"]      = sentiment_sig
@@ -1036,6 +1043,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["squeeze"]        = squeeze
     payload["journal"]        = journal
     payload["user_positions"] = user_positions
+    payload["strategy_replay"] = strategy_replay
 
     # ── Source status map: tells the UI which signals are active/inactive/error
     # so the user knows when something needs setup (e.g. Reddit OAuth missing). ─

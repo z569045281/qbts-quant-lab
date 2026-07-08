@@ -59,6 +59,7 @@ export interface Snapshot {
   };
   etf_prices: { qbtx: number | null; qbtz: number | null };
   user_positions?: UserPosition[];   // 💼 实盘持仓(发布时的快照;编辑后以 POST 响应为准)
+  strategy_replay?: StrategyReplay | null;  // 🏇 策略战绩页(/factors)的复算数据
   edge?: {
     signal:              -1 | 0 | 1;
     label:               "BUY" | "SELL" | "HOLD";
@@ -423,6 +424,36 @@ export interface PositionAdvice {
   ticker: string;
   advice: "持有" | "加仓" | "减仓" | "清仓";
   reason: string;
+}
+
+/* ── 🏇 策略战绩复算(/factors 页) ─────────────────────────────────────────── */
+export interface ReplayTrade {
+  buy_date:  string;
+  buy_px:    number;
+  open:      boolean;
+  sell_date?: string;
+  sell_px?:   number;
+  days:      number;
+  ret:       number;    // 段收益(NAV 口径,含仓位与成本)
+}
+export interface ReplayStrategy {
+  key:   string;
+  name:  string;
+  emoji: string;
+  rule:  string;
+  stats: { ret_full: number; ret_1y: number; max_dd: number;
+           n_trades: number; n_wins: number; win_rate: number | null };
+  current: { in_market: boolean; exposure: number;
+             since?: string; entry_px?: number; unreal?: number; z40?: number | null };
+  trades: ReplayTrade[];
+  n_trades_total: number;
+}
+export interface StrategyReplay {
+  generated_at: string;
+  as_of:        string;
+  window_start: string;
+  bh:           { ret_full: number; ret_1y: number; max_dd: number };
+  strategies:   ReplayStrategy[];
 }
 
 /* ── /dashboard/calibration payload ──────────────────────────────────────── */

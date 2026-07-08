@@ -89,3 +89,4 @@ Format (newest at top):
 2026-07-07 12:53 [opus] 修AI自检#1数据问题: 周末BTC信号周一16:00 ET收盘后过期(日内单窗口关闭): btc_weekend.py [done]
 2026-07-08 11:37 [fable] 进阶分析抽屉开关改成显眼的 iOS 蓝色按钮(展开深挖/收起): page.tsx + version 2.0.3 [done]
 2026-07-08 11:55 [fable] 💼当前持仓功能: positions.py + pos_*动作(api.py/lambda) + decision position_advice(schema+规则16+持仓段) + PositionsCard + v2.1.0 [done]
+2026-07-08 16:42 [fable] /factors 改造为🏇策略战绩页: replay.py 七马全历史复算(买卖点/收益/当前状态) + 页面重写 + nav改名 + v2.2.0 [done]

@@ -1,252 +1,127 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
-import type { IChartApi, CandlestickData, SeriesMarker, Time } from "lightweight-charts";
-import { getFactors, type FactorRow, type ChartData } from "../_lib/data";
+/* 🏇 策略战绩 — 2026-07-08 起替代因子排行榜(因子挖矿已归档,mining.md 是档案)。
+ * 七套验证过的模型在全部历史(~2年)上的规则复算:买卖点位、整体收益、当前状态。
+ * 数据由后端 dashboard/replay.py 在每日发布时算好,随 snapshot 下发。 */
 
-/* ── helpers ── */
-function fmt(n: number | undefined, pct = false) {
-  if (typeof n !== "number" || isNaN(n)) return "—";
-  return pct ? `${(n * 100).toFixed(1)}%` : n.toFixed(3);
-}
-const winColor = (v: number | undefined) =>
-  typeof v !== "number" ? "text-gray-400"
-  : v > 0.55 ? "text-emerald-600" : v > 0.45 ? "text-amber-500" : "text-red-500";
-const ddColor = (v: number | undefined) =>
-  typeof v !== "number" ? "text-gray-400"
-  : v > -0.2 ? "text-emerald-600" : v > -0.4 ? "text-amber-500" : "text-red-500";
+import { useEffect, useState } from "react";
+import { getSnapshot, type StrategyReplay, type ReplayStrategy } from "../_lib/data";
 
-/* ── Factor chart rendered from stored data (no backend) ── */
-function FactorChartStatic({ data }: { data: ChartData }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const chartRef     = useRef<IChartApi | null>(null);
-  const [error, setError] = useState<string | null>(null);
+const pct = (v: number | null | undefined, digits = 0) =>
+  typeof v === "number" && !isNaN(v) ? `${v >= 0 ? "+" : ""}${(v * 100).toFixed(digits)}%` : "—";
+const retColor = (v: number) => (v >= 0 ? "text-emerald-600" : "text-red-600");
 
-  useEffect(() => {
-    let cancelled = false;
-    let chart: IChartApi | null = null;
-    let ro: ResizeObserver | null = null;
-
-    async function init() {
-      try {
-        const { createChart } = await import("lightweight-charts");
-        if (cancelled || !containerRef.current) return;
-
-        chart = createChart(containerRef.current, {
-          width:  containerRef.current.clientWidth,
-          height: 420,
-          layout: { background: { color: "#ffffff" }, textColor: "#525461" },
-          grid:   { vertLines: { color: "#EDEDF0" }, horzLines: { color: "#EDEDF0" } },
-          crosshair: { mode: 1 },
-          rightPriceScale: { borderColor: "#EDEDF0" },
-          timeScale: { borderColor: "#EDEDF0", timeVisible: true, secondsVisible: false },
-        });
-        chartRef.current = chart;
-
-        const candles = chart.addCandlestickSeries({
-          upColor: "#22c55e", downColor: "#F03A3E",
-          borderUpColor: "#22c55e", borderDownColor: "#F03A3E",
-          wickUpColor: "#22c55e", wickDownColor: "#F03A3E",
-        });
-        candles.setData(
-          data.ohlcv.map(b => ({ ...b, time: b.time as Time })) as CandlestickData[]
-        );
-
-        const markers: SeriesMarker<Time>[] = data.markers.map(m => ({
-          time:     m.time as Time,
-          position: m.signal === 1 ? "belowBar" : "aboveBar",
-          color:    m.signal === 1 ? "#006FFF"  : "#F03A3E",
-          shape:    m.signal === 1 ? "arrowUp"  : "arrowDown",
-          text:     m.signal === 1 ? "B"        : "S",
-          size:     1,
-        }));
-        const splitBar = data.ohlcv.reduce((nearest, bar) =>
-          Math.abs(bar.time - data.split_time) < Math.abs(nearest.time - data.split_time)
-            ? bar : nearest,
-          data.ohlcv[0]
-        );
-        const allMarkers: SeriesMarker<Time>[] = [
-          ...markers,
-          { time: splitBar?.time as Time, position: "aboveBar" as const,
-            color: "#f59e0b", shape: "circle" as const, text: "OOS", size: 0 },
-        ].filter(m => m.time != null).sort((a, b) => (a.time as number) - (b.time as number));
-        candles.setMarkers(allMarkers);
-
-        chart.timeScale().fitContent();
-
-        ro = new ResizeObserver(() => {
-          if (containerRef.current && chartRef.current) {
-            chartRef.current.applyOptions({ width: containerRef.current.clientWidth });
-          }
-        });
-        ro.observe(containerRef.current);
-      } catch (e: unknown) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "图表渲染失败");
-      }
-    }
-
-    init();
-    return () => {
-      cancelled = true;
-      ro?.disconnect();
-      ro = null;
-      chartRef.current = null;
-      chart?.remove();
-    };
-  }, [data]);
-
+function StrategyCard({ s }: { s: ReplayStrategy }) {
+  const [showAll, setShowAll] = useState(false);
+  const trades = showAll ? s.trades : s.trades.slice(0, 5);
+  const st = s.stats, cur = s.current;
   return (
-    <div className="border-t-2 border-[#006FFF] bg-white">
-      <div className="px-5 py-2.5 border-b border-[#EDEDF0] text-xs text-[#525461]">
-        橙色圈 = IS/OOS 分割点 &nbsp;·&nbsp;
-        <span className="text-[#006FFF] font-medium">▲ 蓝色 = 买入</span> &nbsp;·&nbsp;
-        <span className="text-[#F03A3E] font-medium">▼ 红色 = 卖出</span>
+    <section className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+      {/* 名称 + 当前状态 */}
+      <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+        <span className="text-sm font-bold text-[#1C1C1E]">{s.emoji} {s.name}</span>
+        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
+          cur.in_market ? "bg-emerald-100 text-emerald-700" : "bg-[#F2F2F7] text-gray-500"}`}>
+          {cur.in_market
+            ? `在场 ${(cur.exposure * 100).toFixed(0)}%${cur.since ? ` · ${cur.since} 入 $${cur.entry_px?.toFixed(2)} · 浮 ${pct(cur.unreal, 1)}` : ""}`
+            : "空仓等待"}
+        </span>
       </div>
-      {error
-        ? <div className="py-16 text-center text-[#F03A3E] text-sm">{error}</div>
-        : <div ref={containerRef} className="w-full" />}
-    </div>
+      <p className="text-[12px] text-gray-400 leading-relaxed mb-3">{s.rule}</p>
+
+      {/* 整体收益 */}
+      <div className="grid grid-cols-5 gap-1.5 text-center mb-3">
+        {([
+          ["全期(2年)", pct(st.ret_full), retColor(st.ret_full)],
+          ["近1年", pct(st.ret_1y), retColor(st.ret_1y)],
+          ["最大回撤", pct(st.max_dd), "text-amber-600"],
+          ["交易段", `${st.n_trades}`, "text-[#525461]"],
+          ["段胜率", st.win_rate != null ? `${(st.win_rate * 100).toFixed(0)}%` : "—",
+           st.win_rate != null && st.win_rate >= 0.5 ? "text-emerald-600" : "text-red-500"],
+        ] as [string, string, string][]).map(([label, val, color]) => (
+          <div key={label} className="bg-[#F6F6F8] rounded-xl px-1 py-2">
+            <div className="text-[10px] text-gray-400">{label}</div>
+            <div className={`text-[13px] font-bold font-mono ${color}`}>{val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 历史买卖点位 */}
+      {s.trades.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-[12px]">
+            <thead>
+              <tr className="text-[10px] text-gray-400 text-left">
+                <th className="py-1 font-normal">买入</th>
+                <th className="py-1 font-normal">卖出</th>
+                <th className="py-1 font-normal text-right">天数</th>
+                <th className="py-1 font-normal text-right">段收益</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trades.map(t => (
+                <tr key={t.buy_date} className={`border-t border-[#F2F2F7] ${t.open ? "bg-emerald-50/60" : ""}`}>
+                  <td className="py-1.5 font-mono whitespace-nowrap">{t.buy_date} <span className="text-gray-400">@</span> ${t.buy_px.toFixed(2)}</td>
+                  <td className="py-1.5 font-mono whitespace-nowrap">
+                    {t.open
+                      ? <span className="text-emerald-700 font-semibold">持仓中</span>
+                      : <>{t.sell_date} <span className="text-gray-400">@</span> ${t.sell_px?.toFixed(2)}</>}
+                  </td>
+                  <td className="py-1.5 text-right font-mono text-gray-500">{t.days}</td>
+                  <td className={`py-1.5 text-right font-mono font-semibold ${retColor(t.ret)}`}>{pct(t.ret, 1)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {s.trades.length > 5 && (
+            <button onClick={() => setShowAll(!showAll)}
+              className="mt-1.5 text-[11px] text-[#007AFF] font-semibold">
+              {showAll ? "收起" : `展开最近 ${s.trades.length} 段(全历史共 ${s.n_trades_total} 段)`}
+            </button>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
-export default function FactorsPage() {
-  const [factors, setFactors] = useState<FactorRow[] | null>(null);
-  const [error, setError]     = useState<string | null>(null);
-  const [openId, setOpenId]   = useState<string | null>(null);
-  const [tab, setTab]         = useState<"chart" | "code">("chart");
+export default function StrategyRecordPage() {
+  const [replay, setReplay] = useState<StrategyReplay | null>(null);
+  const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    getFactors()
-      .then(setFactors)
-      .catch(e => setError(e instanceof Error ? e.message : "加载失败"));
+    getSnapshot()
+      .then(s => {
+        if (s.strategy_replay) setReplay(s.strategy_replay);
+        else setErr("战绩数据还没生成 — 跑一次「生成今日决策」(publish)后就有了。");
+      })
+      .catch(e => setErr(e instanceof Error ? e.message : "加载失败"));
   }, []);
 
-  if (error) {
-    return (
-      <main className="max-w-[1600px] mx-auto px-6 py-10">
-        <div className="bg-white rounded-xl border border-red-200 p-6 max-w-xl">
-          <div className="text-sm font-semibold text-[#F03A3E] mb-2">⚠️ 因子加载失败</div>
-          <pre className="text-xs font-mono text-[#525461] bg-red-50 rounded-md px-3 py-2 whitespace-pre-wrap">{error}</pre>
-        </div>
-      </main>
-    );
-  }
-  if (!factors) {
-    return (
-      <main className="max-w-[1600px] mx-auto px-6 py-10 text-sm text-[#525461]">加载因子中…</main>
-    );
-  }
-
-  const bestSharpe = factors.length ? Math.max(...factors.map(f => f.data.oos_sharpe_ratio)) : null;
-
   return (
-    <main className="max-w-[1600px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-5">
-      {/* ── Header ── */}
-      <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-lg font-bold text-gray-900">⛏️ 因子排行榜</h1>
-          <p className="text-xs text-[#525461] mt-0.5">本地挖矿、已发布的因子（只读）。点任意一行看图表与代码。</p>
-        </div>
-        <div className="flex gap-6 text-right">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-gray-500">因子数</div>
-            <div className="text-2xl font-bold font-mono text-gray-900">{factors.length}</div>
-          </div>
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-gray-500">最佳 OOS Sharpe</div>
-            <div className="text-2xl font-bold font-mono text-emerald-600">
-              {bestSharpe != null ? bestSharpe.toFixed(2) : "—"}
-            </div>
-          </div>
-        </div>
-      </section>
+    <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+      <div>
+        <h1 className="text-xl font-bold text-[#1C1C1E]">🏇 策略战绩</h1>
+        <p className="text-[12px] text-gray-400 mt-1">
+          七套验证模型的全历史规则复算 —— 过去每一次买卖点位、整体收益、当前状态。
+          {replay && <> 数据截至 <b>{replay.as_of}</b> · 窗口 {replay.window_start} 起 · 死拿对照:全期 {pct(replay.bh.ret_full)} / 近1年 {pct(replay.bh.ret_1y)} / 回撤 {pct(replay.bh.max_dd)}</>}
+        </p>
+      </div>
 
-      {/* ── Table ── */}
-      <section className="bg-white rounded-xl border border-[#EDEDF0] overflow-hidden">
-        {factors.length === 0 ? (
-          <div className="px-5 py-16 text-center text-sm text-gray-400">
-            还没有发布的因子 — 在本地挖矿后运行 <code className="font-mono">publish.py</code>。
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-[#EDEDF0]">
-                  <th className="text-left  px-4 py-2.5 font-medium">因子</th>
-                  <th className="text-center px-3 py-2.5 font-medium">类型</th>
-                  <th className="text-right px-3 py-2.5 font-medium">Score</th>
-                  <th className="text-right px-3 py-2.5 font-medium">OOS Sharpe</th>
-                  <th className="text-right px-3 py-2.5 font-medium">胜率</th>
-                  <th className="text-right px-3 py-2.5 font-medium">最大回撤</th>
-                  <th className="text-right px-3 py-2.5 font-medium">命中率</th>
-                  <th className="text-right px-4 py-2.5 font-medium">交易数</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#EDEDF0]">
-                {factors.map((f, idx) => {
-                  const d = f.data;
-                  const open = openId === f.id;
-                  return (
-                    <Fragment key={f.id}>
-                      <tr onClick={() => { setOpenId(open ? null : f.id); setTab("chart"); }}
-                          className={`cursor-pointer transition-colors ${open ? "bg-blue-50/60" : "hover:bg-[#F6F6F8]"}`}>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-mono text-gray-400 w-5">{idx + 1}</span>
-                            <span className="font-medium text-gray-900">{d.name}</span>
-                            {d.overfit && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200">过拟合</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-3 py-3 text-center">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded border ${
-                            d.type === "ml"
-                              ? "bg-violet-50 text-violet-700 border-violet-200"
-                              : "bg-[#F6F6F8] text-[#525461] border-[#EDEDF0]"}`}>
-                            {d.type === "ml" ? "ML" : "规则"} · {d.freq}
-                          </span>
-                        </td>
-                        <td className="px-3 py-3 text-right font-mono font-semibold text-gray-900">{fmt(d.score)}</td>
-                        <td className="px-3 py-3 text-right font-mono font-semibold text-[#006FFF]">{fmt(d.oos_sharpe_ratio)}</td>
-                        <td className={`px-3 py-3 text-right font-mono font-semibold ${winColor(d.oos_win_rate)}`}>{fmt(d.oos_win_rate, true)}</td>
-                        <td className={`px-3 py-3 text-right font-mono font-semibold ${ddColor(d.oos_max_drawdown)}`}>{fmt(d.oos_max_drawdown, true)}</td>
-                        <td className={`px-3 py-3 text-right font-mono ${winColor(d.q_hit_rate)}`}>{fmt(d.q_hit_rate, true)}</td>
-                        <td className="px-4 py-3 text-right font-mono text-[#525461]">{d.oos_n_trades ?? "—"}</td>
-                      </tr>
-                      {open && (
-                        <tr>
-                          <td colSpan={8} className="p-0">
-                            <div className="flex gap-1 px-4 pt-3 bg-white">
-                              {(["chart", "code"] as const).map(t => (
-                                <button key={t} onClick={() => setTab(t)}
-                                        className={`px-3 py-1 text-xs rounded-t-md font-medium transition-colors ${
-                                          tab === t ? "bg-[#006FFF] text-white" : "text-[#525461] hover:bg-[#F6F6F8]"}`}>
-                                  {t === "chart" ? "图表" : "代码"}
-                                </button>
-                              ))}
-                            </div>
-                            {tab === "chart"
-                              ? (f.chart
-                                  ? <FactorChartStatic data={f.chart} />
-                                  : <div className="py-12 text-center text-sm text-gray-400 border-t-2 border-[#006FFF]">无图表数据（发布时未生成）</div>)
-                              : (f.code
-                                  ? <pre className="text-[11px] leading-relaxed font-mono text-gray-800 bg-[#F6F6F8] border-t-2 border-[#006FFF] px-5 py-4 overflow-x-auto whitespace-pre">{f.code}</pre>
-                                  : <div className="py-12 text-center text-sm text-gray-400 border-t-2 border-[#006FFF]">无代码</div>)}
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+      {/* 诚实声明 */}
+      <div className="bg-amber-50 rounded-2xl px-4 py-3 text-[12px] leading-relaxed text-amber-900">
+        ⚠️ <b>这是回测复算,不是实盘记录。</b>点位按各策略规则在历史数据上重放(0.2%/边成本,收盘成交),
+        每天随新 K 线滚动更新,数字会与 mining.md 档案的冻结值有出入;首页「策略马厩」才是 7/2 起的实盘模拟台账,
+        两者起始条件不同、当前状态可能不同。全部策略统计上仍属<b>验证期</b>(冻结至 8/15,凭台账定去留)。
+        因子挖矿已归档,本页替代原因子排行榜。
+      </div>
+
+      {err && <div className="bg-white rounded-2xl px-4 py-6 text-center text-sm text-gray-400">{err}</div>}
+      {!err && !replay && <div className="bg-white rounded-2xl px-4 py-6 text-center text-sm text-gray-400">加载中…</div>}
+      {replay?.strategies.map(s => <StrategyCard key={s.key} s={s} />)}
 
       <div className="text-center text-[10px] text-gray-400">
-        因子由本地挖矿生成、经 publish.py 发布到 Supabase · 仅供研究参考，非投资建议
+        规则与回测口径见 mining.md · 仅供研究参考,非投资建议
       </div>
     </main>
   );
