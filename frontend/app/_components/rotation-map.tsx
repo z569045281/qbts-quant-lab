@@ -19,6 +19,21 @@ type QuadKey = keyof typeof QUAD;
 
 const W = 720, H = 560, PAD = 34;
 
+/* Catmull-Rom → 三次贝塞尔:把周采样折线渲染成连续的蜗牛尾曲线 */
+function smoothPath(pts: readonly (readonly [number, number])[]): string {
+  if (pts.length < 3)
+    return "M" + pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" L");
+  let d = `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)], p1 = pts[i],
+          p2 = pts[i + 1], p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    d += ` C ${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return d;
+}
+
 export function RotationMap({ data }: { data: SectorRotation }) {
   const [hover, setHover] = useState<string | null>(null);
 
@@ -110,22 +125,24 @@ export function RotationMap({ data }: { data: SectorRotation }) {
             const head = pts[pts.length - 1];
             const prev = pts[Math.max(0, pts.length - 2)];
             const ang = Math.atan2(head[1] - prev[1], head[0] - prev[0]) * 180 / Math.PI;
-            const d = "M" + pts.map(p => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" L");
+            const d = smoothPath(pts);
             const dimmed = hover !== null && hover !== s.ticker;
+            const focus = hover === s.ticker;
             const isQ = s.ticker === "QTUM";
             const lp = labelPos[s.ticker];
             return (
               <g key={s.ticker} className="rot-dim" opacity={dimmed ? 0.18 : 1}
                  onMouseEnter={() => setHover(s.ticker)} onMouseLeave={() => setHover(null)}
                  style={{ cursor: "default" }}>
-                {/* 轨迹线(描线动画) */}
+                {/* 轨迹线(描线动画;hover 加粗) */}
                 <path d={d} pathLength={100} className="rot-path" fill="none"
-                      stroke={q.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                      opacity="0.75" />
+                      stroke={q.color} strokeWidth={focus ? 2.8 : 1.8}
+                      strokeLinecap="round" strokeLinejoin="round"
+                      opacity={focus ? 0.95 : 0.55} />
                 {/* 历史采样点:越旧越淡 */}
                 {pts.slice(0, -1).map((p, i) => (
-                  <circle key={i} cx={p[0]} cy={p[1]} r="2"
-                          fill={q.color} opacity={0.12 + 0.4 * (i / pts.length)} />
+                  <circle key={i} cx={p[0]} cy={p[1]} r="1.8"
+                          fill={q.color} opacity={0.08 + 0.3 * (i / pts.length)} />
                 ))}
                 {/* 箭头头部:呼吸光晕 + 白圈点 + 三角箭头 */}
                 <circle cx={head[0]} cy={head[1]} r="9" fill={q.color} className="rot-halo" />

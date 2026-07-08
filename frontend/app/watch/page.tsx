@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  getWatchScan, postWatchAction, WATCH_EDITABLE,
-  type WatchScan, type ScanResult, type PaperSim,
+  getWatchScan, postWatchAction, getSnapshot, WATCH_EDITABLE,
+  type WatchScan, type ScanResult, type PaperSim, type SectorRotation,
 } from "../_lib/data";
 import { fmtLocalDateTime } from "../_lib/format";
+import { RotationMap } from "../_components/rotation-map";
 
 /* ─────────────────────────────────────────────────────────────────────────
    🔭 自选扫描 — 分散高波动篮子的每日买点扫描（独立于 QBTS 决策仪表盘）。
@@ -264,6 +265,7 @@ function RemoveBtn({ t, onRemove }: { t: string; onRemove: (t: string) => void }
 
 export default function WatchScanPage() {
   const [scan, setScan] = useState<WatchScan | null>(null);
+  const [rot, setRot]   = useState<SectorRotation | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);   // non-null = an edit/scan in flight
   const [input, setInput] = useState("");
@@ -273,6 +275,10 @@ export default function WatchScanPage() {
     setScan(s); setLoading(false);
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
+  // 板块轮动地图随每日 snapshot(与重扫无关,只拉一次)
+  useEffect(() => {
+    getSnapshot().then(s => setRot(s.sector_rotation ?? null)).catch(() => {});
+  }, []);
 
   const runAction = async (action: string, ticker?: string, label?: string) => {
     setBusy(label ?? "扫描中");
@@ -375,6 +381,21 @@ export default function WatchScanPage() {
             </span>
           </div>
           <p className="mt-1 text-[12px] leading-relaxed text-gray-600">{scan.market.note}</p>
+        </section>
+      )}
+
+      {/* 🧭 板块轮动地图(与复盘页同源,随每日发布刷新)*/}
+      {rot && (
+        <section className="bg-white rounded-2xl border border-[#EDEDF0] p-5 shadow-sm">
+          <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
+            <h2 className="text-sm font-semibold text-gray-800">🧭 板块轮动地图 · 钱正在往哪儿去</h2>
+            <span className="text-[10px] text-gray-400 font-mono">vs {rot.benchmark} · 截至 {rot.as_of}</span>
+          </div>
+          <p className="text-[11px] text-[#8A8A8E] mb-2 leading-relaxed">
+            自选篮子里的票大多挂在这些板块上——买点信号出现时,先看它的板块在不在右半边(顺风)。
+            尾巴=最近 8 周轨迹,箭头指向最新;⚛️ 量子板块带虚线光环。
+          </p>
+          <RotationMap data={rot} />
         </section>
       )}
 

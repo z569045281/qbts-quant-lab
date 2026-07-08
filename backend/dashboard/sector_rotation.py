@@ -2,8 +2,10 @@
 板块轮动地图(RRG 风格)—— /challenge/lessons 页的动态四象限图数据。
 
 对 15 个板块 ETF(含 ⚛️ 量子 QTUM)相对基准 SPY 计算:
-  RS-Ratio    = 100 + z63(板块/SPY 价格比)        —— 横轴:相对强度
-  RS-Momentum = 100 + z63(RS-Ratio 的 5 日变化)   —— 纵轴:相对动量
+  RS-Ratio    = EMA8(100 + z63(板块/SPY 价格比))       —— 横轴:相对强度
+  RS-Momentum = EMA8(100 + z63(RS-Ratio 的 5 日变化))  —— 纵轴:相对动量
+两条轴都过 EMA(span=8)平滑 —— 不平滑的话 5 日差分的 z 分数周周乱跳,
+轨迹是锯齿蜘蛛网而不是 RRG 该有的蜗牛尾(2026-07-08 用户反馈后加)。
 是对 JdK RS-Ratio/Momentum 的公开近似(原版口径私有),围绕 100 中心:
   右上=领涨(强且更强) 右下=转弱(强但衰减) 左下=落后 左上=转强(弱但回血)
 轨迹 = 每 5 个交易日采样一点、取最近 8 点 —— 箭头方向就是资金轮动方向。
@@ -39,6 +41,7 @@ _SECTORS: list[tuple[str, str, str]] = [
 ]
 _Z_WIN = 63          # z 窗口(一个季度)
 _MOM_LAG = 5         # 动量 = RS-Ratio 的 5 日变化
+_SMOOTH = 8          # 两条轴的 EMA span(降噪,让轨迹成蜗牛尾)
 _STEP = 5            # 轨迹采样步长(≈周)
 _TRAIL = 8           # 轨迹点数
 
@@ -71,9 +74,10 @@ def analyze_sector_rotation() -> dict | None:
                 ratio = (c / spy.reindex(c.index).ffill()).dropna()
                 mu = ratio.rolling(_Z_WIN).mean()
                 sd = ratio.rolling(_Z_WIN).std()
-                rsr = 100 + (ratio - mu) / sd
+                rsr = (100 + (ratio - mu) / sd).ewm(span=_SMOOTH, adjust=False).mean()
                 d = rsr.diff(_MOM_LAG)
-                rsm = (100 + (d - d.rolling(_Z_WIN).mean()) / d.rolling(_Z_WIN).std())
+                rsm = (100 + (d - d.rolling(_Z_WIN).mean()) / d.rolling(_Z_WIN).std()) \
+                    .ewm(span=_SMOOTH, adjust=False).mean()
                 pts = []
                 idx = list(range(len(ratio) - 1, -1, -_STEP))[:_TRAIL][::-1]
                 for i in idx:
@@ -100,8 +104,9 @@ def analyze_sector_rotation() -> dict | None:
             "benchmark": _BENCH,
             "sectors": sectors,
             "note": (f"RS=板块/SPY 价格比的 {_Z_WIN} 日 z(围绕100);动量=RS 的 "
-                     f"{_MOM_LAG} 日变化再标准化;轨迹每 {_STEP} 个交易日采样、"
-                     f"共 {_TRAIL} 点,箭头指向最新。JdK RRG 的公开近似,非官方口径。"),
+                     f"{_MOM_LAG} 日变化再标准化;双轴 EMA{_SMOOTH} 平滑;轨迹每 "
+                     f"{_STEP} 个交易日采样、共 {_TRAIL} 点,箭头指向最新。"
+                     f"JdK RRG 的公开近似,非官方口径。"),
         }
     except Exception as e:
         logger.warning(f"sector_rotation failed: {e}")
