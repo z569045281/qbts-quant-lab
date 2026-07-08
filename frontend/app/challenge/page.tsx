@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { getCryptoChallenge, type CryptoChallenge } from "../_lib/data";
 
 const money = (n: number | undefined) =>
@@ -117,6 +118,21 @@ export default function ChallengePage() {
           </div>
         </div>
       </section>
+
+      {/* ── 复盘与心法入口 ── */}
+      <Link href="/challenge/lessons"
+            className="block bg-gradient-to-r from-[#EEF4FF] to-[#F3EEFF] rounded-xl border border-blue-200
+                       px-6 py-4 hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-gray-900">🧠 复盘与心法 · 从这次挑战学到什么</div>
+            <div className="text-xs text-[#525461] mt-0.5">
+              哪些能每月照做、哪些是运气、赔率的诚实数学 —— 以及按同一套纪律,<b>今天</b>该做什么
+            </div>
+          </div>
+          <span className="text-[#006FFF] text-lg shrink-0">→</span>
+        </div>
+      </Link>
 
       {/* ── Current position ── */}
       <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4">

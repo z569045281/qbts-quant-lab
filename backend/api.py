@@ -997,6 +997,13 @@ async def dashboard_snapshot(force_refresh: bool = False):
         btc_wknd = None
         logger.warning(f"btc_weekend failed: {e}")
     try:
+        # 千元挑战「今日照做」篮子(纯读数,/challenge/lessons 页用)
+        from dashboard.challenge_basket import analyze_challenge_basket
+        chal_basket = await asyncio.to_thread(analyze_challenge_basket)
+    except Exception as e:
+        chal_basket = None
+        logger.warning(f"challenge_basket failed: {e}")
+    try:
         nw_env = await asyncio.to_thread(analyze_nw_envelope, df_d)
     except Exception as e:
         nw_env = {"active": False, "signal": 0, "rationale": f"NW 包络失败: {str(e)[:80]}"}
@@ -1038,6 +1045,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["dip_buy"]        = dip_buy
     payload["champs"]         = champs
     payload["btc_weekend"]    = btc_wknd
+    payload["challenge_basket"] = chal_basket
     payload["nw_envelope"]    = nw_env
     payload["relative_strength"] = rel_strength
     payload["squeeze"]        = squeeze

@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-07 · challenge-lessons · 千元挑战复盘页 /challenge/lessons:诚实复盘(n=2)+六条可复制纪律+今日篮子照做面板(新 backend/dashboard/challenge_basket.py 进 snapshot)+复利/赔率诚实数学;挑战页挂入口 · files: backend/dashboard/challenge_basket.py(new), backend/api.py, frontend/app/challenge/lessons/page.tsx(new), frontend/app/challenge/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json
+
 - [done] 2026-07-07 · champs-fresh-readouts · 修AI自检发现的周一失明:①analyze_champs 信号读数(BTC/QTUM/IONQ z40/CLV/特调)提出台账幂等块外每次新算(节后无新bar时更新块跳过→prompt全空)②btc_weekend 加纯计算 weekend_signal 喂进 snapshot/决策 prompt(周一一级信号) · files: backend/dashboard/qbts_paper.py, backend/dashboard/btc_weekend.py, backend/dashboard/decision.py, backend/api.py
 
 - [done]   2026-06-30 · nw-envelope · 新增 Nadaraya-Watson 包络(非重绘高斯核)作为又一机械判据。新建 backend/dashboard/nadaraya_watson.py(analyze_nw_envelope(df_d):因果单边核,不偷看未来→上/下/中轨+价格在包络内位置 pos+stance);接 scan.py 打分(贴近下轨pos≤0.12 +1 / 贴近上轨pos≥0.90 −1,与RSI同量级不一票独大)+卡片note;接 api.py snapshot(payload['nw_envelope'])+decision.py _build_user_msg 喂 QBTS 决策。阈值用用户TradingView的 88%/90%。⚠️给用户讲清LuxAlgo默认版重绘会灌水回测胜率,这里用非重绘版让它进纸面交易被真实验证 · files: backend/dashboard/nadaraya_watson.py(new), backend/dashboard/scan.py, backend/api.py, backend/dashboard/decision.py

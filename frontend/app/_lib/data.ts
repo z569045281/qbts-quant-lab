@@ -97,6 +97,7 @@ export interface Snapshot {
   regime?:            VolatilityRegime | null;
   dip_buy?:           DipBuy | null;
   champs?:            Champs | null;
+  challenge_basket?:  ChallengeBasket | null;
   nw_envelope?:       NwEnvelope | null;
   squeeze?:           ShortFlow | null;
   relative_strength?: RelativeStrength | null;
@@ -779,6 +780,22 @@ export interface CryptoChallenge {
   odds_note:    string;
   history:      string[];
   updated_at:   string;
+}
+
+/* 挑战「今日照做」篮子 —— 每日 publish 算好放进 snapshot.challenge_basket。 */
+export interface ChallengeEtf {
+  ticker: string;
+  error?: string;
+  close?: number; ma50?: number; above_50dma?: boolean;
+  week_ret?: number; mom20?: number; uptrend?: boolean;
+  tp?: number; stop?: number;
+}
+export interface ChallengeBasket {
+  as_of: string | null;
+  etfs: ChallengeEtf[];
+  pick: string | null;
+  n_qualified: number;
+  note: string;
 }
 
 /** Latest challenge state (single 'current' row; null until the bot first pushes). */
