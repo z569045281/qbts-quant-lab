@@ -782,19 +782,29 @@ export interface CryptoChallenge {
   updated_at:   string;
 }
 
-/* 挑战「今日照做」篮子 —— 每日 publish 算好放进 snapshot.challenge_basket。 */
+/* 挑战「今日照做」篮子 + 全场杠杆ETF扫描 —— 每日 publish 算好放进 snapshot.challenge_basket。 */
 export interface ChallengeEtf {
   ticker: string;
+  label?: string;          // 中文标签,如「生科 3×」(全场扫描行有)
   error?: string;
   close?: number; ma50?: number; above_50dma?: boolean;
   week_ret?: number; mom20?: number; uptrend?: boolean;
   tp?: number; stop?: number;
+  adv20?: number | null;   // 20日均成交额(美元)
+}
+export interface ChallengeMarketScan {
+  n_scanned: number;
+  n_qualified: number;
+  top: ChallengeEtf[];     // 合格者按20日动量取前N
+  pick: string | null;
+  note: string;
 }
 export interface ChallengeBasket {
   as_of: string | null;
   etfs: ChallengeEtf[];
   pick: string | null;
   n_qualified: number;
+  market?: ChallengeMarketScan | null;
   note: string;
 }
 

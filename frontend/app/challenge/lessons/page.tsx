@@ -136,50 +136,7 @@ export default function ChallengeLessonsPage() {
           <p className="text-sm text-[#525461]">篮子读数还没随每日发布生成 —— 下次 09:00 ET publish 后这里会亮起来。</p>
         ) : (
           <>
-            <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
-                <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-wider text-gray-500 border-b border-[#EDEDF0]">
-                    <th className="py-1.5 pr-3">标的</th>
-                    <th className="py-1.5 pr-3">收盘</th>
-                    <th className="py-1.5 pr-3">vs 50日线</th>
-                    <th className="py-1.5 pr-3">近一周</th>
-                    <th className="py-1.5 pr-3">20日动量</th>
-                    <th className="py-1.5">合格</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {basket.etfs.map(e => {
-                    const isPick = e.ticker === basket.pick;
-                    return (
-                      <tr key={e.ticker}
-                          className={`border-b border-[#F4F4F6] last:border-0 ${isPick ? "bg-emerald-50/60" : ""}`}>
-                        <td className="py-2 pr-3 font-mono font-semibold text-gray-900">
-                          {e.ticker}{isPick && <span className="ml-1.5 text-[10px] text-emerald-600 font-sans font-medium">今日之选</span>}
-                        </td>
-                        {e.error ? (
-                          <td colSpan={5} className="py-2 text-gray-400">{e.error}</td>
-                        ) : (
-                          <>
-                            <td className="py-2 pr-3 font-mono text-gray-700">{money(e.close)}</td>
-                            <td className={`py-2 pr-3 font-mono ${e.above_50dma ? "text-emerald-600" : "text-[#F03A3E]"}`}>
-                              {e.above_50dma ? "✓ 上方" : "✗ 下方"}
-                            </td>
-                            <td className={`py-2 pr-3 font-mono ${(e.week_ret ?? 0) >= 0 ? "text-emerald-600" : "text-[#F03A3E]"}`}>
-                              {pct(e.week_ret)}
-                            </td>
-                            <td className={`py-2 pr-3 font-mono ${(e.mom20 ?? 0) >= 0 ? "text-emerald-600" : "text-[#F03A3E]"}`}>
-                              {pct(e.mom20)}
-                            </td>
-                            <td className="py-2">{e.uptrend ? "✅" : "—"}</td>
-                          </>
-                        )}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <EtfTable rows={basket.etfs} pick={basket.pick} />
 
             {basket.pick && pickEtf ? (
               <div className="mt-3 rounded-md bg-emerald-50 border border-emerald-200 px-3 py-2.5 text-[13px] text-emerald-800">
@@ -196,6 +153,41 @@ export default function ChallengeLessonsPage() {
           </>
         )}
       </section>
+
+      {/* ── 全场扫描:同一套门槛看整个杠杆ETF宇宙 ── */}
+      {basket?.market && (
+        <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4">
+          <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
+            <h2 className="text-sm font-semibold text-gray-900">全场扫描 · 同一套门槛看整个杠杆 ETF 宇宙</h2>
+            <span className="text-[11px] text-gray-400 font-mono">
+              扫 {basket.market.n_scanned} 只 · 合格 {basket.market.n_qualified} 只
+            </span>
+          </div>
+
+          {basket.market.top.length > 0 ? (
+            <>
+              <EtfTable rows={basket.market.top} pick={basket.market.pick} showLabel />
+              {(() => {
+                const mp = basket.market.top.find(e => e.ticker === basket.market!.pick);
+                return mp ? (
+                  <div className="mt-3 rounded-md bg-blue-50 border border-blue-200 px-3 py-2.5 text-[13px] text-blue-800">
+                    全场动量之王 <b>{mp.ticker}</b>{mp.label ? `(${mp.label})` : ""}:
+                    进场参考 ≈ {money(mp.close)},TP <b>{money(mp.tp)}</b> / STOP <b>{money(mp.stop)}</b>。
+                    合格名单本身也是<b>轮动地图</b> —— 哪些板块站上 50 日线,钱就在往哪儿去。
+                  </div>
+                ) : null;
+              })()}
+            </>
+          ) : (
+            <div className="rounded-md bg-[#F6F6F8] border border-[#EDEDF0] px-3 py-2.5 text-[13px] text-[#525461]">
+              全场 {basket.market.n_scanned} 只里今天<b>零合格</b> —— 大盘级别的逆风,按纪律这个月看戏。
+            </div>
+          )}
+          <div className="mt-2.5 text-[12px] bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-amber-800 leading-relaxed">
+            ⚠️ {basket.market.note} 挑战 bot 本身仍只交易 4 只篮子。
+          </div>
+        </section>
+      )}
 
       {/* ── 诚实的数学 ── */}
       <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4">
@@ -240,5 +232,60 @@ export default function ChallengeLessonsPage() {
         纸面模拟复盘 · 今日面板为机械读数,不构成投资建议
       </div>
     </main>
+  );
+}
+
+function EtfTable({ rows, pick, showLabel }: {
+  rows: import("../../_lib/data").ChallengeEtf[];
+  pick: string | null;
+  showLabel?: boolean;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-[13px]">
+        <thead>
+          <tr className="text-left text-[11px] uppercase tracking-wider text-gray-500 border-b border-[#EDEDF0]">
+            <th className="py-1.5 pr-3">标的</th>
+            {showLabel && <th className="py-1.5 pr-3">板块</th>}
+            <th className="py-1.5 pr-3">收盘</th>
+            <th className="py-1.5 pr-3">vs 50日线</th>
+            <th className="py-1.5 pr-3">近一周</th>
+            <th className="py-1.5 pr-3">20日动量</th>
+            <th className="py-1.5">合格</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(e => {
+            const isPick = e.ticker === pick;
+            return (
+              <tr key={e.ticker}
+                  className={`border-b border-[#F4F4F6] last:border-0 ${isPick ? "bg-emerald-50/60" : ""}`}>
+                <td className="py-2 pr-3 font-mono font-semibold text-gray-900">
+                  {e.ticker}{isPick && <span className="ml-1.5 text-[10px] text-emerald-600 font-sans font-medium">之选</span>}
+                </td>
+                {showLabel && <td className="py-2 pr-3 text-gray-500 text-[12px] whitespace-nowrap">{e.label || "—"}</td>}
+                {e.error ? (
+                  <td colSpan={5} className="py-2 text-gray-400">{e.error}</td>
+                ) : (
+                  <>
+                    <td className="py-2 pr-3 font-mono text-gray-700">{money(e.close)}</td>
+                    <td className={`py-2 pr-3 font-mono ${e.above_50dma ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+                      {e.above_50dma ? "✓ 上方" : "✗ 下方"}
+                    </td>
+                    <td className={`py-2 pr-3 font-mono ${(e.week_ret ?? 0) >= 0 ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+                      {pct(e.week_ret)}
+                    </td>
+                    <td className={`py-2 pr-3 font-mono ${(e.mom20 ?? 0) >= 0 ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+                      {pct(e.mom20)}
+                    </td>
+                    <td className="py-2">{e.uptrend ? "✅" : "—"}</td>
+                  </>
+                )}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
