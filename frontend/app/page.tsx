@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MiniChart } from "./_components/mini-chart";
 import { ControlPanel } from "./_components/control-panel";
+import PositionsCard from "./_components/positions-card";
 import { RetrospectivePanel } from "./_components/retrospective-panel";
 import { getSnapshot, getLiveQuote, type Snapshot, type Decision, type LiveQuote, type LiveQuoteEntry } from "./_lib/data";
 import { fmtLocalDateTime, parseUtc, etMelbSuffix, epochMelbTime, macroSurprise } from "./_lib/format";
@@ -432,6 +433,18 @@ export default function Dashboard() {
           </div>
         </section>
       )}
+
+      {/* ══ 1.6 💼 当前持仓 — 你的真金仓位 + AI 每日逐笔操作建议 ═══════════ */}
+      <PositionsCard
+        initial={snap.user_positions ?? []}
+        prices={{
+          QBTS: liveCurrent ? liveQbts?.price : snap.price,
+          QBTX: (liveCurrent ? live?.quotes?.qbtx?.price : null) ?? snap.etf_prices?.qbtx,
+          QBTZ: (liveCurrent ? live?.quotes?.qbtz?.price : null) ?? snap.etf_prices?.qbtz,
+        }}
+        advice={d?.position_advice}
+        adviceAsOf={genAt ?? undefined}
+      />
 
       {/* 当日一致性护栏 — 今天多次生成结果反复 → 视为无明确优势 */}
       {d?.intraday_unstable && (

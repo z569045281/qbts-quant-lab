@@ -214,6 +214,8 @@ def publish_handler(event, context):
       watch_add     → add a ticker to the watchlist, then re-scan
       watch_remove  → remove a ticker, then re-scan
       rescan        → just re-run the watchlist scan
+      pos_add       → 💼 upsert a real position {ticker, qty, cost, date?}
+      pos_remove    → 💼 remove a real position {ticker}
     Returns API-Gateway-v2 response shape."""
     body = _parse_body(event)
     action = body.get("action")
@@ -235,6 +237,20 @@ def publish_handler(event, context):
             scan = scan_store.publish_scan()
             return {"statusCode": 200, "body": json.dumps(
                 {"ok": True, "n": len(scan.get("results", []))})}
+
+        if action in ("pos_add", "pos_remove"):
+            # 💼 实盘持仓编辑(AI 建议在下次生成决策时更新)
+            from dashboard import positions as upos
+            try:
+                ticker = (body.get("ticker") or "").strip().upper()
+                plist = (upos.upsert_position(ticker, body.get("qty"),
+                                              body.get("cost"), body.get("date"))
+                         if action == "pos_add" else upos.remove_position(ticker))
+                return {"statusCode": 200, "body": json.dumps(
+                    {"ok": True, "positions": plist})}
+            except (ValueError, TypeError) as e:
+                return {"statusCode": 400, "body": json.dumps(
+                    {"ok": False, "error": str(e)})}
 
         result = _publish_decision_only()
         return {"statusCode": 200, "body": json.dumps(result)}

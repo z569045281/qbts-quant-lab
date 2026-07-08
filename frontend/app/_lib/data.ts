@@ -58,6 +58,7 @@ export interface Snapshot {
     atr_14:   number;
   };
   etf_prices: { qbtx: number | null; qbtz: number | null };
+  user_positions?: UserPosition[];   // 💼 实盘持仓(发布时的快照;编辑后以 POST 响应为准)
   edge?: {
     signal:              -1 | 0 | 1;
     label:               "BUY" | "SELL" | "HOLD";
@@ -408,6 +409,20 @@ export interface Decision {
   intraday_actions?:  ("LONG_QBTX" | "SHORT_QBTZ" | "HOLD")[];  // actions seen today, in order
   model?:             string;    // which model actually produced this decision (fable-5 or fallback)
   system_notes?:      { kind: "数据问题" | "改进建议"; note: string }[];  // AI 每日自检:数据问题/改进建议(给维护者)
+  position_advice?:   PositionAdvice[];  // 💼 用户实盘持仓的逐笔操作建议
+}
+
+/* ── 💼 用户实盘持仓 ─────────────────────────────────────────────────────── */
+export interface UserPosition {
+  ticker: "QBTS" | "QBTX" | "QBTZ" | string;
+  qty:    number;
+  cost:   number;
+  date?:  string;   // 买入日 YYYY-MM-DD
+}
+export interface PositionAdvice {
+  ticker: string;
+  advice: "持有" | "加仓" | "减仓" | "清仓";
+  reason: string;
 }
 
 /* ── /dashboard/calibration payload ──────────────────────────────────────── */
@@ -757,6 +772,27 @@ export async function postWatchAction(
     });
     if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
     return await r.json();
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "请求失败" };
+  }
+}
+
+/** 💼 编辑实盘持仓。action: "pos_add"(同 ticker 覆盖更新)| "pos_remove"。
+ *  与自选编辑同一通道:云 → Lambda Function URL;本地 → FastAPI /scan/watch。 */
+export async function postPositionAction(
+  action: "pos_add" | "pos_remove",
+  p: { ticker: string; qty?: number; cost?: number; date?: string },
+): Promise<{ ok: boolean; positions?: UserPosition[]; error?: string }> {
+  const url = process.env.NEXT_PUBLIC_PUBLISH_URL || `${API}/scan/watch`;
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...p }),
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) return { ok: false, error: j?.error || `HTTP ${r.status}` };
+    return j ?? { ok: false, error: "空响应" };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "请求失败" };
   }

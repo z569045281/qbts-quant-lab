@@ -109,6 +109,13 @@ D. 执行军规（第七轮实测）：QBTX 年拖累−24%/QBTZ−34%;持有≤
    - 改进建议：这套系统当下最值得做的改进（新数据源/该删的噪声信号/流程缺陷），说清为什么值得。
    有一说一：真没有就给空数组，绝不为凑数硬写；每条一句话，必须点名具体字段或数字。
    这些内容不影响今天的交易决定本身。
+16. position_advice —— 若数据里有「用户实盘持仓」段，逐笔给操作建议（持有/加仓/减仓/清仓）：
+   - reason 一句话，必须引用当天的具体信号或执行军规（QBTX 连续持有≤5天、QBTZ 只做
+     1-3 天且绝不过周末、总投机仓≤总资产10%、反向杠杆是战术工具不是持仓）。
+   - 证据打架时偏保守：先减仓后清仓，不轻易建议加仓；加仓只在一级信号确认时给。
+   - 持仓建议与 action 主判断相互独立——主判断 HOLD 不代表已有持仓必须清，但持仓若
+     违反军规（如 QBTZ 拿了超过 3 天）必须直说清仓。
+   - 没有持仓段 → 空数组。
 
 输出格式：只输出一个 JSON 对象（不要 markdown 代码块，不要其他文字）：
 {
@@ -136,6 +143,10 @@ D. 执行军规（第七轮实测）：QBTX 年拖累−24%/QBTZ−34%;持有≤
   "invalidation_price": <使计划作废的 QBTS 关键价位（数字）。LONG 时=跌破即作废的价位；
                          SHORT 时=涨破即作废的价位；HOLD 时=两个触发位中更接近现价的那个>,
   "vivienne_note": "<写给完全不懂股票的女朋友 Vivienne 看的一段大白话，要求见上面规则 14>",
+  "position_advice": [
+    {"ticker": "QBTS"|"QBTX"|"QBTZ", "advice": "持有"|"加仓"|"减仓"|"清仓",
+     "reason": "<一句话，引用当天信号或执行军规，见规则 16；无持仓段给空数组>"}
+  ],
   "system_notes": [
     {"kind": "数据问题"|"改进建议", "note": "<一句话，点名具体字段/数字，见规则 15；没有就给空数组>"}
   ]
@@ -489,6 +500,32 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
         parts.append(f"## 系统历史预测表现\n  {cal['n_graded']} 条已评判，"
                      f"方向命中率 {hr*100:.0f}%（{_hit_ci(hr, cal['n_graded'])}）")
 
+    # ── 💼 用户实盘持仓(真金)→ position_advice ───────────────
+    upos = snapshot.get("user_positions") or []
+    if upos:
+        from datetime import date as _date
+        qbts_now, qbtx_now, qbtz_now = _anchor_prices(snapshot, extras)
+        now_px = {"QBTS": qbts_now, "QBTX": qbtx_now, "QBTZ": qbtz_now}
+        rows = []
+        for p in upos:
+            t = p.get("ticker")
+            qty, cost = _num(p.get("qty")), _num(p.get("cost"))
+            if not t or not qty or not cost:
+                continue
+            line = f"{t}: {qty:g} 股 @ ${cost:.2f}"
+            try:
+                held = (_date.today() - _date.fromisoformat(str(p.get("date"))[:10])).days
+                line += f"(买入 {p['date']},已持有 {held} 个日历日)"
+            except Exception:
+                pass
+            px = now_px.get(t)
+            if px:
+                line += f" · 现价 ${px:.2f} · 浮动 {px / cost - 1:+.1%}(${(px - cost) * qty:+,.0f})"
+            rows.append(line)
+        if rows:
+            parts.append("## 用户实盘持仓（真金！请按规则 16 逐笔在 position_advice 给操作建议，"
+                         "重点核对持有天数是否违反执行军规）\n  " + "\n  ".join(rows))
+
     parts.append("请综合以上全部证据，按 system prompt 的 JSON 格式输出今天的交易决定。")
     return "\n\n".join(parts)
 
@@ -623,7 +660,8 @@ _DECISION_SCHEMA = {
     "additionalProperties": False,
     "required": ["action", "conviction", "p_up_5d", "summary", "trade_plan",
                  "key_drivers", "risks", "upcoming_catalysts", "invalidation",
-                 "invalidation_price", "vivienne_note", "system_notes"],
+                 "invalidation_price", "vivienne_note", "position_advice",
+                 "system_notes"],
     "properties": {
         "action": {"type": "string", "enum": ["LONG_QBTX", "SHORT_QBTZ", "HOLD"]},
         "conviction": {"type": "integer"},
@@ -672,6 +710,18 @@ _DECISION_SCHEMA = {
         "invalidation": {"type": "string"},
         "invalidation_price": _NUM,
         "vivienne_note": {"type": "string"},
+        "position_advice": {   # 💼 用户实盘持仓逐笔建议(无持仓段 = 空数组)
+            "type": "array",
+            "items": {
+                "type": "object", "additionalProperties": False,
+                "required": ["ticker", "advice", "reason"],
+                "properties": {
+                    "ticker": {"type": "string", "enum": ["QBTS", "QBTX", "QBTZ"]},
+                    "advice": {"type": "string", "enum": ["持有", "加仓", "减仓", "清仓"]},
+                    "reason": {"type": "string"},
+                },
+            },
+        },
         "system_notes": {   # 每日系统自检:AI 主动报告数据问题/改进建议(给维护者,非交易内容)
             "type": "array",
             "items": {
@@ -727,6 +777,7 @@ def generate_decision(snapshot: dict, extras: dict | None = None) -> dict:
     decision = json.loads(text)
     decision["model"] = model_used            # observability:实际是谁做的决策
     decision["system_notes"] = (decision.get("system_notes") or [])[:4]
+    decision["position_advice"] = (decision.get("position_advice") or [])[:6]
 
     # Minimal guard — structured outputs already enforces the shape.
     if decision.get("action") not in ("LONG_QBTX", "SHORT_QBTZ", "HOLD"):

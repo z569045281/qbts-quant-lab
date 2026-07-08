@@ -1013,6 +1013,13 @@ async def dashboard_snapshot(force_refresh: bool = False):
         journal = await asyncio.to_thread(journal_recent, 12)
     except Exception:
         journal = None
+    try:
+        # 用户实盘持仓(💼)→ 决策 prompt 逐笔给 position_advice
+        from dashboard.positions import load_positions
+        user_positions = await asyncio.to_thread(load_positions)
+    except Exception as e:
+        user_positions = []
+        logger.warning(f"user positions load failed: {e}")
     payload["options"]        = opt_sig
     payload["intraday"]       = intr_sig
     payload["sentiment"]      = sentiment_sig
@@ -1028,6 +1035,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["relative_strength"] = rel_strength
     payload["squeeze"]        = squeeze
     payload["journal"]        = journal
+    payload["user_positions"] = user_positions
 
     # ── Source status map: tells the UI which signals are active/inactive/error
     # so the user knows when something needs setup (e.g. Reddit OAuth missing). ─
@@ -1202,6 +1210,17 @@ async def scan_watch(req: Request):
     body = await req.json()
     action = body.get("action")
     ticker = (body.get("ticker") or "").strip().upper()
+    if action in ("pos_add", "pos_remove"):
+        # 💼 实盘持仓编辑(走同一条编辑通道;不触发重扫,建议在下次生成决策时更新)
+        from dashboard import positions as upos
+        try:
+            plist = await asyncio.to_thread(
+                upos.upsert_position, ticker, body.get("qty"), body.get("cost"),
+                body.get("date")) if action == "pos_add" else \
+                await asyncio.to_thread(upos.remove_position, ticker)
+            return {"ok": True, "positions": plist}
+        except (ValueError, TypeError) as e:
+            return {"ok": False, "error": str(e)}
     from dashboard.scan import WATCHLIST
     from dashboard import scan_store
     if action == "watch_add" and ticker:
