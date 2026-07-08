@@ -96,6 +96,18 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   meta-model (`_SENTIMENT_WEIGHT=0.12`, low — retail sentiment is weak/laggy) and the decision
   prompt. Blank key → signal simply off (degrades cleanly). Endpoint returns top-level
   `buzz_score`/`sentiment_score`/`trend`/`bullish_pct`/`bearish_pct`; `X-API-Key` header.
+- **千元挑战第二期 bot** (`backend/dashboard/challenge2.py`, runs inside QuoteFunction at
+  `minute%15==2` market-hours ticks — offset dodges the `%5` SMC minutes): $5000 paper
+  sleeve on **Alpaca paper** (real orders, REST via `requests` — alpaca-py is NOT in the
+  Lambda image on purpose). Entry = `challenge_basket` 全场之选 (87% market + GTC bracket
+  TP+11.5%/STOP−12%), +10% touch = liquidate (触碰即落袋; bracket is only the backstop),
+  win $5500 / floor $4250 / 30 days. State = Supabase `crypto_challenge` id='current'
+  (round 1 archived at 'round1-2026-07'); frontend /challenge renders it dynamically.
+  **`ALPACA_API_KEY`/`ALPACA_SECRET_KEY`** live in root `.env` + GitHub Actions secrets +
+  `template.yaml` (`AlpacaApiKey`/`AlpacaSecretKey`, blank = bot off). ⚠️ Round-1 lesson:
+  a plain market sell gets REJECTED while bracket children hold the shares — always exit
+  via `DELETE /v2/positions/{sym}?cancel_orders=true` (round 1's "LIQUIDATE" never actually
+  filled; stray position was cleaned 2026-07-08).
 - **Models**: Fable 5 (decision, fallback Opus 4.8) · Sonnet 4.6 (factor gen) · Haiku 4.5 (news / reflections).
 - **Big image push to ECR occasionally times out** in CI — just re-run "Deploy AWS jobs".
 - **Nadaraya-Watson 包络** (`backend/dashboard/nadaraya_watson.py::analyze_nw_envelope`):

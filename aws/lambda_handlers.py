@@ -83,6 +83,16 @@ def quote_handler(event, context):
             payload["tiaojiu"] = tj
     except Exception as e:
         print(f"! tiaojiu skipped: {type(e).__name__}: {e}")
+
+    # 千元挑战第二期($5000 云端全自动,Alpaca paper)。模块自己挑
+    # minute%15==2 的盘中分钟干活(错开 %5 的 SMC 分钟防超时),其余分钟秒退;
+    # 状态直接写 crypto_challenge 表,不走 live_quote。
+    challenge_summary = None
+    try:
+        from dashboard.challenge2 import maybe_challenge_tick
+        challenge_summary = maybe_challenge_tick(now_et)
+    except Exception as e:
+        print(f"! challenge2 skipped: {type(e).__name__}: {e}")
     recompute = payload.get("session") in ("pre", "regular", "post") and now_et.minute % 5 == 0
     if recompute:
         try:
@@ -107,7 +117,8 @@ def quote_handler(event, context):
     quote_pusher.push_payload(sb, payload)
     q = (payload.get("quotes") or {}).get("qbts") or {}
     return {"ok": True, "session": payload.get("session"), "qbts_price": q.get("price"),
-            "smc_state": ((payload.get("smc") or {}).get("playbook") or {}).get("state")}
+            "smc_state": ((payload.get("smc") or {}).get("playbook") or {}).get("state"),
+            "challenge": challenge_summary}
 
 
 def _publish_decision_only() -> dict:

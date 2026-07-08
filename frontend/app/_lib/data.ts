@@ -98,6 +98,7 @@ export interface Snapshot {
   dip_buy?:           DipBuy | null;
   champs?:            Champs | null;
   challenge_basket?:  ChallengeBasket | null;
+  sector_rotation?:   SectorRotation | null;
   nw_envelope?:       NwEnvelope | null;
   squeeze?:           ShortFlow | null;
   relative_strength?: RelativeStrength | null;
@@ -765,7 +766,9 @@ export interface ChallengePosition {
   tp_px: number; stop_px: number; cur_px?: number; unreal?: number;
 }
 export interface CryptoChallenge {
-  status:       "running" | "won" | "halted";
+  round?:       number;              // 第N期(缺省=1)
+  runner?:      "local" | "cloud";   // 本地 bot / 云端 Lambda
+  status:       "running" | "won" | "halted" | "ended";
   sleeve_start: number;
   sleeve_cash:  number;
   equity:       number;
@@ -805,6 +808,21 @@ export interface ChallengeBasket {
   pick: string | null;
   n_qualified: number;
   market?: ChallengeMarketScan | null;
+  note: string;
+}
+
+/* 板块轮动地图(RRG 近似)—— snapshot.sector_rotation。 */
+export interface SectorPoint {
+  ticker: string; label: string; emoji: string;
+  trail: [number, number][];   // [RS-Ratio, RS-Momentum],最后一点=最新
+  x: number; y: number;        // 最新坐标
+  quadrant: "leading" | "weakening" | "lagging" | "improving";
+  ret20: number;
+}
+export interface SectorRotation {
+  as_of: string;
+  benchmark: string;
+  sectors: SectorPoint[];
   note: string;
 }
 

@@ -11,6 +11,7 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   running: { label: "进行中", cls: "bg-blue-50 text-[#006FFF] border-blue-200" },
   won:     { label: "🏆 已达标", cls: "bg-emerald-50 text-emerald-600 border-emerald-200" },
   halted:  { label: "🛑 已停止", cls: "bg-red-50 text-red-600 border-red-200" },
+  ended:   { label: "⏱ 到期结束", cls: "bg-gray-50 text-gray-600 border-gray-200" },
 };
 
 function daysLeft(deadline: string): number {
@@ -69,9 +70,14 @@ export default function ChallengePage() {
       <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-5">
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-lg font-bold text-gray-900">🎰 $1000 → +$100 一个月挑战</h1>
+            <h1 className="text-lg font-bold text-gray-900">
+              🎰 {money(c.sleeve_start)} → +{money(target)} 一个月挑战
+              {(c.round ?? 1) > 1 && <span className="ml-2 text-xs font-medium text-[#006FFF] bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5 align-middle">第 {c.round} 期</span>}
+            </h1>
             <p className="text-xs text-[#525461] mt-0.5">
-              纸面盘（Alpaca paper）· <span className="font-medium">无加密</span> · 杠杆指数 ETF 动量 · 触碰即落袋
+              纸面盘（Alpaca paper）· {c.runner === "cloud"
+                ? <><span className="font-medium">云端 Lambda 全自动</span> · 全场杠杆 ETF 动量</>
+                : <><span className="font-medium">无加密</span> · 杠杆指数 ETF 动量</>} · 触碰即落袋
             </p>
           </div>
           <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${s.cls}`}>{s.label}</span>
@@ -163,9 +169,10 @@ export default function ChallengePage() {
       {/* ── Strategy / honest odds ── */}
       <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4 space-y-2 text-sm text-[#525461]">
         <h2 className="text-sm font-semibold text-gray-900">打法与赢面</h2>
-        <p>只在 <b>上升趋势</b>（收盘价站上 50 日线且近一周上涨）时进场，集中押动量最强的杠杆指数 ETF，
-           进场即挂 <b className="text-emerald-600">+10% 止盈</b> + <b className="text-[#F03A3E]">−12% 止损</b> 的 bracket 单。
-           权益触碰 <b>+$100 判赢收手</b>，−15% 触及地板则本月停手。</p>
+        <p>只在 <b>上升趋势</b>（收盘价站上 50 日线且近一周上涨）时进场，集中押动量最强的杠杆 ETF
+           {(c.round ?? 1) > 1 && <>（第 {c.round} 期起扩到<b>全场 ~40 只宇宙</b>，同款门槛）</>}，
+           进场即挂 <b className="text-emerald-600">止盈</b> + <b className="text-[#F03A3E]">−12% 止损</b> 的 bracket 单，浮盈触 +10% 即落袋。
+           权益触碰 <b>+{money(target)} 判赢收手</b>，−15% 触及地板则本期停手。</p>
         <p className="text-[13px] bg-[#F6F6F8] rounded-md px-3 py-2 border border-[#EDEDF0]">
           📊 {c.odds_note}
         </p>
@@ -184,7 +191,7 @@ export default function ChallengePage() {
       )}
 
       <div className="text-center text-[10px] text-gray-400">
-        状态由本地挑战 bot 每 15 分钟推送到 Supabase · 更新于 {c.updated_at} · 纸面模拟, 非投资建议
+        状态由{c.runner === "cloud" ? "云端挑战 bot（AWS Lambda）" : "本地挑战 bot "}每 15 分钟推送到 Supabase · 更新于 {c.updated_at} · 纸面模拟, 非投资建议
       </div>
     </main>
   );

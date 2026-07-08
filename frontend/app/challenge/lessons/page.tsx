@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   getSnapshot, getCryptoChallenge,
-  type CryptoChallenge, type ChallengeBasket,
+  type CryptoChallenge, type ChallengeBasket, type SectorRotation,
 } from "../../_lib/data";
+import { RotationMap } from "../../_components/rotation-map";
 
 const pct = (n: number | undefined | null, digits = 1) =>
   typeof n === "number" ? `${n >= 0 ? "+" : ""}${(n * 100).toFixed(digits)}%` : "—";
@@ -48,12 +49,16 @@ const RULES = [
 
 export default function ChallengeLessonsPage() {
   const [basket, setBasket] = useState<ChallengeBasket | null>(null);
+  const [rot, setRot]       = useState<SectorRotation | null>(null);
   const [chal, setChal]     = useState<CryptoChallenge | null>(null);
   const [loaded, setLoad]   = useState(false);
 
   useEffect(() => {
     Promise.allSettled([
-      getSnapshot().then(s => setBasket(s.challenge_basket ?? null)),
+      getSnapshot().then(s => {
+        setBasket(s.challenge_basket ?? null);
+        setRot(s.sector_rotation ?? null);
+      }),
       getCryptoChallenge().then(setChal),
     ]).finally(() => setLoad(true));
   }, []);
@@ -186,6 +191,23 @@ export default function ChallengeLessonsPage() {
           <div className="mt-2.5 text-[12px] bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-amber-800 leading-relaxed">
             ⚠️ {basket.market.note} 挑战 bot 本身仍只交易 4 只篮子。
           </div>
+        </section>
+      )}
+
+      {/* ── 板块轮动地图 ── */}
+      {rot && (
+        <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4">
+          <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
+            <h2 className="text-sm font-semibold text-gray-900">🧭 板块轮动地图 · 钱正在往哪儿去</h2>
+            <span className="text-[11px] text-gray-400 font-mono">vs {rot.benchmark} · 截至 {rot.as_of}</span>
+          </div>
+          <p className="text-[12px] text-[#8A8A8E] mb-2 leading-relaxed">
+            每条尾巴是一个板块最近 8 周的轨迹,箭头指向最新;顺时针轮回:
+            转强↖ → 领涨↗ → 转弱↘ → 落后↙。挑战纪律「只押顺风」翻译到这张图上就是:
+            <b className="text-gray-700">只碰右上,盯着左上找下一个</b>。⚛️ 量子板块带虚线光环。
+          </p>
+          <RotationMap data={rot} />
+          <p className="text-[11px] text-gray-400 mt-2">{rot.note} · 每日发布刷新 · 非投资建议</p>
         </section>
       )}
 

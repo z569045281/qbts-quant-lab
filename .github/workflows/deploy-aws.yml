@@ -57,6 +57,11 @@ jobs:
           if [ -n "${{ secrets.NTFY_TOPIC }}" ]; then
             NTFY_PARAM="NtfyTopic=${{ secrets.NTFY_TOPIC }}"
           fi
+          # Alpaca paper keys (challenge-2 auto-trader). Same empty-value rule.
+          ALPACA_PARAMS=""
+          if [ -n "${{ secrets.ALPACA_API_KEY }}" ]; then
+            ALPACA_PARAMS="AlpacaApiKey=${{ secrets.ALPACA_API_KEY }} AlpacaSecretKey=${{ secrets.ALPACA_SECRET_KEY }}"
+          fi
           sam deploy \
             --stack-name qbts-jobs \
             --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
@@ -70,7 +75,7 @@ jobs:
               FredApiKey='${{ secrets.FRED_API_KEY }}' \
               AdanosApiKey='${{ secrets.ADANOS_API_KEY }}' \
               AllowOrigin='${{ vars.PUBLISH_ALLOW_ORIGIN || '*' }}' \
-              $NTFY_PARAM
+              $NTFY_PARAM $ALPACA_PARAMS
 
       - name: Show Publish Function URL
         run: |

@@ -50,6 +50,18 @@ Parameters:
     Type: String
     Default: "https://ntfy.sh"
     Description: ntfy server base URL (override only for a self-hosted instance).
+  AlpacaApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: >
+      Alpaca PAPER API key — drives the challenge-2 auto-trader in QuoteFunction.
+      Optional: blank just disables the challenge bot (everything else unaffected).
+  AlpacaSecretKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: Alpaca PAPER API secret (pair of AlpacaApiKey).
 
 Globals:
   Function:
@@ -62,6 +74,8 @@ Globals:
         ADANOS_API_KEY: !Ref AdanosApiKey
         NTFY_TOPIC: !Ref NtfyTopic
         NTFY_URL: !Ref NtfyUrl
+        ALPACA_API_KEY: !Ref AlpacaApiKey
+        ALPACA_SECRET_KEY: !Ref AlpacaSecretKey
 
 Resources:
   # ── Decision publish: button (Function URL) + daily auto-run ──────────────

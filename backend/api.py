@@ -1004,6 +1004,13 @@ async def dashboard_snapshot(force_refresh: bool = False):
         chal_basket = None
         logger.warning(f"challenge_basket failed: {e}")
     try:
+        # 板块轮动地图(RRG 近似,/challenge/lessons 页动态四象限图)
+        from dashboard.sector_rotation import analyze_sector_rotation
+        sector_rot = await asyncio.to_thread(analyze_sector_rotation)
+    except Exception as e:
+        sector_rot = None
+        logger.warning(f"sector_rotation failed: {e}")
+    try:
         nw_env = await asyncio.to_thread(analyze_nw_envelope, df_d)
     except Exception as e:
         nw_env = {"active": False, "signal": 0, "rationale": f"NW 包络失败: {str(e)[:80]}"}
@@ -1046,6 +1053,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["champs"]         = champs
     payload["btc_weekend"]    = btc_wknd
     payload["challenge_basket"] = chal_basket
+    payload["sector_rotation"] = sector_rot
     payload["nw_envelope"]    = nw_env
     payload["relative_strength"] = rel_strength
     payload["squeeze"]        = squeeze

@@ -13,6 +13,10 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-08 · challenge2-cloud-bot · 千元挑战第二期:$5000 云端全自动(Alpaca paper 真挂单)。新 backend/dashboard/challenge2.py(REST 直连不加 alpaca-py;进场=challenge_basket 全场之选,87% 市价+GTC bracket,+10%触碰落袋/赢线$5500/地板$4250/30天,minute%15==2 错开SMC分钟),接 quote_handler;template.yaml+deploy-aws.yml 加 AlpacaApiKey/AlpacaSecretKey(gh secrets 已设);第一期归档 round1-2026-07 + 账户残留 LABU×3 已清(其 LIQUIDATE 实际没成交的教训:普通市价卖会被 bracket 子单锁股,须 DELETE /positions?cancel_orders=true);挑战页动态化(第N期/金额/ended/云端标注) · files: backend/dashboard/challenge2.py(new), aws/lambda_handlers.py, aws/template.yaml, .github/workflows/deploy-aws.yml, frontend/app/challenge/page.tsx, frontend/app/_lib/data.ts
+
+- [done] 2026-07-08 · sector-rotation-map · 板块轮动地图(RRG 近似):新 backend/dashboard/sector_rotation.py(15 板块含⚛️QTUM vs SPY,RS=63日z、动量=RS 5日变化再标准化,每5日采样×8点轨迹)进 snapshot;前端 _components/rotation-map.tsx(四象限动效 SVG:描线动画/箭头/呼吸光晕/hover 聚焦/防碰撞标注/数据表兜底,象限四色过 dataviz 校验)挂 /challenge/lessons · files: backend/dashboard/sector_rotation.py(new), backend/api.py, frontend/app/_components/rotation-map.tsx(new), frontend/app/challenge/lessons/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json
+
 - [done] 2026-07-07 · challenge-lessons · 千元挑战复盘页 /challenge/lessons:诚实复盘(n=2)+六条可复制纪律+今日篮子照做面板(新 backend/dashboard/challenge_basket.py 进 snapshot)+复利/赔率诚实数学;挑战页挂入口 · files: backend/dashboard/challenge_basket.py(new), backend/api.py, frontend/app/challenge/lessons/page.tsx(new), frontend/app/challenge/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json
 
 - [done] 2026-07-07 · champs-fresh-readouts · 修AI自检发现的周一失明:①analyze_champs 信号读数(BTC/QTUM/IONQ z40/CLV/特调)提出台账幂等块外每次新算(节后无新bar时更新块跳过→prompt全空)②btc_weekend 加纯计算 weekend_signal 喂进 snapshot/决策 prompt(周一一级信号) · files: backend/dashboard/qbts_paper.py, backend/dashboard/btc_weekend.py, backend/dashboard/decision.py, backend/api.py
