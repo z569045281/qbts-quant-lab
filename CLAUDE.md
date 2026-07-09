@@ -278,6 +278,9 @@ Frontend tabs (`frontend/app/`): **🎯 决策仪表盘** (`/`) · **🔭 自选
   tell the user and re-derive these weights (and each source's keep/drop) from the real
   hit-rate table — don't keep trusting the hand-tuned priors.** Until then treat every edge
   p_up as an unvalidated guess. (User explicitly asked to be reminded of this.)
+  **审判执行器已就位(2026-07-09): `python audit.py`** — 汇总校准逐源命中+决策台账+
+  纸面马+扫描账本,按预注册规则(n≥30 且 Wilson95% 下界>0.5 转正 / 上界<0.5 剔除)
+  出判决报告(backend/dashboard/audit.py;只读,权重改动仍走人工 review)。8/15 直接跑它。
 - **All Supabase migrations have been run** (decision_journal, calibration/predictions/
   source_weights, watchlist, scan_journal, finra_short, watchlist_scan, scan_paper,
   dca_state). Running cost ≈ **$20/mo**, almost all of it the one daily Opus decision at
