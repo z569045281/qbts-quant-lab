@@ -238,6 +238,21 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                         f"({n.get('published','')[:10]}) {n.get('title','')[:80]} — {ai.get('reasoning','')[:60]}")
         parts.append("## 近期新闻（已 AI 初筛）\n" + "\n".join(rows))
 
+    # ── 🌍 地缘政治/政策雷达（伊朗战局/川普政策/量子政策）────────
+    geo = snapshot.get("geopolitics")
+    if geo and geo.get("risk_level"):
+        rows = [f"  [{it.get('track_cn','?')}/{it.get('stance','?')}] "
+                f"{it.get('title','')[:80]} — {it.get('note_cn','')}"
+                for it in (geo.get("items") or [])
+                if it.get("relevance") in ("high", "medium")][:6]
+        parts.append(
+            f"## 🌍 地缘政治/政策雷达 {geo.get('risk_cn','?')} — {geo.get('headline_cn','')}\n"
+            f"  {geo.get('summary_cn','')}\n"
+            + ("\n".join(rows) + "\n" if rows else "")
+            + "  （QBTS 与伊朗战局/川普政策强联动 — 07-07 暴跌即谈判破裂所致。alert 级别下"
+              "技术面买点先让位:降信心/缩仓位,并把「局势再升级」写进失效条件。）"
+        )
+
     # ── 期权流 ────────────────────────────────────────────────
     opt = snapshot.get("options")
     if opt:

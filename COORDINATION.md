@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-09 · [fable] geo-radar · 地缘政治/政策雷达:新 backend/dashboard/geopolitics.py(Google News RSS 伊朗/川普/量子政策 + Haiku 风险分级)进 snapshot+决策 prompt;quote_handler 盘中每~30min 刷新+ntfy 高影响新条目推送;决策页新雷达卡 · files: backend/dashboard/geopolitics.py(new), backend/api.py, backend/dashboard/decision.py, aws/lambda_handlers.py, frontend/app/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json
+
 - [done] 2026-07-08 · challenge2-cloud-bot · 千元挑战第二期:$5000 云端全自动(Alpaca paper 真挂单)。新 backend/dashboard/challenge2.py(REST 直连不加 alpaca-py;进场=challenge_basket 全场之选,87% 市价+GTC bracket,+10%触碰落袋/赢线$5500/地板$4250/30天,minute%15==2 错开SMC分钟),接 quote_handler;template.yaml+deploy-aws.yml 加 AlpacaApiKey/AlpacaSecretKey(gh secrets 已设);第一期归档 round1-2026-07 + 账户残留 LABU×3 已清(其 LIQUIDATE 实际没成交的教训:普通市价卖会被 bracket 子单锁股,须 DELETE /positions?cancel_orders=true);挑战页动态化(第N期/金额/ended/云端标注) · files: backend/dashboard/challenge2.py(new), aws/lambda_handlers.py, aws/template.yaml, .github/workflows/deploy-aws.yml, frontend/app/challenge/page.tsx, frontend/app/_lib/data.ts
 
 - [done] 2026-07-09 · watchlist-sector-fill · 自选按轮动地图板块补空(基本面全部联网核实):+VKTX 减肥药(生科)/HIMS 远程医疗/HOOD 券商加密(金融)/ASTS 卫星通信/CELH 能量饮料(必需消费);地产+传统能源刻意留空(无干净高波动标的)。scan.py THEME 加 5 新票 + 补 FLNC 储能/OKLO 核电标签;已入 Supabase watchlist 并重扫(16 只,VKTX/HIMS/HOOD/CELH 即 买入区,ASTS 偏空回避=如预期等买点) · files: backend/dashboard/scan.py

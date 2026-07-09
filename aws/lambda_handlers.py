@@ -84,6 +84,18 @@ def quote_handler(event, context):
     except Exception as e:
         print(f"! tiaojiu skipped: {type(e).__name__}: {e}")
 
+    # 🌍 地缘政治雷达(伊朗/川普/量子政策):minute%30==8 刷新(RSS 免费,Haiku
+    # 只在头条变了才跑),新高影响条目/风险级别翻转 → ntfy;off-tick carry-forward。
+    try:
+        from dashboard.geopolitics import maybe_geo_refresh
+        geo = maybe_geo_refresh(prev_data.get("geo"), now_et)
+        if geo:
+            payload["geo"] = geo
+    except Exception as e:
+        print(f"! geo radar skipped: {type(e).__name__}: {e}")
+        if prev_data.get("geo"):
+            payload["geo"] = prev_data["geo"]
+
     # 千元挑战第二期($5000 云端全自动,Alpaca paper)。模块自己挑
     # minute%15==2 的盘中分钟干活(错开 %5 的 SMC 分钟防超时),其余分钟秒退;
     # 状态直接写 crypto_challenge 表,不走 live_quote。

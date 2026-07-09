@@ -34,6 +34,29 @@ export interface NewsItem {
   };
 }
 
+/* ── 🌍 地缘政治/政策雷达(伊朗战局/川普政策/量子政策) ────────────────────── */
+export interface GeoItem {
+  key:       string;
+  track:     "iran" | "trump" | "quantum";
+  track_cn:  string;
+  title:     string;
+  source:    string;
+  published: string;              // UTC iso, 分钟精度
+  url:       string;
+  relevance: "high" | "medium" | "low";
+  stance:    "risk_off" | "risk_on" | "neutral";
+  note_cn:   string;
+}
+export interface GeoRadar {
+  as_of:       string;
+  risk_level:  "alert" | "watch" | "calm";
+  risk_cn:     string;
+  headline_cn: string;
+  summary_cn:  string;
+  items:       GeoItem[];
+  alerted?:    string[];          // live_quote 携带的已推送 key(去重用)
+}
+
 export interface Snapshot {
   as_of:        string;
   price:        number;
@@ -92,6 +115,7 @@ export interface Snapshot {
     risk_window: boolean;
     risk_note:   string;
   } | null;
+  geopolitics?: GeoRadar | null;
   smc?: SmcAnalysis | null;
   volume_profile?:    VolumeProfile | null;
   regime?:            VolatilityRegime | null;
@@ -572,6 +596,8 @@ export interface LiveQuote {
     date: string; weekend_ret: number; green: boolean;
     last_utc_day?: string; pushed?: boolean;
   } | null;
+  // 🌍 地缘政治雷达(云端 ~30min 刷新,比每日快照新 → 页面优先读它)
+  geo?: GeoRadar | null;
 }
 
 /** Live quote — Supabase row in deployed mode, local backend in dev. Null on failure. */

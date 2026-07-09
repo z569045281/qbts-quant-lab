@@ -953,6 +953,14 @@ async def dashboard_snapshot(force_refresh: bool = False):
     except Exception:
         macro_cal = None
     try:
+        # 🌍 地缘政治/政策雷达(伊朗战局/川普政策/量子政策 — 07-07 暴跌这类
+        # 事件驱动是机械信号的盲区,这里补上)
+        from dashboard.geopolitics import get_geo_snapshot
+        geo_sig = await asyncio.to_thread(get_geo_snapshot, force_refresh)
+    except Exception as e:
+        geo_sig = None
+        logger.warning(f"geopolitics failed: {e}")
+    try:
         # SMC structural read — pass the live price when fresh so zones are
         # measured against reality, not yesterday's close.
         _lq = _LIVE_QUOTE_CACHE.get("payload")
@@ -1046,6 +1054,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["sentiment"]      = sentiment_sig
     payload["holdings"]       = holdings_sig
     payload["macro"]          = macro_cal
+    payload["geopolitics"]    = geo_sig
     payload["smc"]            = smc
     payload["volume_profile"] = vol_profile
     payload["regime"]         = regime

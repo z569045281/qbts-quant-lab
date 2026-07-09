@@ -177,6 +177,18 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   `sys.path` at module load; without it `from dashboard…` raises `ModuleNotFoundError` (was the
   bug that kept the intraday block from ever landing). `live_quote.data['smc_err']` surfaces any
   recompute exception (only set on failure) so you can debug from Supabase without CloudWatch.
+- **🌍 地缘政治/政策雷达** (`backend/dashboard/geopolitics.py`): QBTS 与伊朗战局/川普
+  政策强联动(07-07 暴跌=谈判破裂),机械信号对此全盲 — 此模块补盲区。三条 track
+  (伊朗/中东、川普政策、量子政策)走 **Google News RSS search**(免费无 key,`when:2d`
+  窗口),一次 **Haiku** 调用做逐条 relevance/stance/中文注 + 整体 risk_level
+  (alert/watch/calm)。成本闸:RSS 免费随便拉,Haiku 只在头条集合变化或分析 >6h 才跑。
+  接进 snapshot(`payload['geopolitics']`)+ 决策 prompt(alert 时明示降信心/缩仓)。
+  **盘中**: quote_handler 在 `minute%30==8`(错开 %5 SMC、%15==2 挑战 bot)调
+  `maybe_geo_refresh` → 写 `live_quote.data['geo']`(off-tick carry-forward),
+  **新高影响条目 / 风险级别翻转 → ntfy 推送**(去重靠 payload 里的 `alerted` key 列表;
+  首次运行不推防轰炸;周日 20:01 ET 那跳顺带补一发周末局势检查)。前端决策页
+  优先读 live 版(`live?.geo ?? snap.geopolitics`),alert 整卡变红。无新增 secret
+  (复用 ANTHROPIC_API_KEY + NTFY_TOPIC,均已在 template.yaml Globals)。
 
 ## Strategy research archive
 
