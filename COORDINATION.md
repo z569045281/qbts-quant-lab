@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-09 · [fable] mining-round18 · 第十八轮:量子篮子横截面落后追赶(用户设想的四象限"谁落后买谁";冠军配对的全篮子推广),预注册判活;若成→观察组+量子族谱四象限图 · files: mining.md
+
 - [done] 2026-07-09 · [fable] mining-round17 · 第十七轮:17A 板块轮动象限(QTUM RRG→QBTS,须超越在册QTUM昨日绿) + 17B SEC 424B增发事件(供给冲击否决器),预注册判活,黑马→观察组 · files: mining.md
 
 - [done] 2026-07-09 · [fable] watch-tier-replay · 观察名单三候选(CPI+PPI公布日/周一BTC大绿日内/GPR地缘缓和)上 /factors 策略战绩「👀观察组」:replay.py tier=watch + FRED排期/GPR xls 数据源(aws deps +xlrd) + 前端分区渲染 v2.8.0 · files: backend/dashboard/replay.py, aws/requirements.txt, requirements.txt, frontend/app/factors/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, mining.md
