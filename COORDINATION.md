@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-09 · [fable] gpr-event-study · GPR 地缘风险指数×QBTS 事件研究(纯研究豁免,验证地缘雷达假设:alert日次日收益/波动是否更差),结果归档 mining.md · files: mining.md
+
 - [done] 2026-07-09 · [fable] geo-radar · 地缘政治/政策雷达:新 backend/dashboard/geopolitics.py(Google News RSS 伊朗/川普/量子政策 + Haiku 风险分级)进 snapshot+决策 prompt;quote_handler 盘中每~30min 刷新+ntfy 高影响新条目推送;决策页新雷达卡 · files: backend/dashboard/geopolitics.py(new), backend/api.py, backend/dashboard/decision.py, aws/lambda_handlers.py, frontend/app/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json
 
 - [done] 2026-07-08 · challenge2-cloud-bot · 千元挑战第二期:$5000 云端全自动(Alpaca paper 真挂单)。新 backend/dashboard/challenge2.py(REST 直连不加 alpaca-py;进场=challenge_basket 全场之选,87% 市价+GTC bracket,+10%触碰落袋/赢线$5500/地板$4250/30天,minute%15==2 错开SMC分钟),接 quote_handler;template.yaml+deploy-aws.yml 加 AlpacaApiKey/AlpacaSecretKey(gh secrets 已设);第一期归档 round1-2026-07 + 账户残留 LABU×3 已清(其 LIQUIDATE 实际没成交的教训:普通市价卖会被 bracket 子单锁股,须 DELETE /positions?cancel_orders=true);挑战页动态化(第N期/金额/ended/云端标注) · files: backend/dashboard/challenge2.py(new), aws/lambda_handlers.py, aws/template.yaml, .github/workflows/deploy-aws.yml, frontend/app/challenge/page.tsx, frontend/app/_lib/data.ts
