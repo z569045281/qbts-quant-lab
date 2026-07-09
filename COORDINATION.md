@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-09 · [fable] mining-round20 · 第二十轮:SEC FTD 交割失败(半月档,出版滞后诚实建模,信息含量诊断版+可交易版分开),预注册判活 · files: mining.md
+
 - [done] 2026-07-09 · [fable] mining-round19 · 第十九轮:裸 BOS/CHoCH 结构事件研究(smc.py 同源口径+防repaint确认约束,日线,姐妹交叉验证),预注册判活 · files: mining.md
 
 - [done] 2026-07-09 · [fable] mining-round18 · 第十八轮:量子篮子横截面落后追赶(用户设想的四象限"谁落后买谁";冠军配对的全篮子推广),预注册判活;若成→观察组+量子族谱四象限图 · files: mining.md
