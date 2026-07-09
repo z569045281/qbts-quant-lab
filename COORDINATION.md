@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-09 · [fable] selfcheck-fixes · 修 AI 自检 6 条:①journal 日期改美东挂钟(UTC/墨尔本翻日错位)②实时报价 2× 换算差>0.8pp 主动标注基准口径③校准命中率口径说明(edge非观望 vs HOLD影子两套勿混)④新闻初筛 QUBT≠QBTS 主体消歧义⑤快照补 market_light(SPY/QQQ vs 50日线+VIX,一级信号B-1不再盲判)⑥playbook rr_veto 熔断折叠一行 · files: backend/dashboard/{journal,decision,news}.py, backend/api.py
+
 - [done] 2026-07-09 · [fable] audit-tool · ⚖️ 8/15 审判执行器:python audit.py 一键出逐源判决报告(校准+决策台账+纸面马+扫描账本,Wilson CI 预注册规则,只读) · files: backend/dashboard/audit.py(new), audit.py(new), CLAUDE.md
 
 - [done] 2026-07-09 · [fable] macro-event-coef · 第十五轮:宏观事件(FOMC/CPI/NFP等)×QBTS 事件日影响系数排行(FRED release dates),结果进 mining.md + 系数表接入 macro.py/决策 prompt · files: mining.md, backend/dashboard/macro.py, backend/dashboard/decision.py

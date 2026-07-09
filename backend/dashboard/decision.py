@@ -189,18 +189,47 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
         newest = max((m for m in (_bt_min(q) for q in lq["quotes"].values()) if m is not None),
                      default=None)
         rows = []
+        fresh_chg: dict[str, float] = {}      # 仅收集"非旧价"的涨跌,做 2× 一致性自检
         for sym, q in lq["quotes"].items():
             chg = f"{q['change_pct']*100:+.2f}%" if q.get("change_pct") is not None else "—"
             bt, m = str(q.get("bar_time") or "")[11:16], _bt_min(q)
             note = ""
             if newest is not None and m is not None and newest - m > 15:
                 note = f"（⚠️ 旧价:最后成交 {bt},比最新报价旧 {newest - m} 分钟 — 薄流动性 ETF 盘后成交稀疏,勿据此核对 2× 换算关系）"
-            elif bt:
-                note = f"（最后成交 {bt}）"
+            else:
+                if bt:
+                    note = f"（最后成交 {bt}）"
+                if q.get("change_pct") is not None:
+                    fresh_chg[sym] = q["change_pct"]
             rows.append(f"  {sym.upper()}: ${q['price']} ({chg} vs 上一收盘){note}")
+        # 2× 一致性自检:两腿都新鲜却对不上 2× 时,多半是各自 prev_close 基准
+        # 口径不一致(反向/杠杆 ETF 的"上一收盘"常取不同 session)——主动标注,
+        # 免得模型(或自检)把基准噪声当成资金流信号(AI 自检 2026-07-09 报过)。
+        if "qbts" in fresh_chg:
+            for etf, lev in (("qbtx", 2.0), ("qbtz", -2.0)):
+                # 0.8pp 阈值:实测 prev_close 口径不一致造成 ~0.8-2pp 的假差
+                # (07-08 案例 QBTS -1.78% vs QBTX -2.73%,差 0.83pp 已引发误读)
+                if etf in fresh_chg and abs(fresh_chg[etf] - lev * fresh_chg["qbts"]) > 0.008:
+                    rows.append(f"  （⚠️ {etf.upper()} 涨跌与 2× 换算差 "
+                                f"{abs(fresh_chg[etf] - lev*fresh_chg['qbts'])*100:.1f}pp — "
+                                f"两标的 prev_close 基准可能不同口径,方向以 QBTS 为准,勿用该差值推断异动）")
         parts.append(
             f"## ⚡ 实时报价（{sess_cn}，{lq.get('asof_et','?')} ET）— 上方日线数据未包含此变动，"
             f"以此为最新现实定价\n" + "\n".join(rows)
+        )
+
+    # ── 🚦 大盘红绿灯（一级信号 B-1 的直接读数,别再盲判）──────
+    ml = snapshot.get("market_light")
+    if ml and ml.get("qqq_vs_50dma") is not None:
+        qqq, spy = ml["qqq_vs_50dma"], ml.get("spy_vs_50dma")
+        light = "🔴 红灯(QQQ 低于 50 日线 → 一切做多逻辑降档,清仓等是合法答案)" if qqq < 0 \
+            else "🟢 绿灯(QQQ 在 50 日线上方)"
+        parts.append(
+            f"## 🚦 大盘红绿灯（一级信号 B-1）\n"
+            f"  {light}\n"
+            f"  QQQ vs 50日线 {qqq*100:+.1f}% · SPY {(spy or 0)*100:+.1f}% · "
+            f"VIX {ml.get('vix','?')} → 环境={ml.get('regime','?')}\n"
+            f"  {ml.get('note','')}"
         )
 
     # 最近 10 根日线（趋势语境）
@@ -319,7 +348,16 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
 
         # ── SMC 顺势纪律 Playbook（全局锁 → 降维中继 → 15m 扣扳机 → FVG）──
         pb = smc.get("playbook")
-        if pb and pb.get("lock"):
+        if pb and pb.get("lock") and pb.get("rr_veto"):
+            # 风控熔断:计划已自我否决 → 折叠成一行结论,不再输出完整交易计划
+            # 与主决策打架(AI 自检 2026-07-09 的建议)。
+            lock_cn = {"bull": "多头锁定", "bear": "空头锁定", "none": "无锁定"}[pb["lock"]]
+            parts.append(
+                f"## SMC 顺势纪律 Playbook\n"
+                f"  【{lock_cn}】{pb.get('risk_note','RR<2 风控熔断')} → 本 playbook 今日无有效入场,"
+                f"强制观望;方向锁仍有效({pb.get('lock_reason','')}),但不构成入场依据。"
+            )
+        elif pb and pb.get("lock"):
             chk = "\n".join(
                 f"    [{'✓' if c['ok'] else '✗'}] {c['label']}：{c['detail']}"
                 for c in (pb.get("checklist") or []))
@@ -524,7 +562,11 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
     if cal and cal.get("n_graded", 0) >= 5:
         hr = cal["overall_hit_rate"]
         parts.append(f"## 系统历史预测表现\n  {cal['n_graded']} 条已评判，"
-                     f"方向命中率 {hr*100:.0f}%（{_hit_ci(hr, cal['n_graded'])}）")
+                     f"方向命中率 {hr*100:.0f}%（{_hit_ci(hr, cal['n_graded'])}）\n"
+                     f"  （评判口径:此命中率只统计【量化元模型 edge 的非观望信号】——"
+                     f"信号方向 vs 其后 5 个交易日实际涨跌;你(决策)的 HOLD 不计入此数,"
+                     f"HOLD 的影子评判(按 p_up_5d)在决策台账里另行记录。两套数字口径不同,"
+                     f"别互相换算;样本仍小,按 CI 读,勿当定论）")
 
     # ── 💼 用户实盘持仓(真金)→ position_advice ───────────────
     upos = snapshot.get("user_positions") or []

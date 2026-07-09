@@ -25,6 +25,7 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -119,7 +120,9 @@ def record(decision: dict, price_at_decision: float, as_of: str) -> None:
     and mutate `decision` so the published snapshot carries it for the UI banner.
     """
     records = _load()
-    today = datetime.now().strftime("%Y-%m-%d")
+    # 交易日期一律用美东挂钟:Lambda(UTC)/墨尔本(UTC+10)在美股晚盘时段都已翻日,
+    # 裸 datetime.now() 会把 07-08 的决策记成 07-09(AI 自检 2026-07-09 抓到的错位)。
+    today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
 
     # Accumulate today's actions from the existing same-day record (if any).
     prior_actions: list[str] = []
@@ -235,7 +238,7 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
 
         r["status"] = "graded"
         r["result"] = {
-            "graded_at": datetime.now().strftime("%Y-%m-%d"),
+            "graded_at": datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
             "outcome":   outcome,
             "correct":   correct,
             "ret_pct":   round(ret_pct, 4) if ret_pct is not None else None,

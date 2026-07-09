@@ -961,6 +961,15 @@ async def dashboard_snapshot(force_refresh: bool = False):
         geo_sig = None
         logger.warning(f"geopolitics failed: {e}")
     try:
+        # 🚦 大盘红绿灯(SPY/QQQ vs 50日线 + VIX)。决策纪律 B-1 把「QQQ<50日线」
+        # 列为一级信号,但快照此前没有该字段 → AI 每天盲判(自检 2026-07-09 报出)。
+        # 复用自选扫描的同一实现,口径一致。
+        from dashboard.scan import _market_context
+        market_light = await asyncio.to_thread(_market_context)
+    except Exception as e:
+        market_light = None
+        logger.warning(f"market context failed: {e}")
+    try:
         # SMC structural read — pass the live price when fresh so zones are
         # measured against reality, not yesterday's close.
         _lq = _LIVE_QUOTE_CACHE.get("payload")
@@ -1055,6 +1064,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["holdings"]       = holdings_sig
     payload["macro"]          = macro_cal
     payload["geopolitics"]    = geo_sig
+    payload["market_light"]   = market_light
     payload["smc"]            = smc
     payload["volume_profile"] = vol_profile
     payload["regime"]         = regime

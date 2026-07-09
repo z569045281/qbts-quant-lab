@@ -93,6 +93,13 @@ For each news headline below, return a JSON object with:
                   the headline/summary contains them.
 
 Rules:
+- SUBJECT DISAMBIGUATION FIRST: identify which company each headline is actually about.
+  QBTS = D-Wave Quantum ONLY. QUBT = Quantum Computing Inc — a DIFFERENT company
+  (similar name, frequently appears in QBTS news feeds). IONQ / RGTI = peers.
+  If the subject is NOT QBTS, your reasoning MUST name the actual subject company and
+  the impact is at most sector-level (medium) — never attribute another company's
+  initiatives/contracts to QBTS. (A QUBT headline was once summarized as "QBTS
+  expanding manufacturing" — that misattribution polluted the sentiment signal.)
 - QBTS is a quantum-computing pure-play with low float; news cuts hard in both directions.
 - IONQ / RGTI news matters for sector-wide regime but less per-name.
 - Earnings, government contracts, partnerships = high impact — BUT only when concrete
