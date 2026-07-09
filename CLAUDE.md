@@ -283,7 +283,10 @@ Frontend tabs (`frontend/app/`): **🎯 决策仪表盘** (`/`) · **🔭 自选
   出判决报告(backend/dashboard/audit.py;只读,权重改动仍走人工 review)。8/15 直接跑它。
 - **All Supabase migrations have been run** (decision_journal, calibration/predictions/
   source_weights, watchlist, scan_journal, finra_short, watchlist_scan, scan_paper,
-  dca_state). Running cost ≈ **$20/mo**, almost all of it the one daily Opus decision at
+  dca_state) — **except `sql/publish_audit_migration.sql`(2026-07-09 点击审计表,待用户跑)**。
+  点击审计:Lambda `_audit_click` 把每次真人按钮点击(出决策/自选/持仓)的 IP/UA/
+  设备提示写进 `publish_audit`(cron 不记,失败不挡动作);前端版本号连点 3 次开
+  隐藏查看窗(audit-modal)。浏览器拿不到计算机名——IP+系统/浏览器+时区就是全部口径。 Running cost ≈ **$20/mo**, almost all of it the one daily Opus decision at
   **09:00 ET** (≈ 23:00 Melbourne in AU winter / 01:00 in AU summer).
 
 ## Durable facts vs this file

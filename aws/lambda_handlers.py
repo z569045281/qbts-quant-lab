@@ -214,6 +214,32 @@ def _publish_decision_only() -> dict:
     return {"ok": True, "decision": summary}
 
 
+def _audit_click(event, body: dict) -> None:
+    """👀 谁点了按钮 — 把每次 Function URL 调用(出决策/自选编辑等)的来源记进
+    Supabase `publish_audit`:IP、User-Agent、前端附带的设备提示(时区/语言/
+    平台/屏幕)。定时调度(EventBridge)没有 sourceIp → 不记,只记真人点击。
+    纯 best-effort:审计失败绝不能挡住动作本身;表未建时静默跳过
+    (需先跑 sql/publish_audit_migration.sql)。"""
+    try:
+        ip = (((event or {}).get("requestContext") or {}).get("http") or {}).get("sourceIp")
+        if not ip:
+            return                                  # cron/内部调用,不记
+        headers = {k.lower(): v for k, v in ((event or {}).get("headers") or {}).items()}
+        from supabase import create_client
+        url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+        key = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
+        if not url or not key:
+            return
+        create_client(url, key).table("publish_audit").insert({
+            "action": body.get("action") or "publish",
+            "ip":     ip,
+            "ua":     (headers.get("user-agent") or "")[:300],
+            "client": body.get("client") or None,
+        }).execute()
+    except Exception as e:
+        print(f"! audit skipped: {type(e).__name__}: {e}")
+
+
 def _parse_body(event) -> dict:
     """Parse the Function URL POST body (may be base64-encoded) into a dict."""
     import base64
@@ -242,6 +268,7 @@ def publish_handler(event, context):
     Returns API-Gateway-v2 response shape."""
     body = _parse_body(event)
     action = body.get("action")
+    _audit_click(event, body)      # 👀 记录点击者(IP/UA/设备提示;cron 不记)
     try:
         if action in ("watch_add", "watch_remove"):
             from dashboard.scan import WATCHLIST

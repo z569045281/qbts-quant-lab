@@ -862,6 +862,45 @@ export async function getCryptoChallenge(): Promise<CryptoChallenge | null> {
   return data.data as CryptoChallenge;
 }
 
+/** 👀 点击审计:浏览器能诚实拿到的设备提示(计算机名拿不到 — Web 没有这 API)。
+ *  随按钮 POST 附带,Lambda 连同来源 IP/UA 一起写进 publish_audit。 */
+export function clientHints(): Record<string, string> {
+  try {
+    const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
+    return {
+      tz:       Intl.DateTimeFormat().resolvedOptions().timeZone ?? "",
+      lang:     navigator.language ?? "",
+      platform: nav.userAgentData?.platform || navigator.platform || "",
+      screen:   `${window.screen?.width ?? "?"}x${window.screen?.height ?? "?"}`,
+    };
+  } catch {
+    return {};
+  }
+}
+
+export interface PublishAuditRow {
+  id:     number;
+  ts:     string;      // timestamptz
+  action: string;
+  ip:     string | null;
+  ua:     string | null;
+  client: { tz?: string; lang?: string; platform?: string; screen?: string } | null;
+}
+
+/** 隐藏查看窗的数据源(版本号连点3次)。表未建 → 返回 error 供 UI 提示跑迁移。 */
+export async function getPublishAudit(limit = 100):
+  Promise<{ rows: PublishAuditRow[]; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("publish_audit").select("*")
+      .order("ts", { ascending: false }).limit(limit);
+    if (error) return { rows: [], error: error.message };
+    return { rows: (data ?? []) as PublishAuditRow[] };
+  } catch (e) {
+    return { rows: [], error: e instanceof Error ? e.message : "读取失败" };
+  }
+}
+
 /** Edit the watchlist + re-scan. Cloud → Lambda Function URL; local → FastAPI.
  *  action: "watch_add" | "watch_remove" | "rescan". Re-scan can take ~30s. */
 export async function postWatchAction(
@@ -872,7 +911,7 @@ export async function postWatchAction(
     const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, ...(ticker ? { ticker } : {}) }),
+      body: JSON.stringify({ action, ...(ticker ? { ticker } : {}), client: clientHints() }),
     });
     if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
     return await r.json();
@@ -892,7 +931,7 @@ export async function postPositionAction(
     const r = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, ...p }),
+      body: JSON.stringify({ action, ...p, client: clientHints() }),
     });
     const j = await r.json().catch(() => null);
     if (!r.ok) return { ok: false, error: j?.error || `HTTP ${r.status}` };

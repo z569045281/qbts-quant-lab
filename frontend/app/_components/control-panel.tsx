@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API } from "../_lib/api";
+import { clientHints } from "../_lib/data";
 
 const PUBLISH_URL = process.env.NEXT_PUBLIC_PUBLISH_URL;
 
@@ -30,7 +31,12 @@ function CloudPanel({ onPublished }: { onPublished: () => void }) {
     setBusy(true);
     setResult(null);
     try {
-      const r = await fetch(PUBLISH_URL!, { method: "POST" });
+      // body 附设备提示(时区/语言/平台/屏幕)→ Lambda 连 IP/UA 记进 publish_audit
+      const r = await fetch(PUBLISH_URL!, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client: clientHints() }),
+      });
       const j = await r.json().catch(() => ({}));
       if (r.ok && j.ok !== false) {
         setResult({ ok: true, msg: j.decision ? `决策已更新 · ${j.decision}` : "决策已更新" });

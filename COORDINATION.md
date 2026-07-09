@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-09 · [fable] click-audit · 👀 按钮点击审计:Lambda _audit_click 记 IP/UA/设备提示进 publish_audit(cron不记);前端 POST 附 clientHints(时区/语言/平台/屏幕);版本号连点3次开隐藏查看窗(audit-modal,访客小结+逐条);v2.7.0 · ⚠️ 待用户跑 sql/publish_audit_migration.sql · files: aws/lambda_handlers.py, sql/publish_audit_migration.sql(new), frontend/app/_components/{audit-modal.tsx(new),control-panel.tsx}, frontend/app/_lib/data.ts, frontend/app/page.tsx, frontend/public/version.json, CLAUDE.md
+
 - [done] 2026-07-09 · [fable] selfcheck-fixes · 修 AI 自检 6 条:①journal 日期改美东挂钟(UTC/墨尔本翻日错位)②实时报价 2× 换算差>0.8pp 主动标注基准口径③校准命中率口径说明(edge非观望 vs HOLD影子两套勿混)④新闻初筛 QUBT≠QBTS 主体消歧义⑤快照补 market_light(SPY/QQQ vs 50日线+VIX,一级信号B-1不再盲判)⑥playbook rr_veto 熔断折叠一行 · files: backend/dashboard/{journal,decision,news}.py, backend/api.py
 
 - [done] 2026-07-09 · [fable] audit-tool · ⚖️ 8/15 审判执行器:python audit.py 一键出逐源判决报告(校准+决策台账+纸面马+扫描账本,Wilson CI 预注册规则,只读) · files: backend/dashboard/audit.py(new), audit.py(new), CLAUDE.md

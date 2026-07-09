@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MiniChart } from "./_components/mini-chart";
+import { AuditModal } from "./_components/audit-modal";
 import { ControlPanel } from "./_components/control-panel";
 import PositionsCard from "./_components/positions-card";
 import { RetrospectivePanel } from "./_components/retrospective-panel";
@@ -96,6 +97,9 @@ export default function Dashboard() {
   const [live, setLive] = useState<LiveQuote | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 👀 隐藏点击审计:版本号 1.5s 内连点 3 次打开
+  const [auditOpen, setAuditOpen] = useState(false);
+  const versionClicks = useRef<number[]>([]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -1504,10 +1508,21 @@ export default function Dashboard() {
         QBTS Quant Lab · AI 决策由 Claude 基于 8 类数据源综合生成 · 每日 publish.py 更新 · 仅供研究参考，非投资建议
       </footer>
 
-      {/* 右下角版本号 */}
-      <div className="hidden md:block fixed bottom-2 right-3 z-10 text-[10px] font-mono text-gray-300 select-none pointer-events-none">
+      {/* 右下角版本号 — 连点 3 次(1.5s 内)打开隐藏的点击审计查看窗 */}
+      <div
+        className="fixed bottom-2 right-3 z-10 text-[10px] font-mono text-gray-300 select-none cursor-default"
+        onClick={() => {
+          const now = Date.now();
+          versionClicks.current = [...versionClicks.current.filter(t => now - t < 1500), now];
+          if (versionClicks.current.length >= 3) {
+            versionClicks.current = [];
+            setAuditOpen(true);
+          }
+        }}
+      >
         v{APP_VERSION}
       </div>
+      {auditOpen && <AuditModal onClose={() => setAuditOpen(false)} />}
     </main>
   );
 }

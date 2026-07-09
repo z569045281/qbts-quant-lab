@@ -198,3 +198,24 @@ create policy "anon read live_quote"
   on public.live_quote for select
   to anon, authenticated
   using (true);
+
+-- ── publish_audit ────────────────────────────────────────────────────────────
+-- 👀 谁点了按钮:Lambda publish_handler 的 _audit_click 每次真人点击写一行
+-- (IP/UA/前端设备提示;EventBridge 定时任务不记)。前端版本号连点 3 次的
+-- 隐藏查看窗读取 → 需要 anon SELECT。写入只走 service key。
+create table if not exists public.publish_audit (
+  id     bigint generated always as identity primary key,
+  ts     timestamptz not null default now(),
+  action text not null,   -- publish / watch_add / watch_remove / rescan / pos_add / pos_remove
+  ip     text,
+  ua     text,            -- 原始 User-Agent(截断 300 字)
+  client jsonb            -- {tz, lang, platform, screen}
+);
+
+alter table public.publish_audit enable row level security;
+
+drop policy if exists "anon read publish_audit" on public.publish_audit;
+create policy "anon read publish_audit"
+  on public.publish_audit for select
+  to anon, authenticated
+  using (true);
