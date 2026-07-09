@@ -51,6 +51,12 @@ THEME = {
     "NVDA": "芯片", "SPCX": "SpaceX",
     # diversifying drivers (low corr to basket, verified 2026-06-24)
     "MP": "稀土", "SYM": "机器人",
+    # sector-gap fills per rotation map — 生科/医疗/金融/通讯/必需消费 were blank
+    # while 生科 led the tape (fundamentals verified live 2026-07-09)
+    "VKTX": "减肥药", "HIMS": "远程医疗", "HOOD": "券商加密",
+    "ASTS": "卫星通信", "CELH": "能量饮料",
+    # user-added via site, labels backfilled 2026-07-09
+    "FLNC": "储能", "OKLO": "核电",
 }
 
 # ── Lockup-event overlay (informational only; does NOT feed the score) ────────────
