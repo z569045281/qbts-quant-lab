@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-09 · [fable] mining-round21 · 第二十一轮(挖矿收官):Google Trends 散户搜索热度(pytrends 周频 SVI,预注册:n<10 只作文字;诊断镜子假说) · files: mining.md
+
 - [done] 2026-07-09 · [fable] mining-round20 · 第二十轮:SEC FTD 交割失败(半月档,出版滞后诚实建模,信息含量诊断版+可交易版分开),预注册判活 · files: mining.md
 
 - [done] 2026-07-09 · [fable] mining-round19 · 第十九轮:裸 BOS/CHoCH 结构事件研究(smc.py 同源口径+防repaint确认约束,日线,姐妹交叉验证),预注册判活 · files: mining.md
