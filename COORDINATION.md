@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-09 · [fable] mining-round19 · 第十九轮:裸 BOS/CHoCH 结构事件研究(smc.py 同源口径+防repaint确认约束,日线,姐妹交叉验证),预注册判活 · files: mining.md
+
 - [done] 2026-07-09 · [fable] mining-round18 · 第十八轮:量子篮子横截面落后追赶(用户设想的四象限"谁落后买谁";冠军配对的全篮子推广),预注册判活;若成→观察组+量子族谱四象限图 · files: mining.md
 
 - [done] 2026-07-09 · [fable] mining-round17 · 第十七轮:17A 板块轮动象限(QTUM RRG→QBTS,须超越在册QTUM昨日绿) + 17B SEC 424B增发事件(供给冲击否决器),预注册判活,黑马→观察组 · files: mining.md
