@@ -24,7 +24,7 @@ function StrategyCard({ s }: { s: ReplayStrategy }) {
           cur.in_market ? "bg-emerald-100 text-emerald-700" : "bg-[#F2F2F7] text-gray-500"}`}>
           {cur.in_market
             ? `在场 ${(cur.exposure * 100).toFixed(0)}%${cur.since ? ` · ${cur.since} 入 $${cur.entry_px?.toFixed(2)} · 浮 ${pct(cur.unreal, 1)}` : ""}`
-            : "空仓等待"}
+            : cur.triggered_today ? "今日触发 · 日内单" : "空仓等待"}
         </span>
       </div>
       <p className="text-[12px] text-gray-400 leading-relaxed mb-3">{s.rule}</p>
@@ -118,7 +118,21 @@ export default function StrategyRecordPage() {
 
       {err && <div className="bg-white rounded-2xl px-4 py-6 text-center text-sm text-gray-400">{err}</div>}
       {!err && !replay && <div className="bg-white rounded-2xl px-4 py-6 text-center text-sm text-gray-400">加载中…</div>}
-      {replay?.strategies.map(s => <StrategyCard key={s.key} s={s} />)}
+      {replay?.strategies.filter(s => s.tier !== "watch").map(s => <StrategyCard key={s.key} s={s} />)}
+
+      {/* 👀 观察组:观察名单候选的前向战绩(未晋升,8/15 凭记录+判活标准复查) */}
+      {replay?.strategies.some(s => s.tier === "watch") && (
+        <>
+          <div className="pt-3">
+            <h2 className="text-sm font-bold text-[#525461]">👀 观察组 · 未晋升</h2>
+            <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
+              挖矿观察名单的候选(各轮判活差一口气的信号)——同框记战绩,但<b>不进决策、不算在册马</b>;
+              8/15 审判时凭记录 + 预注册判活标准复查,过线才升马。卡片规则里写明了各自出身轮次与没晋升的原因。
+            </p>
+          </div>
+          {replay.strategies.filter(s => s.tier === "watch").map(s => <StrategyCard key={s.key} s={s} />)}
+        </>
+      )}
 
       <div className="text-center text-[10px] text-gray-400">
         规则与回测口径见 mining.md · 仅供研究参考,非投资建议

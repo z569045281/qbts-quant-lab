@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-09 · [fable] watch-tier-replay · 观察名单三候选(CPI+PPI公布日/周一BTC大绿日内/GPR地缘缓和)上 /factors 策略战绩「👀观察组」:replay.py tier=watch + FRED排期/GPR xls 数据源(aws deps +xlrd) + 前端分区渲染 v2.8.0 · files: backend/dashboard/replay.py, aws/requirements.txt, requirements.txt, frontend/app/factors/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, mining.md
+
 - [done] 2026-07-09 · [fable] mining-round16 · 第十六轮:宏观公布日溢价专题(CPI/PPI/NFP/FOMC 持有进公布,第十五轮线索;用户点单,冻结豁免;黑马→纸面马进策略战绩) · files: mining.md, 可能 backend/dashboard/qbts_paper.py+replay.py
 
 - [done] 2026-07-09 · [fable] click-audit · 👀 按钮点击审计:Lambda _audit_click 记 IP/UA/设备提示进 publish_audit(cron不记);前端 POST 附 clientHints(时区/语言/平台/屏幕);版本号连点3次开隐藏查看窗(audit-modal,访客小结+逐条);v2.7.0 · ⚠️ 待用户跑 sql/publish_audit_migration.sql · files: aws/lambda_handlers.py, sql/publish_audit_migration.sql(new), frontend/app/_components/{audit-modal.tsx(new),control-panel.tsx}, frontend/app/_lib/data.ts, frontend/app/page.tsx, frontend/public/version.json, CLAUDE.md

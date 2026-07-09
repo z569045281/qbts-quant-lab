@@ -21,3 +21,4 @@ anthropic
 supabase
 python-dotenv
 fastapi
+xlrd==2.0.2

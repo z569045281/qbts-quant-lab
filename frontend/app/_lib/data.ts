@@ -469,10 +469,12 @@ export interface ReplayStrategy {
   name:  string;
   emoji: string;
   rule:  string;
+  tier?: "watch";      // 👀 观察组(观察名单候选的前向战绩,未晋升纸面马);缺省=在册马
   stats: { ret_full: number; ret_1y: number; max_dd: number;
            n_trades: number; n_wins: number; win_rate: number | null };
   current: { in_market: boolean; exposure: number;
-             since?: string; entry_px?: number; unreal?: number; z40?: number | null };
+             since?: string; entry_px?: number; unreal?: number; z40?: number | null;
+             triggered_today?: boolean };
   trades: ReplayTrade[];
   n_trades_total: number;
 }

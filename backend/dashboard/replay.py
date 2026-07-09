@@ -15,16 +15,69 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import time
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from dotenv import load_dotenv
+
+load_dotenv()   # 独立运行时也要有 FRED_API_KEY(审判工具同款教训:环境变量缺失会静默降级)
 
 logger = logging.getLogger(__name__)
 
 _COST = 0.002
 _CACHE = Path(__file__).parent.parent / "data" / "cache" / "strategy_replay.json"
+_REL_CACHE = Path(__file__).parent.parent / "data" / "cache" / "release_days.json"
+_GPR_CACHE = Path(__file__).parent.parent / "data" / "cache" / "gpr_daily.xls"
+
+
+def _release_days() -> set[str] | None:
+    """CPI+PPI 官方发布日(FRED release dates,含已排期的未来日 → 观察⑧的
+    "明天是否公布日"当前仓位才不瞎)。缓存 24h;无 key/失败 → None(跳过该策略)。"""
+    if _REL_CACHE.exists() and time.time() - _REL_CACHE.stat().st_mtime < 86400:
+        try:
+            return set(json.loads(_REL_CACHE.read_text()))
+        except Exception:
+            pass
+    key = os.getenv("FRED_API_KEY")
+    if not key:
+        return None
+    days: set[str] = set()
+    try:
+        for rid in (10, 46):        # CPI / PPI
+            url = (f"https://api.stlouisfed.org/fred/release/dates?release_id={rid}"
+                   f"&api_key={key}&file_type=json&limit=1000&sort_order=desc"
+                   f"&realtime_start=2022-01-01&realtime_end=2027-12-31"
+                   f"&include_release_dates_with_no_data=true")
+            with urllib.request.urlopen(url, timeout=15) as r:
+                days |= {d["date"] for d in json.load(r).get("release_dates", [])}
+        _REL_CACHE.write_text(json.dumps(sorted(days)))
+        return days
+    except Exception as e:
+        logger.warning(f"replay: FRED release dates failed — {e}")
+        return None
+
+
+def _gpr_act() -> pd.Series | None:
+    """GPR 日频军事行动分项(Caldara–Iacoviello,免费 xls)。缓存 24h;
+    需要 xlrd;失败 → None(跳过观察⑩)。注意数据出版滞后 ~1-2 天。"""
+    try:
+        if not (_GPR_CACHE.exists() and time.time() - _GPR_CACHE.stat().st_mtime < 86400):
+            req = urllib.request.Request(
+                "https://www.matteoiacoviello.com/gpr_files/data_gpr_daily_recent.xls",
+                headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                _GPR_CACHE.write_bytes(r.read())
+        g = pd.read_excel(_GPR_CACHE)[["date", "GPRD_ACT"]]
+        g["date"] = pd.to_datetime(g["date"])
+        return g.set_index("date")["GPRD_ACT"].sort_index()
+    except Exception as e:
+        logger.warning(f"replay: GPR fetch/parse failed — {e}")
+        return None
 
 
 def _dl(ticker: str) -> pd.Series | None:
@@ -212,6 +265,83 @@ def compute_replay(df_d: pd.DataFrame) -> dict | None:
         "tj", "特调双腿(用户自创)", "🎯",
         "快%R上穿−80且慢<−50 → 抄底买入;快%R下穿−20(止盈)或下穿−50(破位)→ 卖出。进场腿十三轮最强(+17.4%/5天),QBTS 专用。",
         pd.Series(tj, index=idx), c))
+
+    # ── 👀 观察组:观察名单候选的前向战绩(未晋升纸面马,8/15 审判時复查)──
+    # 与七马同框展示但 tier="watch";规则文字必须写明出身轮次与没晋升的原因。
+
+    # ⑧ CPI+PPI 公布日(第十六轮:三窗口正+姐妹3/3,卡在 t=1.76<2)
+    try:
+        rel = _release_days()
+        if rel:
+            flag = pd.Series([1.0 if str(t.date()) in rel else 0.0 for t in idx], index=idx)
+            # 持有"进"公布日 = 前一交易日收盘建仓 → w(t-1)=1 吃公布日收益
+            w_rel = flag.shift(-1).fillna(0.0)
+            strategies.append(_pack(
+                "obs_cpippi", "CPI+PPI公布日", "👀",
+                "每月 CPI/PPI 公布日(盘前8:30出数)前一天收盘买、公布日收盘卖,吃公布风险溢价。"
+                "第十六轮:全样本+223%/姐妹3/3,但 t=1.76 未过 2.0 晋升线且溢价大半是隔夜漂移马甲"
+                "——观察中,别当在册信号。",
+                w_rel, c) | {"tier": "watch"})
+    except Exception as e:
+        logger.warning(f"replay: obs_cpippi skipped — {e}")
+
+    # ⑨ 周一·周末BTC大绿(第十三轮幅度分档:肉集中在 w≥+1.9% 的大绿档)
+    try:
+        if btc is not None and "open" in d.columns:
+            o = d["open"].astype(float)
+            flags = []
+            for t in idx:
+                if t.weekday() != 0:
+                    flags.append(False); continue
+                b_fri = btc.asof(t - pd.Timedelta(days=3))
+                b_sun = btc.asof(t - pd.Timedelta(days=1))
+                flags.append(bool(pd.notna(b_fri) and pd.notna(b_sun)
+                                  and b_sun / b_fri - 1 >= 0.019))
+            flags = pd.Series(flags, index=idx)
+            ir = (c / o - 1).where(flags, 0.0) - _COST * 2 * flags.astype(float)
+            stats, nav = _nav_stats(ir)
+            trades = [{"buy_date": str(t.date()), "buy_px": round(float(o.loc[t]), 2),
+                       "open": False, "sell_date": str(t.date()),
+                       "sell_px": round(float(c.loc[t]), 2), "days": 0,
+                       "ret": round(float(c.loc[t] / o.loc[t] - 1 - _COST * 2), 4)}
+                      for t in idx[flags.values]]
+            wins = sum(1 for t in trades if t["ret"] > 0)
+            strategies.append({
+                "key": "obs_btcmon", "name": "周一BTC大绿日内", "emoji": "👀", "tier": "watch",
+                "rule": "周末BTC(五→日)涨幅≥+1.9%(大绿档)→ 周一开盘买、收盘卖,不过夜。"
+                        "第十三轮:小绿档无肉(+0.36%),大绿档日内+3.08%;效应 2025 年中才出现,"
+                        "regime 现象——观察中。",
+                "stats": stats | {"n_trades": len(trades), "n_wins": wins,
+                                  "win_rate": round(wins / len(trades), 3) if trades else None},
+                "current": {"in_market": False, "exposure": 0.0,
+                            "triggered_today": bool(flags.iloc[-1])},
+                "trades": trades[::-1][:12], "n_trades_total": len(trades),
+            })
+    except Exception as e:
+        logger.warning(f"replay: obs_btcmon skipped — {e}")
+
+    # ⑩ GPR 地缘缓和买入(第十四轮:QTUM 9/9 阈值组合全正,QBTS 单票噪声大)
+    try:
+        act = _gpr_act()
+        if act is not None and len(act) > 60:
+            ratio = act / act.rolling(30).median()
+            hot = (ratio > 2.5) & (act > 150)
+            was = hot.shift(1).rolling(5).max() == 1
+            cool = (ratio < 1.2) & was
+            cool &= ~cool.shift(1, fill_value=False)
+            w_gpr = pd.Series(0.0, index=idx)
+            for d0 in act.index[cool]:
+                i = int(idx.searchsorted(d0)) + 2   # GPR 出版滞后 ~2 天,+2 才可执行
+                if i < len(idx):
+                    w_gpr.iloc[i:min(i + 5, len(idx))] = 1.0
+            strategies.append(_pack(
+                "obs_gprcool", "地缘缓和买入", "👀",
+                "军事行动指数(GPR_ACT)跳变后首次回落基线 → 滞后2天买入持5天(枪声停了买)。"
+                "第十四轮:QTUM 9 组阈值全正(t最高3.3),QBTS 单票被逼空长尾污染+数据滞后"
+                "——观察中,信号极稀(约季度一次)。",
+                w_gpr, c) | {"tier": "watch"})
+    except Exception as e:
+        logger.warning(f"replay: obs_gprcool skipped — {e}")
 
     # B&H 基准
     bh_stats, _ = _nav_stats(ret)
