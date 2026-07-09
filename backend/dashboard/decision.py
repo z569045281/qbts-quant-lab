@@ -478,9 +478,20 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                 fc = f"（预测 {e['forecast']} / 前值 {e['previous']}）"
             else:
                 fc = ""
-            rows.append(f"  {star} {e['date']} {e['time_et']}ET [{e['impact']}] {e['title']}{fc}")
+            co = (e.get("coef") or {}).get("label")
+            rows.append(f"  {star} {e['date']} {e['time_et']}ET [{e['impact']}] {e['title']}{fc}"
+                        + (f"〔{co}〕" if co and e.get("nuclear") else ""))
         risk_line = f"  ⚠️ {macro['risk_note']}" if macro.get("risk_window") else f"  {macro.get('risk_note','')}"
-        parts.append("## 宏观经济日历（未来14天，🔴=重磅）\n" + "\n".join(rows) + "\n" + risk_line)
+        coef_line = (
+            "  （宏观日影响系数·第十五轮实测 2022-08~2026-07,事件日|ret|÷平日,*=显著:"
+            "非农/失业率 SPY×1.56*·QTUM×1.46* > CPI SPY×1.44 > FOMC SPY×1.31(余波常落在次日);"
+            "PPI/核心PCE/GDP/零售/JOLTS ≈×1.0 连大盘都不动。"
+            "关键:QBTS 单票在所有宏观日系数均≈1.0——6.3%/日固有波动淹没宏观脉冲,"
+            "别只因『数据日』缩 QBTS 仓;正确用法=把非农/CPI/FOMC 当【大盘方向的潜在翻转点】,"
+            "公布后看 SPY/QQQ/VIX 反应定基调,而非提前恐惧。）"
+        )
+        parts.append("## 宏观经济日历（未来14天，🔴=重磅）\n" + "\n".join(rows)
+                     + "\n" + risk_line + "\n" + coef_line)
 
     # ── 财报日历 ─────────────────────────────────────────────
     earnings = extras.get("earnings_dates") or []

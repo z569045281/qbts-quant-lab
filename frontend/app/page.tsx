@@ -730,6 +730,12 @@ export default function Dashboard() {
                     {e.date.slice(5)} {e.time_et}ET{etMelbSuffix(e.date, e.time_et)}
                   </span>
                   <span className="font-medium text-gray-800">{e.title}</span>
+                  {e.coef && e.coef.spy >= 1.3 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-orange-100 text-orange-700"
+                          title={`实测事件日波动放大倍数(2022-08~2026-07): 大盘×${e.coef.spy} · 量子ETF×${e.coef.qtum} · QBTS单票×${e.coef.qbts}(宏观日对QBTS单票无额外波动,系数看大盘方向背景)`}>
+                      大盘×{e.coef.spy}
+                    </span>
+                  )}
                   {(() => {
                     // Badge 按类型诚实:演讲天生没数值结果,别挂"已公布"让人以为缺数据;
                     // 有预测的数据过期但没实际值(如免费源没有的 ISM/ADP,或覆盖内待下次补)

@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-09 · [fable] macro-event-coef · 第十五轮:宏观事件(FOMC/CPI/NFP等)×QBTS 事件日影响系数排行(FRED release dates),结果进 mining.md + 系数表接入 macro.py/决策 prompt · files: mining.md, backend/dashboard/macro.py, backend/dashboard/decision.py
+
 - [done] 2026-07-09 · [fable] gpr-event-study · GPR 地缘风险指数×QBTS 事件研究(纯研究豁免,验证地缘雷达假设:alert日次日收益/波动是否更差),结果归档 mining.md · files: mining.md
 
 - [done] 2026-07-09 · [fable] geo-radar · 地缘政治/政策雷达:新 backend/dashboard/geopolitics.py(Google News RSS 伊朗/川普/量子政策 + Haiku 风险分级)进 snapshot+决策 prompt;quote_handler 盘中每~30min 刷新+ntfy 高影响新条目推送;决策页新雷达卡 · files: backend/dashboard/geopolitics.py(new), backend/api.py, backend/dashboard/decision.py, aws/lambda_handlers.py, frontend/app/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json

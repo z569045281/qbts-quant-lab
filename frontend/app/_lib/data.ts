@@ -392,6 +392,8 @@ export interface MacroEvent {
   previous:    string;
   actual:      string;    // filled by the feed after release
   nuclear:     boolean;
+  // 第十五轮实测事件日影响系数(|ret| 相对无事件日的倍数;null=未测该类事件)
+  coef?:       { spy: number; qtum: number; qbts: number; label: string } | null;
   hours_until?: number;   // negative = already released
 }
 

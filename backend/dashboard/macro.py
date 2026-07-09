@@ -1,10 +1,11 @@
 """
 Macro economic calendar — CPI / PPI / FOMC / NFP and friends.
 
-QBTS is a high-beta, long-duration small-cap: macro liquidity expectations move
-it MORE than its own news on data days. A hot CPI print can sink the quantum
-basket 5-10% regardless of company fundamentals. The dashboard was blind to
-this — this module closes the gap.
+QBTS is a high-beta, long-duration small-cap sensitive to macro liquidity
+expectations. 第十五轮实测(2026-07-09)修正了本模块最初的夸张假设:宏观数据日
+放大的是【大盘/板块】波动(非农 SPY×1.56*/QTUM×1.46*、CPI×1.44、FOMC×1.31),
+QBTS 单票系数全≈1.0 —— 6.3%/日固有波动淹没宏观脉冲。日历的正确用途 = 方向
+背景(数据落地后看大盘转向),不是单票事件风险。
 
 Source: ForexFactory weekly calendar JSON (faireconomy CDN, free, no key):
     https://nfs.faireconomy.media/ff_calendar_thisweek.json
@@ -50,10 +51,43 @@ _FOMC_2026 = [
 
 # Events that historically whipsaw high-beta growth stocks (substring match,
 # case-insensitive, against the FF title).
+# 第十五轮实测(2026-07-09,mining.md)按事件日 |ret| 放大倍数修剪:PPI/核心PCE/
+# GDP/零售/JOLTS 连 SPY 都不动(×0.96~1.14, ns)→ 退出 nuclear,免得 risk_window
+# 为无关数据收缩仓位;真重磅只有 非农>CPI>FOMC。失业率与非农同场发布,补进名单。
 _NUCLEAR_PATTERNS = (
-    "cpi", "ppi", "fomc", "federal funds rate", "non-farm", "nonfarm",
-    "core pce", "pce price index", "gdp", "jackson hole", "press conference",
+    "cpi", "fomc", "federal funds rate", "non-farm", "nonfarm",
+    "unemployment rate", "jackson hole", "press conference",
 )
+
+# 第十五轮事件日影响系数(2022-08~2026-07,事件日 |ret| ÷ 无事件日 |ret|;
+# *=统计显著)。核心发现:QBTS 单票所有宏观日系数≈1.0 —— 6.3%/日的固有波动
+# 淹没宏观脉冲;宏观通过大盘/板块通道起作用(方向背景),不构成单票事件风险。
+_IMPACT_COEF = (
+    # (patterns, {spy, qtum, qbts, label})
+    (("non-farm", "nonfarm", "unemployment rate", "average hourly"),
+     {"spy": 1.56, "qtum": 1.46, "qbts": 1.05, "label": "非农/失业率 大盘×1.56*"}),
+    (("cpi",),
+     {"spy": 1.44, "qtum": 1.25, "qbts": 0.99, "label": "CPI 大盘×1.44"}),
+    (("fomc", "federal funds rate", "press conference"),
+     {"spy": 1.31, "qtum": 0.96, "qbts": 0.99, "label": "FOMC 大盘×1.31·余波常在次日"}),
+    (("unemployment claims",),
+     {"spy": 1.14, "qtum": 1.15, "qbts": 1.04, "label": "初请 大盘×1.14"}),
+    (("ppi",),      {"spy": 1.00, "qtum": 0.92, "qbts": 1.12, "label": "PPI 大盘×1.0(实测不动)"}),
+    (("core pce", "pce price index"),
+     {"spy": 1.14, "qtum": 0.89, "qbts": 0.87, "label": "PCE 大盘×1.14(ns)"}),
+    (("gdp",),      {"spy": 0.96, "qtum": 1.01, "qbts": 0.86, "label": "GDP 大盘×0.96(实测不动)"}),
+    (("retail sales",),
+     {"spy": 1.13, "qtum": 0.94, "qbts": 0.90, "label": "零售 大盘×1.13(ns)"}),
+    (("jolts",),    {"spy": 1.10, "qtum": 1.08, "qbts": 1.00, "label": "JOLTS 大盘×1.1(ns)"}),
+)
+
+
+def _impact_coef(title: str) -> dict | None:
+    t = title.lower()
+    for pats, coef in _IMPACT_COEF:
+        if any(p in t for p in pats):
+            return coef
+    return None
 
 
 def _is_nuclear(title: str) -> bool:
@@ -125,6 +159,7 @@ def get_macro_calendar(force_refresh: bool = False) -> dict:
             "previous":    previous,
             "actual":      actual,             # filled by FF after release — 实际值
             "nuclear":     _is_nuclear(title),
+            "coef":        _impact_coef(title),  # 第十五轮实测影响系数(None=未测)
             "hours_until": hours_until,        # negative = already released
             "_utc":        dt_utc.isoformat(), # internal, for window math
         }
@@ -203,7 +238,8 @@ def get_macro_calendar(force_refresh: bool = False) -> dict:
             h = next(e["hours_until"] for e in in_window if e["title"] == ev)
             descs.append(f"{ev}（{abs(h):.0f}小时{'后发布' if h >= 0 else '前已发布'}）")
         risk_note = ("未来48小时重磅数据：" + "、".join(descs)
-                     + " — 高beta股波动放大，建议降低仓位或等数据落地再确认方向")
+                     + " — 实测宏观日只放大大盘/板块波动(QBTS 单票系数≈1.0)，"
+                       "别提前恐惧；数据落地后看大盘反应再定方向")
     else:
         nxt = next((e for e in nuclear if e["hours_until"] > 0), None)
         risk_note = (f"下一个重磅数据：{nxt['date']} {nxt['title']}（约{nxt['hours_until']/24:.0f}天后）"
