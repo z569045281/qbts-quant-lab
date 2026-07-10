@@ -23,7 +23,7 @@ function StrategyCard({ s }: { s: ReplayStrategy }) {
         <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
           cur.in_market ? "bg-emerald-100 text-emerald-700" : "bg-[#F2F2F7] text-gray-500"}`}>
           {cur.in_market
-            ? `在场 ${(cur.exposure * 100).toFixed(0)}%${cur.since ? ` · ${cur.since} 入 $${cur.entry_px?.toFixed(2)} · 浮 ${pct(cur.unreal, 1)}` : ""}`
+            ? `在场 ${(cur.exposure * 100).toFixed(0)}%${cur.sym ? ` · ${cur.sym}` : ""}${cur.since ? ` · ${cur.since} 入 $${cur.entry_px?.toFixed(2)} · 浮 ${pct(cur.unreal, 1)}` : ""}`
             : cur.triggered_today ? "今日触发 · 日内单" : "空仓等待"}
         </span>
       </div>
@@ -60,8 +60,10 @@ function StrategyCard({ s }: { s: ReplayStrategy }) {
             </thead>
             <tbody>
               {trades.map(t => (
-                <tr key={t.buy_date} className={`border-t border-[#F2F2F7] ${t.open ? "bg-emerald-50/60" : ""}`}>
-                  <td className="py-1.5 font-mono whitespace-nowrap">{t.buy_date} <span className="text-gray-400">@</span> ${t.buy_px.toFixed(2)}</td>
+                <tr key={`${t.buy_date}-${t.sym ?? ""}`} className={`border-t border-[#F2F2F7] ${t.open ? "bg-emerald-50/60" : ""}`}>
+                  <td className="py-1.5 font-mono whitespace-nowrap">
+                    {t.sym && <span className="mr-1 text-[10px] font-bold text-[#007AFF] bg-blue-50 rounded px-1 py-0.5">{t.sym}</span>}
+                    {t.buy_date} <span className="text-gray-400">@</span> ${t.buy_px.toFixed(2)}</td>
                   <td className="py-1.5 font-mono whitespace-nowrap">
                     {t.open
                       ? <span className="text-emerald-700 font-semibold">持仓中</span>

@@ -463,6 +463,7 @@ export interface ReplayTrade {
   sell_px?:   number;
   days:      number;
   ret:       number;    // 段收益(NAV 口径,含仓位与成本)
+  sym?:      string;    // 多标的策略(观察组⑪杠杆ETF)标注本段交易的票
 }
 export interface ReplayStrategy {
   key:   string;
@@ -474,7 +475,7 @@ export interface ReplayStrategy {
            n_trades: number; n_wins: number; win_rate: number | null };
   current: { in_market: boolean; exposure: number;
              since?: string; entry_px?: number; unreal?: number; z40?: number | null;
-             triggered_today?: boolean };
+             triggered_today?: boolean; sym?: string };
   trades: ReplayTrade[];
   n_trades_total: number;
 }

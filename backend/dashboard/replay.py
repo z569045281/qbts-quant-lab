@@ -343,6 +343,86 @@ def compute_replay(df_d: pd.DataFrame) -> dict | None:
     except Exception as e:
         logger.warning(f"replay: obs_gprcool skipped — {e}")
 
+    # ⑪ 杠杆ETF超卖回归(2026-07-10 适用域研究:与 QBTS 无关的宇宙 —— 仪表盘
+    #    通用信号 DNA 的真主场是指数超卖回归;12ETF pooled t=3.0、样本外 8ETF 复现。
+    #    这里前向验证可交易版:任一收盘下穿 NW 买入线 → 收盘买入,持 10 个交易日,
+    #    同时只持一仓(多票同触发选超卖最深)。)
+    try:
+        from dashboard.nadaraya_watson import (_H, _LEVEL, _MIN_BARS, _MULT,
+                                               _causal_nw)
+        univ = ["TQQQ", "SOXL", "UPRO", "TNA", "SPXL", "FNGU"]
+        sigs = {}
+        for tk in univ:
+            s = _dl(tk)
+            if s is None or len(s) < _MIN_BARS + 60:
+                continue
+            nw = pd.Series(_causal_nw(s.to_numpy(float), _H, 499), index=s.index)
+            mae = (s - nw).abs().rolling(499, min_periods=_MIN_BARS).mean() * _MULT
+            up_, lo_ = nw + mae, nw - mae
+            bl = up_ - (up_ - lo_) * _LEVEL / 100.0
+            sigs[tk] = {"c": s, "cross": (s < bl) & (s.shift(1) >= bl.shift(1)),
+                        "depth": (bl - s) / s}
+        if len(sigs) >= 4:                      # 宇宙缺票太多就跳过,别出瘸腿卡
+            cal = None
+            for v in sigs.values():
+                cal = v["c"].index if cal is None else cal.intersection(v["c"].index)
+            px2 = pd.DataFrame({t: v["c"] for t, v in sigs.items()}).loc[cal]
+            ret2 = px2.pct_change().fillna(0.0)
+            cross2 = pd.DataFrame({t: v["cross"] for t, v in sigs.items()}
+                                  ).reindex(cal).fillna(False)
+            depth2 = pd.DataFrame({t: v["depth"] for t, v in sigs.items()}).reindex(cal)
+            HOLD = 10
+            sret2 = pd.Series(0.0, index=cal)
+            tr2, held = [], None
+            for i in range(len(cal)):
+                if held is not None:
+                    sym = held["sym"]
+                    sret2.iloc[i] += float(ret2[sym].iloc[i])
+                    if i - held["i0"] >= HOLD:
+                        sret2.iloc[i] -= _COST
+                        po = float(px2[sym].iloc[i])
+                        tr2.append({"sym": sym,
+                                    "buy_date": str(cal[held["i0"]].date()),
+                                    "buy_px": round(held["px"], 2), "open": False,
+                                    "sell_date": str(cal[i].date()),
+                                    "sell_px": round(po, 2), "days": i - held["i0"],
+                                    "ret": round(po / held["px"] - 1 - 2 * _COST, 4)})
+                        held = None
+                if held is None and bool(cross2.iloc[i].any()):
+                    sym = depth2.iloc[i].where(cross2.iloc[i]).idxmax()
+                    if isinstance(sym, str):
+                        held = {"sym": sym, "i0": i, "px": float(px2[sym].iloc[i])}
+                        sret2.iloc[i] -= _COST
+            if held is not None:
+                sym = held["sym"]
+                tr2.append({"sym": sym, "buy_date": str(cal[held["i0"]].date()),
+                            "buy_px": round(held["px"], 2), "open": True,
+                            "days": int(len(cal) - 1 - held["i0"]),
+                            "ret": round(float(px2[sym].iloc[-1]) / held["px"] - 1
+                                         - _COST, 4)})
+            stats2, _nav2 = _nav_stats(sret2)
+            wins2 = sum(1 for t in tr2 if not t["open"] and t["ret"] > 0)
+            closed2 = sum(1 for t in tr2 if not t["open"])
+            cur2 = {"in_market": held is not None, "exposure": 1.0 if held else 0.0}
+            if held is not None:
+                cur2 |= {"sym": held["sym"], "since": tr2[-1]["buy_date"],
+                         "entry_px": tr2[-1]["buy_px"], "unreal": tr2[-1]["ret"]}
+            strategies.append({
+                "key": "obs_levmr", "name": "杠杆ETF超卖回归", "emoji": "👀",
+                "tier": "watch",
+                "rule": "六只杠杆指数ETF(TQQQ/SOXL/UPRO/TNA/SPXL/FNGU)任一收盘跌破"
+                        "非重绘NW包络买入线 → 收盘买入(多票同触发选超卖最深),持10个"
+                        "交易日,同时只持一仓。出身:07-10适用域研究——指数超卖回归是"
+                        "仪表盘通用信号的真主场(12ETF合并 t=3.0,样本外8ETF复现,妖股上"
+                        "同信号为负)。与QBTS完全无关的宇宙,前向观察兑现度。",
+                "stats": stats2 | {"n_trades": closed2, "n_wins": wins2,
+                                   "win_rate": round(wins2 / closed2, 3) if closed2 else None},
+                "current": cur2,
+                "trades": tr2[::-1][:12], "n_trades_total": len(tr2),
+            })
+    except Exception as e:
+        logger.warning(f"replay: obs_levmr skipped — {e}")
+
     # B&H 基准
     bh_stats, _ = _nav_stats(ret)
 
