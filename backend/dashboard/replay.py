@@ -350,11 +350,14 @@ def compute_replay(df_d: pd.DataFrame) -> dict | None:
     try:
         from dashboard.nadaraya_watson import (_H, _LEVEL, _MIN_BARS, _MULT,
                                                _causal_nw)
-        univ = ["TQQQ", "SOXL", "UPRO", "TNA", "SPXL", "FNGU"]
+        # FNGU 剔除:数据只有 2025-02 起,会把交集日历截短 → 「全期」统计
+        # 悄悄丢掉 2025 年 2-4 月的三段亏损(净 −22%),全期收益虚高成近1年的
+        # 复制品。宇宙只收有完整 2 年历史的票。
+        univ = ["TQQQ", "SOXL", "UPRO", "TNA", "SPXL"]
         sigs = {}
         for tk in univ:
             s = _dl(tk)
-            if s is None or len(s) < _MIN_BARS + 60:
+            if s is None or len(s) < 480:       # 必须接近完整 2y,短历史票直接不要
                 continue
             nw = pd.Series(_causal_nw(s.to_numpy(float), _H, 499), index=s.index)
             mae = (s - nw).abs().rolling(499, min_periods=_MIN_BARS).mean() * _MULT
@@ -410,7 +413,7 @@ def compute_replay(df_d: pd.DataFrame) -> dict | None:
             strategies.append({
                 "key": "obs_levmr", "name": "杠杆ETF超卖回归", "emoji": "👀",
                 "tier": "watch",
-                "rule": "六只杠杆指数ETF(TQQQ/SOXL/UPRO/TNA/SPXL/FNGU)任一收盘跌破"
+                "rule": "五只杠杆指数ETF(TQQQ/SOXL/UPRO/TNA/SPXL)任一收盘跌破"
                         "非重绘NW包络买入线 → 收盘买入(多票同触发选超卖最深),持10个"
                         "交易日,同时只持一仓。出身:07-10适用域研究——指数超卖回归是"
                         "仪表盘通用信号的真主场(12ETF合并 t=3.0,样本外8ETF复现,妖股上"

@@ -131,3 +131,4 @@ Format (newest at top):
 2026-07-10 10:45 [fable] 千元挑战二期改马拉松(用户改规则): challenge2.py 取消+10%判赢收手→跑到8/15+里程碑推送+平仓日冷却+equity_curve / challenge页SVG资金曲线 + v2.9.0 [done]
 2026-07-10 11:20 [fable] 适用域研究(用户提问:这套仪表盘适合分析什么股): 5核心信号×5股性篮子横扫回测 → mining.md 归档,纯研究零部署
 2026-07-10 12:40 [fable] 观察组第4号候选上线(用户拍板): replay.py obs_levmr 杠杆ETF超卖回归(NW买线下穿·持10日·单仓) + factors页/data.ts sym字段 + v2.10.0 [done]
+2026-07-10 13:10 [fable] obs_levmr 口径修正: FNGU 短历史(2025-02起)截短交集日历致全期虚高 → 剔出宇宙(5只完整2y票),全期+127%/近1年+185% 诚实分窗 [done]
