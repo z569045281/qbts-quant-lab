@@ -813,6 +813,10 @@ export interface CryptoChallenge {
   odds_note:    string;
   history:      string[];
   updated_at:   string;
+  marathon?:     boolean;            // 🏁 2026-07-10 起:不设收手线,跑到 8/15
+  milestone_at?: string;             // 首次 +10% 的时间(报喜不收手)
+  cooldown_date?: string;            // 平仓当日冷却,次日再进场
+  equity_curve?: [string, number][]; // [iso_ts, equity] 每跳(15min)一点
 }
 
 /* 挑战「今日照做」篮子 + 全场杠杆ETF扫描 —— 每日 publish 算好放进 snapshot.challenge_basket。 */

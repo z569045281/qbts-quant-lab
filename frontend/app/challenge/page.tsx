@@ -58,10 +58,11 @@ export default function ChallengePage() {
 
   const s     = STATUS[c.status] ?? STATUS.running;
   const gained = Math.max(0, c.pnl);
-  const target = c.win_line - c.sleeve_start;                  // $100
+  const target = c.win_line - c.sleeve_start;                  // $100 / $500
   const prog  = Math.min(100, Math.max(0, (c.pnl / target) * 100));
   const pos   = c.position;
   const win   = c.status === "won";
+  const marathon = !!c.marathon;
   const gainColor = c.pnl > 0 ? "text-emerald-600" : c.pnl < 0 ? "text-[#F03A3E]" : "text-gray-900";
 
   return (
@@ -71,7 +72,9 @@ export default function ChallengePage() {
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
             <h1 className="text-lg font-bold text-gray-900">
-              🎰 {money(c.sleeve_start)} → +{money(target)} 一个月挑战
+              {marathon
+                ? <>🏁 {money(c.sleeve_start)} 马拉松挑战 · 跑到 {c.deadline.slice(5).replace("-", "/")}</>
+                : <>🎰 {money(c.sleeve_start)} → +{money(target)} 一个月挑战</>}
               {(c.round ?? 1) > 1 && <span className="ml-2 text-xs font-medium text-[#006FFF] bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5 align-middle">第 {c.round} 期</span>}
             </h1>
             <p className="text-xs text-[#525461] mt-0.5">
@@ -107,23 +110,36 @@ export default function ChallengePage() {
           </div>
         </div>
 
-        {/* progress bar toward +$100 */}
+        {/* progress bar toward the +10% line(马拉松=里程碑,老规则=达标线) */}
         <div className="mt-5">
           <div className="flex justify-between text-[11px] text-[#525461] mb-1">
-            <span>目标进度 · 赚到 {money(gained)} / {money(target)}</span>
+            <span>{marathon ? "里程碑" : "目标"}进度 · 赚到 {money(gained)} / {money(target)}
+              {marathon && c.milestone_at && <span className="ml-1 text-emerald-600 font-medium">🏆 已达成,继续跑</span>}</span>
             <span className="font-mono">{prog.toFixed(0)}%</span>
           </div>
           <div className="h-2.5 rounded-full bg-[#EDEDF0] overflow-hidden">
-            <div className={`h-full rounded-full transition-all ${win ? "bg-emerald-500" : "bg-[#006FFF]"}`}
+            <div className={`h-full rounded-full transition-all ${(win || (marathon && c.milestone_at)) ? "bg-emerald-500" : "bg-[#006FFF]"}`}
                  style={{ width: `${Math.max(prog, 2)}%` }} />
           </div>
           <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-mono">
             <span>本金 {money(c.sleeve_start)}</span>
             <span>地板 {money(c.floor_line)}</span>
-            <span>达标 {money(c.win_line)}</span>
+            <span>{marathon ? "里程碑" : "达标"} {money(c.win_line)}</span>
           </div>
         </div>
       </section>
+
+      {/* ── 📈 资金曲线 ── */}
+      {(c.equity_curve?.length ?? 0) >= 2 && (
+        <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4">
+          <div className="flex items-baseline justify-between mb-2">
+            <h2 className="text-sm font-semibold text-gray-900">📈 资金曲线</h2>
+            <span className="text-[10px] text-gray-400">每 15 分钟一点 · 峰值 {money(c.peak_equity)}</span>
+          </div>
+          <EquityChart curve={c.equity_curve!} start={c.sleeve_start}
+                       winLine={c.win_line} floorLine={c.floor_line} />
+        </section>
+      )}
 
       {/* ── 复盘与心法入口 ── */}
       <Link href="/challenge/lessons"
@@ -171,8 +187,10 @@ export default function ChallengePage() {
         <h2 className="text-sm font-semibold text-gray-900">打法与赢面</h2>
         <p>只在 <b>上升趋势</b>（收盘价站上 50 日线且近一周上涨）时进场，集中押动量最强的杠杆 ETF
            {(c.round ?? 1) > 1 && <>（第 {c.round} 期起扩到<b>全场 ~40 只宇宙</b>，同款门槛）</>}，
-           进场即挂 <b className="text-emerald-600">止盈</b> + <b className="text-[#F03A3E]">−12% 止损</b> 的 bracket 单，浮盈触 +10% 即落袋。
-           权益触碰 <b>+{money(target)} 判赢收手</b>，−15% 触及地板则本期停手。</p>
+           进场即挂 <b className="text-emerald-600">止盈</b> + <b className="text-[#F03A3E]">−12% 止损</b> 的 bracket 单，浮盈触 +10% 即落袋{marathon && <>（落袋当日冷却，次日再进场）</>}。
+           {marathon
+             ? <>🏁 <b>马拉松模式</b>：不设收手线，持续交易到 <b>{c.deadline}</b>，到期看 {money(c.sleeve_start)} 滚成多少；{money(c.win_line)} 只是里程碑，−15% 地板仍<b>硬性停手</b>。</>
+             : <>权益触碰 <b>+{money(target)} 判赢收手</b>，−15% 触及地板则本期停手。</>}</p>
         <p className="text-[13px] bg-[#F6F6F8] rounded-md px-3 py-2 border border-[#EDEDF0]">
           📊 {c.odds_note}
         </p>
@@ -194,6 +212,59 @@ export default function ChallengePage() {
         状态由{c.runner === "cloud" ? "云端挑战 bot（AWS Lambda）" : "本地挑战 bot "}每 15 分钟推送到 Supabase · 更新于 {c.updated_at} · 纸面模拟, 非投资建议
       </div>
     </main>
+  );
+}
+
+/** 纯 SVG 资金曲线:时间 × 权益,参考线 = 本金/里程碑/地板。静态导出零依赖。 */
+function EquityChart({ curve, start, winLine, floorLine }:
+    { curve: [string, number][]; start: number; winLine: number; floorLine: number }) {
+  const W = 640, H = 240, PAD = { l: 54, r: 14, t: 12, b: 22 };
+  const pts = curve
+    .map(([t, v]) => ({ ms: new Date(t).getTime(), v }))
+    .filter(p => Number.isFinite(p.ms) && Number.isFinite(p.v))
+    .sort((a, b) => a.ms - b.ms);
+  if (pts.length < 2) return null;
+
+  const x0 = pts[0].ms, x1 = pts[pts.length - 1].ms || x0 + 1;
+  const vs = pts.map(p => p.v);
+  const yLo = Math.min(floorLine, ...vs) * 0.995;
+  const yHi = Math.max(winLine, ...vs) * 1.005;
+  const X = (ms: number) => PAD.l + ((ms - x0) / Math.max(1, x1 - x0)) * (W - PAD.l - PAD.r);
+  const Y = (v: number) => PAD.t + (1 - (v - yLo) / (yHi - yLo)) * (H - PAD.t - PAD.b);
+
+  const path = pts.map((p, i) => `${i ? "L" : "M"}${X(p.ms).toFixed(1)},${Y(p.v).toFixed(1)}`).join("");
+  const area = `${path}L${X(x1).toFixed(1)},${(H - PAD.b).toFixed(1)}L${PAD.l},${(H - PAD.b).toFixed(1)}Z`;
+  const last = pts[pts.length - 1];
+  const up = last.v >= start;
+  const line = up ? "#059669" : "#F03A3E";
+  const fmtD = (ms: number) => {
+    const d = new Date(ms);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+  const Ref = ({ v, color, label }: { v: number; color: string; label: string }) => (
+    <g>
+      <line x1={PAD.l} x2={W - PAD.r} y1={Y(v)} y2={Y(v)} stroke={color} strokeWidth="1" strokeDasharray="4 4" opacity="0.55" />
+      <text x={PAD.l - 6} y={Y(v) + 3.5} textAnchor="end" fontSize="10" fill={color} fontFamily="ui-monospace,monospace">
+        {label}
+      </text>
+    </g>
+  );
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="挑战资金曲线">
+      <Ref v={winLine}   color="#059669" label={`$${winLine.toLocaleString()}`} />
+      <Ref v={start}     color="#9CA3AF" label={`$${start.toLocaleString()}`} />
+      <Ref v={floorLine} color="#F03A3E" label={`$${floorLine.toLocaleString()}`} />
+      <path d={area} fill={line} opacity="0.08" />
+      <path d={path} fill="none" stroke={line} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={X(last.ms)} cy={Y(last.v)} r="3.5" fill={line} />
+      <text x={Math.min(X(last.ms), W - PAD.r - 4)} y={Math.max(Y(last.v) - 8, 11)} textAnchor="end"
+            fontSize="11" fontWeight="600" fill={line} fontFamily="ui-monospace,monospace">
+        ${last.v.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+      </text>
+      <text x={PAD.l} y={H - 6} fontSize="10" fill="#9CA3AF" fontFamily="ui-monospace,monospace">{fmtD(x0)}</text>
+      <text x={W - PAD.r} y={H - 6} textAnchor="end" fontSize="10" fill="#9CA3AF" fontFamily="ui-monospace,monospace">{fmtD(x1)}</text>
+    </svg>
   );
 }
 

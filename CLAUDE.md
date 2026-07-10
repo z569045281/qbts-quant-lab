@@ -100,8 +100,11 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   `minute%15==2` market-hours ticks — offset dodges the `%5` SMC minutes): $5000 paper
   sleeve on **Alpaca paper** (real orders, REST via `requests` — alpaca-py is NOT in the
   Lambda image on purpose). Entry = `challenge_basket` 全场之选 (87% market + GTC bracket
-  TP+11.5%/STOP−12%), +10% touch = liquidate (触碰即落袋; bracket is only the backstop),
-  win $5500 / floor $4250 / 30 days. State = Supabase `crypto_challenge` id='current'
+  TP+11.5%/STOP−12%), +10% touch = liquidate (触碰即落袋; bracket is only the backstop).
+  **🏁 马拉松模式 (2026-07-10 用户改规则)**: 不再 +10% 判赢收手 — $5500 只是里程碑
+  (首次报喜一次), 持续交易到 **2026-08-15**; 落袋当日冷却次日再进场 (否则下一跳原价
+  买回白付点差); floor $4250 硬性停手不变; 每跳记 `equity_curve` (15min 粒度, cap
+  2000 点) → /challenge 页 SVG 资金曲线。State = Supabase `crypto_challenge` id='current'
   (round 1 archived at 'round1-2026-07'); frontend /challenge renders it dynamically.
   **`ALPACA_API_KEY`/`ALPACA_SECRET_KEY`** live in root `.env` + GitHub Actions secrets +
   `template.yaml` (`AlpacaApiKey`/`AlpacaSecretKey`, blank = bot off). ⚠️ Round-1 lesson:
