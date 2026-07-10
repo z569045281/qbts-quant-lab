@@ -14,7 +14,9 @@ import json
 import logging
 import os
 import time
+from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import anthropic
 import yfinance as yf
@@ -31,6 +33,24 @@ _NEWS_CACHE.parent.mkdir(parents=True, exist_ok=True)
 _CACHE_SECONDS = 3600        # 1-hour TTL — news doesn't change minute-by-minute
 _PER_TICKER_LIMIT = 5
 _TICKERS = ["QBTS", "IONQ", "RGTI"]
+
+
+def _fmt_et(ts) -> str:
+    """pubDate(UTC)→美东时间。yfinance 给 UTC,直接展示会出现比 as_of(ET 交易日)
+    "晚一天"的假未来日期 —— AI 自检 2026-07-10 报过。全仪表盘时间统一 ET 口径。"""
+    try:
+        if isinstance(ts, (int, float)):
+            dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+        else:
+            s = str(ts).strip()
+            if not s:
+                return ""
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(ZoneInfo("America/New_York")).strftime("%Y-%m-%dT%H:%M ET")
+    except Exception:
+        return str(ts)[:19]
 
 
 def _normalize_item(raw: dict, ticker: str) -> dict:
@@ -51,7 +71,7 @@ def _normalize_item(raw: dict, ticker: str) -> dict:
     return {
         "title":     c.get("title", "?"),
         "publisher": publisher,
-        "published": (c.get("pubDate") or raw.get("providerPublishTime", "") or "")[:19],
+        "published": _fmt_et(c.get("pubDate") or raw.get("providerPublishTime", "")),
         "url":       url,
         "summary":   (c.get("summary") or "")[:280],
         "ticker":    ticker,

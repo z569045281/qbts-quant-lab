@@ -202,17 +202,23 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                 if q.get("change_pct") is not None:
                     fresh_chg[sym] = q["change_pct"]
             rows.append(f"  {sym.upper()}: ${q['price']} ({chg} vs 上一收盘){note}")
-        # 2× 一致性自检:两腿都新鲜却对不上 2× 时,多半是各自 prev_close 基准
-        # 口径不一致(反向/杠杆 ETF 的"上一收盘"常取不同 session)——主动标注,
-        # 免得模型(或自检)把基准噪声当成资金流信号(AI 自检 2026-07-09 报过)。
+        # 2× 一致性自检:07-10 实测两腿 prev_close 基准其实一致(fast_info ≈ 日线),
+        # 偏差是薄流动性 ETF 的真实贴价偏离(07-09 收盘 QBTZ −5.70% vs 隐含 −5.04%)。
+        # quote_pusher 现在带 implied_px(隐含公允价)/premium_pct —— 有它就报折溢价,
+        # 失效价换算一律以隐含比率为基准,勿把贴价偏离当资金流信号。
         if "qbts" in fresh_chg:
             for etf, lev in (("qbtx", 2.0), ("qbtz", -2.0)):
-                # 0.8pp 阈值:实测 prev_close 口径不一致造成 ~0.8-2pp 的假差
-                # (07-08 案例 QBTS -1.78% vs QBTX -2.73%,差 0.83pp 已引发误读)
                 if etf in fresh_chg and abs(fresh_chg[etf] - lev * fresh_chg["qbts"]) > 0.008:
-                    rows.append(f"  （⚠️ {etf.upper()} 涨跌与 2× 换算差 "
-                                f"{abs(fresh_chg[etf] - lev*fresh_chg['qbts'])*100:.1f}pp — "
-                                f"两标的 prev_close 基准可能不同口径,方向以 QBTS 为准,勿用该差值推断异动）")
+                    q_etf = lq["quotes"].get(etf) or {}
+                    prem, ipx = q_etf.get("premium_pct"), q_etf.get("implied_px")
+                    if prem is not None and ipx is not None:
+                        rows.append(f"  （⚠️ {etf.upper()} 现价对 2× 隐含公允价 ${ipx} 折溢价 "
+                                    f"{prem*100:+.1f}% — 薄流动性贴价偏离(prev_close 基准已核实一致),"
+                                    f"失效价/目标价换算用隐含比率,勿把该偏离当异动信号）")
+                    else:
+                        rows.append(f"  （⚠️ {etf.upper()} 涨跌与 2× 换算差 "
+                                    f"{abs(fresh_chg[etf] - lev*fresh_chg['qbts'])*100:.1f}pp — "
+                                    f"薄流动性贴价偏离,方向以 QBTS 为准,勿用该差值推断异动）")
         parts.append(
             f"## ⚡ 实时报价（{sess_cn}，{lq.get('asof_et','?')} ET）— 上方日线数据未包含此变动，"
             f"以此为最新现实定价\n" + "\n".join(rows)
@@ -625,12 +631,19 @@ def _anchor_prices(snapshot: dict, extras: dict | None) -> tuple[float | None, f
     is anchored to *simultaneous* prices; otherwise fall back to the same-session
     closes. Mixing a live QBTS with a stale ETF close would skew the conversion,
     so ETF prices only come from live when QBTS itself is live.
+
+    杠杆腿优先用 implied_px(隐含公允价 = 自身上一收盘 × 2×QBTS涨跌,quote_pusher
+    计算):QBTX/QBTZ 薄流动性,最后成交价常带 ±1pp 级贴价偏离(07-09 实测 1.6pp),
+    直接当锚会让换算出的失效价/目标价系统性偏移(AI 自检 07-10 报过)。
     """
     quotes = ((extras or {}).get("live_quote") or {}).get("quotes") or {}
-    def _q(sym: str) -> float | None:
-        p = _num((quotes.get(sym) or {}).get("price"))
+    def _q(sym: str, fair_first: bool = False) -> float | None:
+        q = quotes.get(sym) or {}
+        p = _num(q.get("implied_px")) if fair_first else None
+        if p is None or p <= 0:
+            p = _num(q.get("price"))
         return p if (p is not None and p > 0) else None
-    q_qbts, q_qbtx, q_qbtz = _q("qbts"), _q("qbtx"), _q("qbtz")
+    q_qbts, q_qbtx, q_qbtz = _q("qbts"), _q("qbtx", True), _q("qbtz", True)
 
     etf = snapshot.get("etf_prices") or {}
     s_qbts = _num(snapshot.get("price"))

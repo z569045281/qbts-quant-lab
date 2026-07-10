@@ -41,7 +41,7 @@ export interface GeoItem {
   track_cn:  string;
   title:     string;
   source:    string;
-  published: string;              // UTC iso, 分钟精度
+  published: string;              // 美东时间 "YYYY-MM-DDTHH:MM ET"(2026-07-10 起,曾是 UTC)
   url:       string;
   relevance: "high" | "medium" | "low";
   stance:    "risk_off" | "risk_on" | "neutral";

@@ -88,6 +88,19 @@ def build_payload() -> dict:
         q = fetch_quote(sym)
         if q:
             quotes[sym.lower()] = q
+    # 杠杆腿隐含公允价:QBTZ/QBTX 薄流动性,最后成交价常偏离 2× 换算(实测
+    # 07-09 收盘差 0.66pp,是真实贴价偏离而非 prev_close 口径问题)。给下游一个
+    # 干净基准:implied_px = 自身上一收盘 × (1 + 杠杆 × QBTS涨跌),premium_pct
+    # = 现价对它的折溢价 —— 失效价换算/一致性自检都以此为准。
+    base = quotes.get("qbts")
+    if base and base.get("change_pct") is not None:
+        for sym, lev in (("qbtx", 2.0), ("qbtz", -2.0)):
+            q = quotes.get(sym)
+            if q and q.get("prev_close"):
+                fair = q["prev_close"] * (1 + lev * base["change_pct"])
+                q["implied_px"] = round(fair, 4)
+                if q.get("price") and fair:
+                    q["premium_pct"] = round(q["price"] / fair - 1, 6)
     return {
         "session":    us_session(now_et),
         "asof_et":    now_et.strftime("%Y-%m-%d %H:%M:%S"),

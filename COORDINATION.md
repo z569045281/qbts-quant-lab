@@ -132,3 +132,4 @@ Format (newest at top):
 2026-07-10 11:20 [fable] 适用域研究(用户提问:这套仪表盘适合分析什么股): 5核心信号×5股性篮子横扫回测 → mining.md 归档,纯研究零部署
 2026-07-10 12:40 [fable] 观察组第4号候选上线(用户拍板): replay.py obs_levmr 杠杆ETF超卖回归(NW买线下穿·持10日·单仓) + factors页/data.ts sym字段 + v2.10.0 [done]
 2026-07-10 13:10 [fable] obs_levmr 口径修正: FNGU 短历史(2025-02起)截短交集日历致全期虚高 → 剔出宇宙(5只完整2y票),全期+127%/近1年+185% 诚实分窗 [done]
+2026-07-10 15:50 [fable] AI自检07-10三连修: news时间戳UTC→ET / QBTX·QBTZ隐含公允价+折溢价(quote_pusher)+失效价换算锚改公允(decision._anchor_prices) / rel_strength补姐妹单日+追赶触发判定+peers TTL刷新+滞后守卫 [done]
