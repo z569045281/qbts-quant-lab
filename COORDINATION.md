@@ -129,3 +129,4 @@ Format (newest at top):
 2026-07-09 10:35 [fable] 千元挑战收官打法提炼 note → mining.md(用户要求,会话收尾)[done]
 2026-07-10 09:05 [fable] 地缘雷达推送频控(一晚20条轰炸修复): geopolitics.py maybe_geo_refresh 加冷却(升级立推/同级3h/降级1h,last_push_ts随live_quote) + CLAUDE.md [done]
 2026-07-10 10:45 [fable] 千元挑战二期改马拉松(用户改规则): challenge2.py 取消+10%判赢收手→跑到8/15+里程碑推送+平仓日冷却+equity_curve / challenge页SVG资金曲线 + v2.9.0 [done]
+2026-07-10 11:20 [fable] 适用域研究(用户提问:这套仪表盘适合分析什么股): 5核心信号×5股性篮子横扫回测 → mining.md 归档,纯研究零部署
