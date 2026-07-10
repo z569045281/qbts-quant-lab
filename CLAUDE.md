@@ -186,7 +186,10 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   **盘中**: quote_handler 在 `minute%30==8`(错开 %5 SMC、%15==2 挑战 bot)调
   `maybe_geo_refresh` → 写 `live_quote.data['geo']`(off-tick carry-forward),
   **新高影响条目 / 风险级别翻转 → ntfy 推送**(去重靠 payload 里的 `alerted` key 列表;
-  首次运行不推防轰炸;周日 20:01 ET 那跳顺带补一发周末局势检查)。前端决策页
+  首次运行不推防轰炸;周日 20:01 ET 那跳顺带补一发周末局势检查)。**推送频控
+  (2026-07-10,一晚 20 条轰炸后加)**:级别升级立推(high);同级别持续报道 3h 冷却、
+  降级 1h 冷却(冷却中新条目静默登记,卡片照常盘中更新);`last_push_ts` 随
+  live_quote 携带。前端决策页
   优先读 live 版(`live?.geo ?? snap.geopolitics`),alert 整卡变红。无新增 secret
   (复用 ANTHROPIC_API_KEY + NTFY_TOPIC,均已在 template.yaml Globals)。
 

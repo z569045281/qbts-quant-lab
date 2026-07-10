@@ -127,3 +127,4 @@ Format (newest at top):
 2026-07-08 11:55 [fable] 💼当前持仓功能: positions.py + pos_*动作(api.py/lambda) + decision position_advice(schema+规则16+持仓段) + PositionsCard + v2.1.0 [done]
 2026-07-08 16:42 [fable] /factors 改造为🏇策略战绩页: replay.py 七马全历史复算(买卖点/收益/当前状态) + 页面重写 + nav改名 + v2.2.0 [done]
 2026-07-09 10:35 [fable] 千元挑战收官打法提炼 note → mining.md(用户要求,会话收尾)[done]
+2026-07-10 09:05 [fable] 地缘雷达推送频控(一晚20条轰炸修复): geopolitics.py maybe_geo_refresh 加冷却(升级立推/同级3h/降级1h,last_push_ts随live_quote) + CLAUDE.md [done]

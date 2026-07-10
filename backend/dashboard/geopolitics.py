@@ -19,6 +19,13 @@ changed (new item keys vs cache) or the analysis is >6h old. The intraday
 Lambda path (`maybe_geo_refresh`) runs ~every 30 min and fires an ntfy push
 on (a) a NEW high-relevance item, (b) the risk level flipping — deduped via
 the `alerted` key list carried in live_quote, same pattern as intraday_smc.
+
+Push rate limit (2026-07-10, after a 20-push night): a sustained hot story
+churns re-worded headlines every fetch → new md5 keys → a push per tick.
+So pushes now cool down: level ESCALATION is immediate, same-level fresh
+items wait ≥3h since the last push (silently registered meanwhile — the
+dashboard card still updates live), de-escalation waits ≥1h (damps
+alert↔watch flapping). `last_push_ts` rides in the live_quote payload.
 """
 
 from __future__ import annotations
@@ -61,6 +68,10 @@ _TRACKS = [
 ]
 
 _RISK_CN = {"alert": "🔴 升温", "watch": "🟡 观察", "calm": "🟢 平静"}
+_LEVEL_RANK = {"calm": 0, "watch": 1, "alert": 2}
+
+_PUSH_COOLDOWN_SAME = 3 * 3600   # 同级别的持续报道:距上次推送 ≥3h 才再推
+_PUSH_COOLDOWN_DOWN = 1 * 3600   # 降级(缓和):≥1h,防 alert↔watch 横跳刷屏
 
 
 def _item_key(title: str) -> str:
@@ -257,32 +268,46 @@ def maybe_geo_refresh(prev: dict | None, now_et: datetime) -> dict | None:
 
     fresh = dict(fresh)                       # live_quote copy carries push state
     alerted = list((prev or {}).get("alerted") or [])
+    last_push = float((prev or {}).get("last_push_ts") or 0)
+    now_ts = time.time()
     hot = [it for it in fresh.get("items", [])
            if it.get("relevance") == "high" and it["key"] not in alerted]
-    level_flip = bool(prev) and prev.get("risk_level") and \
-        prev.get("risk_level") != fresh.get("risk_level")
+    prev_level = (prev or {}).get("risk_level")
+    cur_level = fresh.get("risk_level")
+    level_flip = bool(prev) and prev_level and prev_level != cur_level
+    escalated = level_flip and \
+        _LEVEL_RANK.get(cur_level, 0) > _LEVEL_RANK.get(prev_level, 0)
 
     if prev is None:
         # 首次运行不推(避免部署即轰炸),只登记现有高影响条目
         alerted += [it["key"] for it in hot]
     elif hot or level_flip:
-        head = f"{fresh.get('risk_cn','?')} {fresh.get('headline_cn','')}"
-        lines = [head]
-        if level_flip:
-            lines.append(f"风险级别 {_RISK_CN.get(prev.get('risk_level'),'?')} → {fresh.get('risk_cn')}")
-        for it in hot[:3]:
-            lines.append(f"· [{it['track_cn']}] {it['title'][:70]}")
-            if it.get("note_cn"):
-                lines.append(f"  → {it['note_cn']}")
-        if fresh.get("summary_cn"):
-            lines.append(fresh["summary_cn"])
-        from dashboard.intraday_smc import _ntfy
-        pri = "high" if (level_flip or fresh.get("risk_level") == "alert") else "default"
-        if _ntfy("QBTS Geo Radar", "\n".join(lines), tags="globe_with_meridians", priority=pri):
+        # 频控:升级立推;降级 ≥1h;同级别持续报道 ≥3h(冷却中静默登记,
+        # 卡片照常盘中更新 — 推送只做「注意力触发」,不当新闻流)
+        cooldown = 0 if escalated else \
+            (_PUSH_COOLDOWN_DOWN if level_flip else _PUSH_COOLDOWN_SAME)
+        if now_ts - last_push < cooldown:
             alerted += [it["key"] for it in hot]
+        else:
+            head = f"{fresh.get('risk_cn','?')} {fresh.get('headline_cn','')}"
+            lines = [head]
+            if level_flip:
+                lines.append(f"风险级别 {_RISK_CN.get(prev_level,'?')} → {fresh.get('risk_cn')}")
+            for it in hot[:3]:
+                lines.append(f"· [{it['track_cn']}] {it['title'][:70]}")
+                if it.get("note_cn"):
+                    lines.append(f"  → {it['note_cn']}")
+            if fresh.get("summary_cn"):
+                lines.append(fresh["summary_cn"])
+            from dashboard.intraday_smc import _ntfy
+            pri = "high" if (escalated and cur_level == "alert") else "default"
+            if _ntfy("QBTS Geo Radar", "\n".join(lines), tags="globe_with_meridians", priority=pri):
+                alerted += [it["key"] for it in hot]
+                last_push = now_ts
 
     # 只保留仍在雷达上的 key + 最近 100 个,防无限增长
     fresh["alerted"] = alerted[-100:]
+    fresh["last_push_ts"] = last_push
     return fresh
 
 
