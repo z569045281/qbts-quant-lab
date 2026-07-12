@@ -272,9 +272,15 @@ Frontend tabs (`frontend/app/`): **🎯 决策仪表盘** (`/`) · **🔭 自选
   sectors**; from real SPY/QQQ/IOO drawdown→fwd-return data — only a **−20%+ capitulation**
   justifies deploying the reserve, **−5~10% above the 200dMA is the best return+win-rate
   blend**, the **−10~20% middle is the worst** ("falling knife", NOT a bargain), and
-  buying near highs is fine. Cards show P/E + earnings-yield (CAPE proxy), target weights
-  40/30/20/10, a ballast note (BND/SGOV), and a "keep separate from the QBTS speculation
-  sleeve" warning. Macro CAPE (US ~40 / global ~27.7) is hardcoded with a "re-verify" note.
+  buying near highs is fine. Cards show P/E + earnings-yield (CAPE proxy), a "keep
+  separate from the QBTS speculation sleeve" warning. Macro CAPE (US ~40 / global ~27.7)
+  is hardcoded with a "re-verify" note. **2026-07-13 (user: "都加") menu completed into a
+  full portfolio**: equity tier **+AVDV** (international small value, AVUV's mirror) at
+  weights 30/20/14/8/8 = 80%, plus a **ballast tier** (`BALLAST_META`) **BND 12% +
+  GLDM 8%** with own cards + weights (`ballast_etfs` in payload) → total 100%. Ballast
+  deploy is overridden to 固定比例·不择时 — the equity drawdown→deploy evidence does NOT
+  apply to bonds/gold (GLDM sat −24% off its Jan-2026 $5,595/oz high at add-time, which
+  the equity rules would falsely read as 深跌可加码).
 
 - **Measurement phase (important).** The scan paper-trade, decision journal, and
   calibration only *just* started logging — **signals are statistically UNPROVEN**. A UI

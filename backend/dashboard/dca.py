@@ -4,13 +4,17 @@ core of index ETFs. NOT a trading signal. Rebuilt around what actually drives lo
 ETF outcomes (savings rate > time-in-market > fees > not panic-selling > diversification);
 entry timing is near noise, so the honest job here is small and twofold:
 
-  1. Pick the right *baskets* — a 4-ETF menu spanning the global valuation spectrum, so
+  1. Pick the right *baskets* — an equity menu spanning the global valuation spectrum, so
      you can tilt toward what's cheap (CAPE has real predictive power ACROSS REGIONS, not
-     across US sectors):
+     across US sectors), PLUS a ballast tier (2026-07-13, user: "都加") so the menu is a
+     complete portfolio instead of 100% equities:
         VTI  美股全市场      — US core (expensive: CAPE ~40)
         VEA  发达除美        — Europe/Japan/etc (cheaper)
         VWO  新兴市场        — emerging (cheapest)
         AVUV 美股小盘价值     — the one cheap corner of US
+        AVDV 国际小盘价值     — AVUV's overseas mirror
+        BND  美国全债        — ballast (equity-crash buffer)
+        GLDM 黄金            — the independent third leg (2022-style stock+bond双杀 hedge)
   2. Say *when to deploy extra* — using the evidence (real SPY/QQQ/IOO history): the
      −5~10% pullback above the 200-day is the best return+win-rate blend; only a −20%+
      capitulation justifies the reserve; the −10~20% middle is the worst ("falling knife"),
@@ -35,13 +39,24 @@ logger = logging.getLogger(__name__)
 
 # Global valuation menu (one ETF per distinct region/valuation bucket). Target weights
 # are a *moderate* valuation tilt vs the ~60/40 US/ex-US cap-weighted baseline.
+# Equity tier sums to 80; ballast tier (below) fills the remaining 20 → total 100.
 META = {
-    "VTI":  {"name": "美股全市场",   "role": "美国核心",        "target": 40},
-    "VEA":  {"name": "发达除美",     "role": "欧洲+日本等",     "target": 30},
-    "VWO":  {"name": "新兴市场",     "role": "新兴·最便宜",     "target": 20},
-    "AVUV": {"name": "美股小盘价值", "role": "美股便宜角落",     "target": 10},
+    "VTI":  {"name": "美股全市场",   "role": "美国核心",          "target": 30},
+    "VEA":  {"name": "发达除美",     "role": "欧洲+日本等",       "target": 20},
+    "VWO":  {"name": "新兴市场",     "role": "新兴·最便宜",       "target": 14},
+    "AVUV": {"name": "美股小盘价值", "role": "美股便宜角落",       "target": 8},
+    "AVDV": {"name": "国际小盘价值", "role": "AVUV的海外镜像",     "target": 8},
 }
 DCA_ETFS = list(META.keys())
+
+# 压舱石档(2026-07-13 用户拍板"都加"):从一行提示文字升级成实际配置。
+# 债是股灾缓冲;黄金是股债之外的独立第三腿(2022 股债双杀年份的对冲)。
+# 注意:股票的回撤→加码打法(_deploy)对它们不适用 —— 固定比例定投 + 年度再平衡即可。
+BALLAST_META = {
+    "BND":  {"name": "美国全债", "role": "压舱石·股灾缓冲",       "target": 12},
+    "GLDM": {"name": "黄金",     "role": "独立第三腿·抗股债双杀", "target": 8},
+}
+BALLAST_ETFS = list(BALLAST_META.keys())
 
 # 择机观察名单 —— 不进核心配置(不占 40/30/20/10 权重),只显示估值,便宜了再择机加。
 # 故意独立于 META:加进 META 会污染 DCA_ETFS 和 allocation 权重条。
@@ -49,7 +64,7 @@ WATCH = {
     "QQQ": {"name": "纳指100", "role": "美国大科技·择机(现贵,等便宜)"},
 }
 WATCH_ETFS = list(WATCH.keys())
-_META_ALL = {**META, **WATCH}   # 仅用于 _compute_etf 取名字/角色
+_META_ALL = {**META, **WATCH, **BALLAST_META}   # 仅用于 _compute_etf 取名字/角色
 
 _WINTER = {11, 12, 1, 2, 3, 4}   # historically strong half (kept as a minor detail)
 
@@ -145,7 +160,12 @@ def _compute_etf(ticker: str) -> dict:
             "drawdown_pct": round(drawdown, 4),
             "vs_200dma_pct": round(vs_200, 4),
             "below_200": below_200,
-            "deploy": _deploy(drawdown, below_200),
+            # 股票的回撤→加码证据(SPY/QQQ/IOO 历史)对债/金不成立:黄金/债的回撤
+            # 没有股票那种均值回归统计,别把 GLDM −24% 当"深跌可加码"。
+            "deploy": ({"tag": "固定比例·不择时", "emoji": "⚓",
+                        "text": "压舱资产:按固定权重定投 + 年度再平衡即可。上面股票的"
+                                "回撤加码打法对它不适用(那套证据来自股指历史)。"}
+                       if ticker in BALLAST_META else _deploy(drawdown, below_200)),
             "best_month": best_m, "best_month_avg": round(float(by_month[best_m]), 4),
             "worst_month": worst_m, "worst_month_avg": round(float(by_month[worst_m]), 4),
             "winter_avg": round(winter, 4), "summer_avg": round(summer, 4),
@@ -162,19 +182,24 @@ def compute_dca(tickers: list[str] | None = None) -> dict:
     tickers = tickers or DCA_ETFS
     results = [_compute_etf(t) for t in tickers]
     watch = [_compute_etf(t) for t in WATCH_ETFS]
+    ballast_etfs = [_compute_etf(t) for t in BALLAST_ETFS]
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "etfs": tickers,
         "results": results,
+        # 压舱石档(债+金):有卡片、有权重,和股票核心一起构成 100%
+        "ballast_etfs": ballast_etfs,
         # 择机观察(不进核心配置):便宜了再买
         "watch": watch,
         "watch_note": "这些不进上面的核心配置、不占权重。只看估值:🔴偏贵就等、"
                       "转🟡中性/🟢便宜再考虑择机小仓加(卫星仓,不是压舱石)。",
         # recommended valuation-tilted allocation (moderate; rebalance annually)
         "allocation": {
-            "weights": {t: META[t]["target"] for t in tickers if t in META},
-            "note": "市值中性约 60%美/40%外;这里按估值往非美+新兴温和倾斜。每年再平衡一次"
-                    "(把涨多的卖一点、补给跌的,本身就是高抛低吸)。",
+            "weights": {**{t: META[t]["target"] for t in tickers if t in META},
+                        **{t: BALLAST_META[t]["target"] for t in BALLAST_ETFS}},
+            "note": "股 80(市值中性约 60%美/40%外,这里按估值往非美+新兴温和倾斜)"
+                    "+ 债 12 + 金 8 = 100%。每年再平衡一次(把涨多的卖一点、补给跌的,"
+                    "本身就是高抛低吸)。想更激进就把债金比例挪给股票,更保守就反过来。",
         },
         # macro valuation backdrop (CAPE — re-verify periodically; cross-country CAPE
         # should be judged vs each market's OWN history, not compared absolutely)
@@ -184,8 +209,10 @@ def compute_dca(tickers: list[str] | None = None) -> dict:
                     "预期未来十年年化仅 ~1–2%);全球整体 ≈27.7(Siblis 2026-01)。便宜在非美/新兴。"
                     "这是 7–10 年的弱倾斜信号、不是择时,数据需定期复核。",
         },
-        "ballast": "这 4 只全是股票(100% 权益),崩盘会一起腰斩。十年不用 + 扛得住 → 可全股;"
-                   "否则加 10~30% 债券(BND)当压舱石。暴跌预备金 / 应急金放短债(如 SGOV)生息,别躺着。",
+        "ballast": "压舱石已纳入配置(BND 12% + GLDM 8%):债缓冲股灾,黄金对冲 2022 那种"
+                   "股债双杀(机构界 2026 年已把 5~10% 黄金当主流配置)。十年不用 + 扛得住 → "
+                   "可把这 20% 挪回股票全权益;否则保守方向加债。暴跌预备金 / 应急金放短债"
+                   "(如 SGOV,~4% 年化)生息,别躺着。",
         "principle": "决定结果的顺序:多投 > 早投 > 低费 > 不割肉 > 全球分散,买点择时接近噪声。"
                      "主力资金按节奏自动投、别怕新高;下面只帮你『选对篮子 + 什么时候多投一点』。",
         "separation": "⚠️ 这是躺平核心仓 —— 请和 QBTS / 自选扫描的投机仓彻底分开;后者要小到亏光也不影响生活。",

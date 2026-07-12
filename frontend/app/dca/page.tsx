@@ -130,7 +130,8 @@ export default function DcaPage() {
           <div className="flex h-6 rounded-lg overflow-hidden text-[10px] font-semibold text-white">
             {Object.entries(weights).map(([t, w], i) => (
               <div key={t}
-                className={["bg-[#006FFF]", "bg-emerald-500", "bg-amber-500", "bg-purple-500"][i % 4]}
+                className={["bg-[#006FFF]", "bg-emerald-500", "bg-amber-500", "bg-purple-500",
+                            "bg-cyan-600", "bg-slate-500", "bg-yellow-600"][i % 7]}
                 style={{ width: `${w}%` }} title={`${t} ${w}%`}>
                 <span className="px-1.5 leading-6">{t} {w}%</span>
               </div>
@@ -142,7 +143,8 @@ export default function DcaPage() {
 
       {/* 定投计算器 + 复利希望机(本机累计) */}
       {state && Object.keys(weights).length > 0 && (
-        <DcaCalculator weights={weights} results={state.results} />
+        <DcaCalculator weights={weights}
+          results={[...state.results, ...(state.ballast_etfs ?? [])]} />
       )}
 
       {/* 卡片 */}
@@ -171,11 +173,18 @@ export default function DcaPage() {
         </section>
       )}
 
-      {/* 压舱格(债券/现金)*/}
-      {state?.ballast && (
+      {/* 压舱石档(债+金):有卡片有权重,与股票核心合成 100% */}
+      {(state?.ballast_etfs?.length || state?.ballast) && (
         <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
-          <div className="text-xs font-semibold text-slate-700 mb-1">⚓ 压舱 & 预备金(独立于上面的股票)</div>
-          <p className="text-[12px] leading-relaxed text-slate-600">{state.ballast}</p>
+          <div className="text-xs font-semibold text-slate-700 mb-1">⚓ 压舱石(已纳入上面的配置权重)</div>
+          {state?.ballast && (
+            <p className="text-[12px] leading-relaxed text-slate-600 mb-3">{state.ballast}</p>
+          )}
+          {state?.ballast_etfs && state.ballast_etfs.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {state.ballast_etfs.map(r => <DcaCard key={r.ticker} r={r} />)}
+            </div>
+          )}
         </section>
       )}
 

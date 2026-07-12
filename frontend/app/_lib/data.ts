@@ -766,6 +766,7 @@ export interface DcaState {
   generated_at: string;
   etfs:         string[];
   results:      DcaResult[];
+  ballast_etfs?: DcaResult[];  // 压舱石档(BND+GLDM):有卡片有权重,与股票核心合成 100%
   watch?:       DcaResult[];   // 择机观察(不进核心配置,便宜了再买)
   watch_note?:  string;
   allocation?:  { weights: Record<string, number>; note: string };
