@@ -21,6 +21,17 @@ Signal levels:
   Active net change < -15%                      → SELL high
   ≥3 exits + concentration dropping             → SELL medium
   Insider% > 5% growing                         → +0.15 tilt BUY
+
+STALENESS GATE (2026-07-13, added after the dashboard audit): 13F is a quarterly
+STATIC snapshot, but the old code re-emitted the same directional push every single
+day — it fired on 18/19 graded days with the largest average log-odds in the whole
+edge model (+0.26) while hitting only 18% (n=17), single-handedly dragging overall
+edge direction accuracy to ~25% in a downtrend. A slow variable must not masquerade
+as a daily direction signal. Fix: the directional push only speaks while the filing
+is fresh — Date Reported is the quarter END and filings lag ≤45 days, so ≤75 days
+old = full strength (the just-filed window), 75–120 days = linear fade to zero,
+>120 days = muted (signal 0). The holders snapshot/card display is untouched; only
+the edge push is gated.
 """
 
 from __future__ import annotations
@@ -28,6 +39,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import yfinance as yf
@@ -40,6 +52,8 @@ _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
 _CACHE_TTL = 86400          # 24h — 13F is quarterly, no point refreshing more often
 _NEW_POSITION_THRESHOLD = 0.95   # pctChange ≥ this = new entry (was 0 last quarter)
 _EXIT_THRESHOLD         = -0.50  # pctChange ≤ this = major exit (sold ≥50%)
+_FRESH_DAYS = 75            # report_date(季度末)+45天申报滞后 ≈ 申报刚落地的新鲜窗
+_MUTE_DAYS  = 120           # 超过此天数 → 方向推力静音(展示照旧)
 
 # Keyword patterns that identify PASSIVE index/ETF holders
 _PASSIVE_KEYWORDS = (
@@ -48,6 +62,11 @@ _PASSIVE_KEYWORDS = (
     "value index", "vanguard total", "vanguard index funds", "vanguard small-cap",
     "vanguard mid-cap", "vanguard world", "fidelity small cap index",
     "fidelity extended market", "tech-software sector etf",
+    # 2026-07-13 审计修:凡 Vanguard 名下臂膀(Portfolio Management / Capital
+    # Management 等)都是指数化运作,此前漏网被当"主动新建仓"给假票 + "geode"
+    # 是 Fidelity 的指数臂。宁可错杀 Vanguard 极少数主动产品,不能让指数流
+    # 冒充聪明钱。
+    "vanguard", "geode",
 )
 
 
@@ -115,10 +134,14 @@ def fetch_holdings(ticker: str = "QBTS") -> dict:
     # Most-recent 13F report date — 13F is filed up to 45d after quarter-end, so
     # this is often 2-4 months stale. Surface it so the prompt can down-weight it.
     report_date = max((h["date"] for h in all_holders if h["date"]), default="")
+    # 陈旧度闸用这个:信号本体来自主动管理人的季度 13F。全体 max 会被月报的
+    # 共同基金(如 05-31)洗白,让 03-31 的季度数据看起来"新鲜"。
+    active_report_date = max((h["date"] for h in active if h["date"]), default="")
 
     return {
         "ticker":              ticker,
         "report_date":         report_date,
+        "active_report_date":  active_report_date,
         "institution_pct":     round(institution_pct, 4),
         "institution_count":   institution_count,
         "insider_pct":         round(insider_pct, 4),
@@ -187,6 +210,26 @@ def compute_holdings_signal(data: dict) -> dict:
             f"机构 {data['institution_pct']*100:.0f}% · "
             f"主动净变化 {active_change*100:+.1f}%（中性）"
         )
+
+    # 陈旧度闸:季度静态文件不再天天冒充每日方向信号(见模块 docstring)。
+    # 用主动持有人自己的报告期 —— 全体 max 会被月报共同基金洗白。
+    if signal != 0:
+        rd = str(data.get("active_report_date") or data.get("report_date") or "")[:10]
+        age_days = None
+        if rd:
+            try:
+                age_days = (datetime.now(timezone.utc).date() - date.fromisoformat(rd)).days
+            except ValueError:
+                age_days = None
+        if age_days is None or age_days > _MUTE_DAYS:
+            bits.append(f"⚠️ 报告期 {rd or '未知'}"
+                        f"{f' 距今 {age_days} 天' if age_days is not None else ''}"
+                        f" 已过时 → 方向推力静音(仅展示)")
+            signal, confidence, mag = 0, "low", 0.0
+        elif age_days > _FRESH_DAYS:
+            fade = (_MUTE_DAYS - age_days) / (_MUTE_DAYS - _FRESH_DAYS)
+            mag = mag * fade
+            bits.append(f"报告期 {rd} 距今 {age_days} 天 → 推力衰减 ×{fade:.2f}")
 
     return {
         "signal":             signal,

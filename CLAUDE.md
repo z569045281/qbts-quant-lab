@@ -225,6 +225,24 @@ Mistakes worth not repeating — when you learn one, add a dated bullet here.
   rides ntfy/live_quote (btc_weekend was) is invisible to the decision — wire it into the
   snapshot too.
 
+- **2026-07-13 · A static/slow variable must never masquerade as a daily direction
+  signal.** Dashboard audit found the 13F source fired on 18/19 graded days with the
+  single largest average push in the edge model (+0.26 log-odds, always bullish) while
+  hitting 18% (n=17) — the same quarterly filing re-emitted daily as if it were fresh
+  news, single-handedly dragging edge overall to 25% direction hit in a downtrend. Fixes
+  (`holdings.py`): staleness gate keyed to the **active holders'** report date (the
+  all-holders max gets whitewashed by monthly-reporting mutual funds) — ≤75d full
+  strength, 75–120d linear fade, >120d muted (display untouched); plus "vanguard"/"geode"
+  added to passive keywords (Vanguard Portfolio/Capital Management arms were counted as
+  active "new positions" = fake smart-money votes). Same audit: HOLD decisions are now
+  gradeable in `audit.py` (|decision-day QBTS| < 3% = correct, preregistered 2026-07-13)
+  so the journal accumulates a record even when the AI stays out (was 20 HOLD / 21 days
+  = zero judgeable samples), and nav paper-horses report vs same-window buy&hold
+  (`bh_ret_pct` — they had "all losses" optics while actually ALL beating B&H by
+  4–11pp). Known open issue: `python audit.py` crashes on GBK Windows consoles
+  (UnicodeEncodeError on ⚖) — run with `PYTHONIOENCODING=utf-8` (user declined the fix
+  for now).
+
 - **2026-06-24 · For ANY stock/market topic, lead with WebSearch (+ `yfinance`), never
   memory** *(user's standing instruction)*. When a question touches a specific stock —
   lockups / IPO terms / float / catalysts / earnings dates / valuation / "how low can it

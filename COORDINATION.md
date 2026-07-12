@@ -138,3 +138,4 @@ Format (newest at top):
 2026-07-10 13:10 [fable] obs_levmr 口径修正: FNGU 短历史(2025-02起)截短交集日历致全期虚高 → 剔出宇宙(5只完整2y票),全期+127%/近1年+185% 诚实分窗 [done]
 2026-07-10 15:50 [fable] AI自检07-10三连修: news时间戳UTC→ET / QBTX·QBTZ隐含公允价+折溢价(quote_pusher)+失效价换算锚改公允(decision._anchor_prices) / rel_strength补姐妹单日+追赶触发判定+peers TTL刷新+滞后守卫 [done]
 2026-07-13 14:05 [fable] 定投菜单补全(用户:都加): dca.py +AVDV(股80: 30/20/14/8/8)+压舱石档BND 12/GLDM 8(ballast_etfs卡片+权重,deploy改固定比例不择时) + dca页压舱石卡片区/7色权重条/计算器并入压舱石 + v2.12.0 [done]
+2026-07-13 16:05 [fable] 仪表盘回测审计三连修(用户:1/3/4都修): holdings.py 13F陈旧度闸(主动持有人报告期,75/120天衰减静音)+Vanguard/Geode误分类修 + audit.py HOLD判读(|当日|<3%=对,预注册)+纸面马补买入持有对照 + CLAUDE.md教训 [done]

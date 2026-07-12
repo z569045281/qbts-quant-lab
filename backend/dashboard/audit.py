@@ -13,6 +13,13 @@ CLAUDE.md 的常设提醒:edge.py 的所有权重都是硬编码先验,等各源
 只读不写:工具产出报告(stdout + cache/audit_report.json),权重改动仍走
 人工 code review(edge.py 常量),证据在手再动刀。
 
+2026-07-13 报告口径补充(判决规则本身未动,以下均为新增可见度):
+  · HOLD 判读(预注册):AI 决策 HOLD 也可评判 —— 决策覆盖的那个交易日
+    |QBTS 涨跌| < 3% = 判对(货架上有 QBTX/QBTZ 双向工具,错过任一方向
+    ≥3% 的行情都算漏判)。与方向单分开统计,不并入 n≥30 判决。
+  · 纸面马净值行补同窗「买入持有」对照(数据一直在 start_date/bh_nav 里,
+    此前报告不显示,导致七马看似全输、实则多数跑赢暴跌中的持有)。
+
 用法: python audit.py   (repo 根;或 python -m dashboard.audit 于 backend/)
 """
 
@@ -97,6 +104,31 @@ def run_audit() -> dict:
             **_verdict(wins, len(graded)),
             "paper": j.get("paper"),
         }
+        # HOLD 判读(2026-07-13 预注册补充,见模块 docstring;展示用,不触发权重)。
+        # 决策是 09:00 ET 盘前发布 → 覆盖的是 record 日期起的第一个交易日;
+        # 当日实盘未收盘(该 bar 是最后一根且就是今天)则跳过不评。
+        closes = df_d["close"]
+        rets = closes.pct_change()
+        today_utc = datetime.now(timezone.utc).date()
+        h_n = h_hit = 0
+        for r in recs:
+            if r.get("action") != "HOLD":
+                continue
+            dt = str(r.get("date") or "")[:10]
+            if not dt:
+                continue
+            idx = rets.index[rets.index >= dt]
+            if len(idx) == 0 or idx[0].date() >= today_utc:
+                continue
+            rv = rets.loc[idx[0]]
+            if rv != rv:            # NaN(首根 bar)
+                continue
+            h_n += 1
+            h_hit += abs(float(rv)) < 0.03
+        report["sections"]["decision_journal"]["hold_read"] = {
+            **_verdict(h_hit, h_n),
+            "rule": "|决策日QBTS涨跌|<3% 判对(双向工具在架,错过≥3%行情=漏判)",
+        }
     except Exception as e:
         report["sections"]["decision_journal"] = {"error": str(e)[:120]}
 
@@ -111,9 +143,23 @@ def run_audit() -> dict:
                 horses[key] = {**_verdict(blk.get("n_win") or 0, blk["n_closed"]),
                                "realized": blk.get("realized")}
             elif blk.get("nav") is not None:             # 净值型马($1000 起跑)
-                horses[key] = {"nav": blk["nav"],
-                               "ret_pct": round(blk["nav"] / 1000 - 1, 4),
-                               "verdict": "净值陪跑·8/15 与买入持有对比"}
+                h = {"nav": blk["nav"],
+                     "ret_pct": round(blk["nav"] / 1000 - 1, 4),
+                     "verdict": "净值陪跑·8/15 判决"}
+                # 同窗买入持有对照(口径补充,判决仍在 8/15):优先用马自己
+                # 记的 bh_ret_pct,没有就按 start_date 从日线现算
+                bh = blk.get("bh_ret_pct")
+                if bh is None and blk.get("start_date"):
+                    try:
+                        s = df_d["close"][df_d.index >= str(blk["start_date"])[:10]]
+                        if len(s) > 1:
+                            bh = round(float(s.iloc[-1] / s.iloc[0]) - 1, 4)
+                    except Exception:
+                        bh = None
+                if bh is not None:
+                    h["bh_ret_pct"] = bh
+                    h["vs_bh_pp"] = round((h["ret_pct"] - bh) * 100, 1)
+                horses[key] = h
         report["sections"]["paper_horses"] = horses
     except Exception as e:
         report["sections"]["paper_horses"] = {"error": str(e)[:120]}
@@ -154,6 +200,10 @@ def format_report(report: dict) -> str:
         L.append(f"\n② AI 决策台账 — 方向单 n={dj['n']} 命中{dj['hit_rate']*100:.0f}% "
                  f"CI[{dj['ci95'][0]*100:.0f},{dj['ci95'][1]*100:.0f}] {dj['verdict']}"
                  f" · 模拟持仓已实现 ${pp.get('realized')}")
+        hr = dj.get("hold_read")
+        if hr and hr.get("n"):
+            L.append(f"   HOLD 判读(|当日|<3%=对) n={hr['n']} 命中{hr['hit_rate']*100:.0f}% "
+                     f"CI[{hr['ci95'][0]*100:.0f},{hr['ci95'][1]*100:.0f}] {hr['verdict']}")
     hs = report["sections"].get("paper_horses", {})
     if hs and "error" not in hs:
         L.append("\n③ 纸面马竞速:")
@@ -162,7 +212,14 @@ def format_report(report: dict) -> str:
                 L.append(f"   {k:<14s} n={d['n']:<3d} 命中{d['hit_rate']*100:3.0f}% "
                          f"{d['verdict']} 落袋${d.get('realized')}")
             elif "nav" in d:
-                L.append(f"   {k:<14s} 净值${d['nav']:.0f} ({d['ret_pct']*100:+.1f}%) {d['verdict']}")
+                bh = d.get("bh_ret_pct")
+                extra = ""
+                if bh is not None:
+                    vs = d.get("vs_bh_pp") or 0
+                    extra = (f" | 买入持有{bh*100:+.1f}% → "
+                             f"{'跑赢' if vs >= 0 else '跑输'}{abs(vs):.1f}pp")
+                L.append(f"   {k:<14s} 净值${d['nav']:.0f} ({d['ret_pct']*100:+.1f}%)"
+                         f"{extra} {d['verdict']}")
     sp = report["sections"].get("scan_paper", {})
     if "n" in sp:
         L.append(f"\n④ 自选扫描纸面 — n={sp['n']} 胜率{sp['hit_rate']*100:.0f}% "
