@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-10 · [fable] mining-round22 · 第二十二轮:周末信息→周一 系统性专题(用户点单,冻结豁免纯研究)。预注册四候选:A 纳指期货周日夜盘(NQ=F 1h) B 亚洲周一领先(N225/HSI,美开盘前收盘) C ETH周末对BTC周末的增量 D 金价周日夜盘避险读数;判活=|t|≥2 且对在册周末BTC有增量 且姐妹≥2/3 同向;赢家最多进观察名单 · files: mining.md
+
 - [done] 2026-07-09 · [fable] mining-round21 · 第二十一轮(挖矿收官):Google Trends 散户搜索热度(pytrends 周频 SVI,预注册:n<10 只作文字;诊断镜子假说) · files: mining.md
 
 - [done] 2026-07-09 · [fable] mining-round20 · 第二十轮:SEC FTD 交割失败(半月档,出版滞后诚实建模,信息含量诊断版+可交易版分开),预注册判活 · files: mining.md
