@@ -253,7 +253,14 @@ Frontend tabs (`frontend/app/`): **🎯 决策仪表盘** (`/`) · **🔭 自选
   reused the soft UI "跌破20/50线" `exit_hint` as a hard stop, so a 买入区 (needs close>20MA but
   can sit <50MA) was flagged 'risk' and stopped the SAME day it opened → every trade a 1-day
   whipsaw loss. Now the stop is its own entry-anchored level and entries are tape-gated; the
-  ledger was reset once on this change.), **exit hints**, a static **lockup countdown**
+  ledger was reset once on this change. **2026-07-13 机制 v2**(首月战绩买入区 0/6、
+  账本 −$226 后六连修): ①目标过 **1.5R 盈亏比门**(沿参照列表向上取第一个 ≥1.5×止损
+  距离的,都不够=不设目标 `target_rr_veto`) ②模拟器改 **回踩限价挂单**(照卡片打法挂
+  需求区上沿,5 交易日内触价按 min(open,limit) 成交,过期/转空撤单;现价已在买点才即时
+  进场) ③买入区改 **顺风×回踩合取**(pts≥3 且 趋势腿 且 位置腿,缺腿降级) ④**板块
+  轮动门**(`SECTOR_OF` 映射到 sector_rotation 象限,左半边降级) ⑤无目标仓位 **破10日
+  线跟踪出场** ⑥`avoid` 避雷块(偏空回避=首月唯一 66% 命中的信号)。新单 epoch='v2',
+  v1 老仓按新出场规则跑完,审判按 epoch 分开统计。), **exit hints**, a static **lockup countdown**
   (`LOCKUPS` dict, SPCX), **earnings overlay**, a **thin-data guard** (<60 bars → flagged
   & excluded from paper trades), **market context** (SPY/QQQ vs 50dMA + VIX risk-on/off),
   and a **concurrent-buy correlation** note. Basket: QBTS POET EOSE RUN LUNR MARA AG NVDA

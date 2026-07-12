@@ -669,6 +669,9 @@ export interface ScanResult {
   regime?:       string | null;
   rsi?:          number | null;
   trigger?:      string;        // plain-language one-liner
+  target_rr_veto?: boolean;     // 上方参照太近(不够1.5×止损),不设目标
+  entry_limit?:  number | null; // 数值买点(回踩限价参考,纸面模拟用)
+  sector?:       { ticker: string; label: string; quadrant: string } | null;  // 轮动地图板块
   levels?:       { buy_zone: string | null; target: string | null; stop_hint: string | null };
   exit_hint?:    { kind: "profit" | "risk" | "warn"; tag: string; text: string } | null;  // 如有持仓的轻量出场提示
   lockup?:       {                                  // 解禁倒计时(事件叠加层,仅展示)
@@ -691,9 +694,14 @@ export interface PaperClosed {
   entry_date: string; entry_price: number; exit_date: string; exit_price: number;
   pnl: number; pnl_pct: number; reason: string; days: number;
 }
+export interface PaperPending {
+  ticker: string; limit: number; placed_date: string;
+  signal_price?: number; target?: number | null;
+}
 export interface PaperSim {
   trade_usd: number;
   open: PaperOpen[];
+  pending?: PaperPending[];     // v2:回踩限价挂单(触价才成交)
   closed: PaperClosed[];
   totals: {
     realized: number; unrealized: number; total: number;
@@ -715,6 +723,7 @@ export interface WatchScan {
   record_overall?: { n: number; correct: number; hit_rate: number | null };
   paper?:          PaperSim | null;
   market?:         MarketContext | null;
+  avoid?:          { tickers: string[]; note: string } | null;  // ⛔ 避雷清单(偏空回避)
   concurrent_buys?: ConcurrentBuys | null;
   commentary?:     string;
 }

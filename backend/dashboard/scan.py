@@ -59,6 +59,17 @@ THEME = {
     "FLNC": "储能", "OKLO": "核电",
 }
 
+# 票 → 轮动地图板块(sector_rotation 的 15 个代理 ETF;缺=不设板块门)。
+# 买入门 v2:板块在地图左半边(落后/转弱)时买入区降级 —— 首月 0/6 的买单
+# 几乎全开在转弱板块,这个门先纸面验证。
+SECTOR_OF = {
+    "QBTS": "QTUM", "POET": "SMH", "NVDA": "SMH", "MU": "SMH",
+    "SYM": "XLI", "LUNR": "XLI", "SPCX": "XLI", "EOSE": "XLI",
+    "AG": "GDX", "MP": "XLB",
+    "RUN": "XLU", "FLNC": "XLU", "OKLO": "XLU",
+    "VKTX": "XBI", "HIMS": "XLV", "HOOD": "XLF", "ASTS": "XLC", "CELH": "XLP",
+}
+
 # ── Lockup-event overlay (informational only; does NOT feed the score) ────────────
 # Static, hand-verified IPO lockup schedules for event-driven fresh listings — the
 # mechanical scan cannot see supply unlocks, so we surface a countdown. Dates from
@@ -256,9 +267,10 @@ def _exit_hint(close: float, target_num, sma20, sma50, buy_zone) -> dict | None:
     return None
 
 
-def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
+def scan_ticker(ticker: str, sector_info: dict | None = None) -> tuple[dict, "pd.DataFrame | None"]:
     """Scan one ticker → (card, daily_df). Never raises; errors are captured.
-    The daily df is returned so the caller can grade past calls without re-fetching."""
+    The daily df is returned so the caller can grade past calls without re-fetching.
+    sector_info: 轮动地图上该票所属板块的 {ticker,label,quadrant}(可缺,缺=不设门)。"""
     base = {"ticker": ticker, "theme": THEME.get(ticker, "其他"),
             "lockup": _lockup_info(ticker), "earnings": _earnings_info(ticker),
             "dilution": _dilution_info(ticker), "fundamentals": _fundamental_flags(ticker)}
@@ -303,10 +315,35 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
             if nw.get("signal") == 1:   pts += 1
             elif nw.get("signal") == -1: pts -= 1
 
-        if pts >= 3:    stance, emoji = "买入区", "🟢"
-        elif pts >= 1:  stance, emoji = "接近买点", "🟡"
-        elif pts >= -1: stance, emoji = "观望", "⚪"
-        else:           stance, emoji = "偏空回避", "🔴"
+        # ── 顺风 × 回踩位 两个合取分量(2026-07-10 机制修订 v2)────────────
+        # 首月战绩:买入区 0/6、接近买点 3/10 —— 加总凑分会在转弱段里凑出买点。
+        # 全库 22 轮挖矿反复验证的结构是「趋势顺风 + 回踩位置」同时成立,
+        # 所以 买入区 从 "pts≥3" 改成 "pts≥3 且 顺风分量 且 位置分量" 的合取。
+        has_trend = (trend == "bullish") or (close > sma20 and sma20 > sma50)
+        has_location = (("discount" in zone or "折价" in zone)
+                        or (rsi is not None and rsi < 35)
+                        or (nw.get("active") and nw.get("signal") == 1))
+
+        if pts >= 3 and has_trend and has_location:
+            stance, emoji = "买入区", "🟢"
+        elif pts >= 1:               # 含评分够线但缺一条腿的降级票
+            stance, emoji = "接近买点", "🟡"
+        elif pts >= -1:
+            stance, emoji = "观望", "⚪"
+        else:
+            stance, emoji = "偏空回避", "🔴"
+        conj_note = None
+        if pts >= 3 and stance != "买入区":
+            missing = "顺风(趋势)" if not has_trend else "回踩位(折价/RSI/NW下轨)"
+            conj_note = f"评分 {pts} 够线但缺{missing} —— 降级为接近买点"
+
+        # 板块轮动门:所在板块在轮动地图左半边(落后/转弱)→ 买入区降级。
+        # 首月 0/6 的买单几乎全开在转弱板块;先纸面验证这个门有没有用。
+        if stance == "买入区" and sector_info and sector_info.get("quadrant") in ("lagging", "weakening"):
+            stance, emoji = "接近买点", "🟡"
+            qcn = {"lagging": "落后", "weakening": "转弱"}[sector_info["quadrant"]]
+            conj_note = (f"个股信号够线,但板块({sector_info.get('label','')})在轮动地图"
+                         f"「{qcn}」象限 —— 降级观察,等板块转右半边")
         # pts 理论满配 +8(六项全绿 2+2+1+1+1+1),按 ±7 归一会算出 107% → 夹到 0-100
         score = max(0, min(100, round((pts + 7) / 14 * 100)))
 
@@ -321,8 +358,15 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
         # 上方参照必须真的在现价之上 —— 突破/创新高的票上方常无成交节点或供给,
         # 兜底绝不能吐一个低于现价的数当"上方目标"(读着像胡说,还会污染纸面止盈)。
         _cand = [mag_up, vah, (min(supply_above) if supply_above else None)]
-        _ups = [x for x in _cand if isinstance(x, (int, float)) and pd.notna(x) and x > close]
-        target = min(_ups) if _ups else None
+        _ups = sorted(x for x in _cand if isinstance(x, (int, float)) and pd.notna(x) and x > close)
+        # ── 盈亏比门(2026-07-10 v2):目标距离必须 ≥1.5× 止损距离 ────────
+        # 旧版取"最近参照"当目标,刚突破的票目标能近到 +0.4% 而止损 7–14%,
+        # 盈亏比天生是倒的(赢必小、输必大)。现在沿参照列表向上走,
+        # 取第一个够 1.5R 的;都不够 → 不设目标(改走跟踪出场),绝不硬凑。
+        from dashboard.scan_store import _stop_pct
+        stop_dist = close * _stop_pct(vol_annual)
+        target = next((u for u in _ups if u - close >= 1.5 * stop_dist), None)
+        target_rr_veto = bool(_ups) and target is None   # 有参照但全都太近
         brk = (min(supply_above) if supply_above else None) \
               or (vah if (isinstance(vah, (int, float)) and pd.notna(vah) and vah > close) else None)
 
@@ -332,7 +376,9 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
             if bz:     trig = f"结构偏多,可在需求区 {bz} 分批买"
             elif val:  trig = f"结构偏多,回踩价值区下沿 {_money(val)} 附近可买"
             else:      trig = "结构偏多,回踩不破前低可分批买"
-            if target: trig += f",上方先看 {_money(target)}"
+            if target: trig += f",上方先看 {_money(target)}(≥1.5倍止损距离)"
+            elif target_rr_veto:
+                trig += f",上方参照 {_money(_ups[0])} 太近不设目标(盈亏比不足,持仓走跟踪出场)"
             else:      trig += ",已突破·上方无成交参照(创新高,追高谨慎)"
         elif stance == "接近买点":
             ref = bz or _money(val)
@@ -358,6 +404,8 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
         if nw.get("active") and nw.get("stance") != "inside":
             notes.append(nw["note"])
 
+        if conj_note:
+            notes.insert(0, conj_note)
         thin = n_bars < _MIN_BARS
         if thin:
             notes.insert(0, f"⚠️ 仅 {n_bars} 天历史,技术信号不可靠(已排除出模拟交易)")
@@ -377,6 +425,13 @@ def scan_ticker(ticker: str) -> tuple[dict, "pd.DataFrame | None"]:
             "trigger": trig,
             "levels": {"buy_zone": bz, "target": _money(target), "stop_hint": reg.get("stop_hint")},
             "target_num": round(target, 2) if isinstance(target, (int, float)) and pd.notna(target) else None,
+            "target_rr_veto": target_rr_veto,
+            # 数值买点(纸面模拟的回踩限价参考):需求区上沿,退而求其次价值区下沿
+            "entry_limit": (round(buy_zone["high"], 2) if buy_zone
+                            else (round(float(val), 2)
+                                  if isinstance(val, (int, float)) and pd.notna(val) and val < close
+                                  else None)),
+            "sector": sector_info,
             "nw": {k: nw.get(k) for k in ("stance", "signal", "lower", "upper",
                    "buy_line", "sell_line", "nw", "position_pct", "crossed_in", "crossed_out")} if nw.get("active") else None,
             "exit_hint": _exit_hint(close, target, sma20, sma50, buy_zone),
@@ -427,10 +482,21 @@ def scan_watchlist(tickers: list[str] | None = None) -> dict:
     from dashboard import scan_store as store
     tickers = tickers or store.load_watchlist(WATCHLIST)
 
+    # 轮动地图板块象限(一次拉取;失败=全部不设门,扫描照常)
+    sec_map: dict[str, dict] = {}
+    try:
+        from dashboard.sector_rotation import analyze_sector_rotation
+        rot = analyze_sector_rotation()
+        for s in (rot or {}).get("sectors", []):
+            sec_map[s["ticker"]] = {"ticker": s["ticker"], "label": s["label"],
+                                    "quadrant": s["quadrant"]}
+    except Exception as e:
+        logger.warning(f"sector rotation for scan failed: {e}")
+
     results: list[dict] = []
     dfs: dict[str, "pd.DataFrame"] = {}
     for t in tickers:
-        r, df_d = scan_ticker(t)
+        r, df_d = scan_ticker(t, sector_info=sec_map.get(SECTOR_OF.get(t, "")))
         results.append(r)
         if df_d is not None:
             dfs[t] = df_d
@@ -450,12 +516,20 @@ def scan_watchlist(tickers: list[str] | None = None) -> dict:
     # broad-tape context FIRST — it gates paper entries (don't buy into a risk_off selloff)
     market = _market_context()
 
-    # paper trades: $1000 per buy signal, held to a sell signal → realized/unrealized P&L
+    # paper trades: $1000 per buy signal → 回踩限价挂单(v2),held to a sell signal
     paper = None
     try:
-        paper = store.run_paper_trades(results, market_regime=(market or {}).get("regime"))
+        paper = store.run_paper_trades(results, market_regime=(market or {}).get("regime"),
+                                       dfs=dfs)
     except Exception as e:
         logger.warning(f"scan paper-trades failed: {e}")
+
+    # ⛔ 避雷清单:偏空回避是首月唯一有战绩的输出(66% 命中),单独拎出来给 UI
+    avoid = [r["ticker"] for r in results if r.get("stance") == "偏空回避"]
+    avoid_block = ({"tickers": avoid,
+                    "note": "结构偏空的票历史上继续跌的概率更高(首月 66% 命中)——"
+                            "手里有的注意风险,没有的别接飞刀。"}
+                   if avoid else None)
 
     # portfolio-level risk: if >1 clean buy signal, how correlated are they?
     concurrent = None
@@ -485,6 +559,7 @@ def scan_watchlist(tickers: list[str] | None = None) -> dict:
         "record_overall": overall,
         "paper": paper,
         "market": market,
+        "avoid": avoid_block,
         "concurrent_buys": concurrent,
         "commentary": _commentary(results),
     }

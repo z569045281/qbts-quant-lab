@@ -212,6 +212,23 @@ function PaperPanel({ p }: { p: PaperSim }) {
         </div>
       </div>
 
+      {/* 回踩限价挂单(v2:照卡片打法等回调,触价才成交) */}
+      {(p.pending?.length ?? 0) > 0 && (
+        <div className="mt-3">
+          <div className="text-[11px] text-gray-500 mb-1">⏳ 等回踩的限价挂单 {p.pending!.length} 笔(5 个交易日内触价成交,否则撤单)</div>
+          <div className="space-y-1">
+            {p.pending!.map(o => (
+              <div key={o.ticker} className="flex items-center gap-2 text-[12px] bg-amber-50/50 rounded-lg px-2.5 py-1.5">
+                <span className="font-bold text-gray-800 w-12">{o.ticker}</span>
+                <span className="text-gray-400 text-[11px]">{o.placed_date.slice(5)} 挂 ${o.limit.toFixed(2)}</span>
+                {o.signal_price != null && <span className="text-gray-300 text-[10px]">信号价 ${o.signal_price.toFixed(2)}</span>}
+                {o.target != null && <span className="ml-auto text-[10px] text-gray-400">目标 ${o.target.toFixed(2)}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 当前持仓 */}
       {p.open.length > 0 && (
         <div className="mt-3">
@@ -247,8 +264,8 @@ function PaperPanel({ p }: { p: PaperSim }) {
         </div>
       )}
 
-      {p.open.length === 0 && p.closed.length === 0 && (
-        <p className="mt-3 text-[11px] text-gray-400">还没有触发任何买入信号 — 出现 🟢买入区 时会自动模拟买入 ${p.trade_usd.toFixed(0)}。</p>
+      {p.open.length === 0 && p.closed.length === 0 && (p.pending?.length ?? 0) === 0 && (
+        <p className="mt-3 text-[11px] text-gray-400">还没有触发任何买入信号 — 出现 🟢买入区 时会按"回踩限价"自动模拟挂单 ${p.trade_usd.toFixed(0)}。</p>
       )}
     </section>
   );
@@ -381,6 +398,20 @@ export default function WatchScanPage() {
             </span>
           </div>
           <p className="mt-1 text-[12px] leading-relaxed text-gray-600">{scan.market.note}</p>
+        </section>
+      )}
+
+      {/* ⛔ 避雷清单 —— 偏空回避是扫描首月唯一有战绩的信号(66% 命中) */}
+      {scan?.avoid && scan.avoid.tickers.length > 0 && (
+        <section className="rounded-2xl border border-red-200 bg-red-50/60 p-3.5 shadow-sm">
+          <div className="flex items-center gap-2 flex-wrap text-[13px]">
+            <span>⛔</span>
+            <span className="font-semibold text-red-700">今日避雷</span>
+            {scan.avoid.tickers.map(t => (
+              <span key={t} className="px-2 py-0.5 rounded-full bg-white border border-red-200 text-red-600 font-mono text-[12px] font-semibold">{t}</span>
+            ))}
+          </div>
+          <p className="mt-1 text-[12px] leading-relaxed text-red-700/80">{scan.avoid.note}</p>
         </section>
       )}
 

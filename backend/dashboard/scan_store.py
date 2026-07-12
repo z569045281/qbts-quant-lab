@@ -221,13 +221,15 @@ def grade_and_record(results: list[dict], dfs: dict[str, pd.DataFrame]) -> None:
 def _load_paper() -> dict:
     row = _load_row(_PAPER_TABLE, _PAPER_FILE)
     return {"positions": (row or {}).get("positions", {}),
-            "closed":    (row or {}).get("closed", [])}
+            "closed":    (row or {}).get("closed", []),
+            "pending":   (row or {}).get("pending", {})}
 
 
 def _save_paper(state: dict) -> None:
     _save_row(_PAPER_TABLE, _PAPER_FILE, {
         "positions": state.get("positions", {}),
         "closed":    state.get("closed", [])[-_MAX_CLOSED:],
+        "pending":   state.get("pending", {}),
     })
 
 
@@ -238,26 +240,73 @@ def _bdays(d0: str, d1: str) -> int:
         return 0
 
 
-def run_paper_trades(results: list[dict], market_regime: str | None = None) -> dict:
-    """$1000 paper trade per buy signal, held until a sell signal; records realized P&L.
+_PENDING_DAYS = 5   # 回踩限价单有效期(交易日),不触价过期撤单
 
-      Buy  = stance 买入区 (not already holding, not thin-data noise, AND the broad
-             tape is not risk_off — don't fight a market-wide selloff).
-      Sell = 现价≤入场止损价(止损,按波动率定档) | 偏空回避(转空) | 现价≥入场当天目标(到目标止盈).
 
-    The stop is its OWN volatility-scaled level fixed at entry — NOT the UI's soft
-    'below the 20/50-day MA' hint, which used to stop trades the same day they opened
-    (a 买入区 needs close>20MA but can sit <50MA → flagged 'risk' → instant whipsaw loss).
-    止盈锚定到入场当天的目标(浮动目标会随回落塌到头顶,把亏损误判成止盈)。
+def run_paper_trades(results: list[dict], market_regime: str | None = None,
+                     dfs: "dict[str, pd.DataFrame] | None" = None) -> dict:
+    """$1000 paper trade per buy signal — **v2 (2026-07-10 机制修订,epoch 划线)**。
 
-    One position per ticker at a time; entry/exit at the scan-day close with ~0.2%/side
-    cost so the P&L isn't fantasy. Persists the ledger to scan_paper and returns a
-    display summary with live unrealized P&L."""
+    v1 的两个结构性 bug(首月账本 −$226 的主因):①卡片说"回踩需求区分批买",
+    模拟器却当日收盘追入——买在信号日高点,被正常回踩打掉止损;②目标取"最近
+    参照"能近到 +0.4% 而止损 7–14%,盈亏比天生是倒的。v2 改成执行卡片自己的打法:
+
+      进场  买入区信号 → 现价已在买点(≤entry_limit×1.005 或无可表达买点)当日
+            收盘进场;否则在需求区上沿挂回踩限价单,_PENDING_DAYS 个交易日内
+            触价成交(按当日 min(open, limit),跳空低开按开盘成交),过期撤单,
+            转偏空回避立即撤单。目标已在 scan.py 过 1.5R 盈亏比门(不合格=None)。
+      出场  入场锚定的波动止损 | 转空 | 到目标止盈 |
+            无目标仓位(突破票/盈亏比veto)收盘破 10 日线跟踪出场。
+
+    新仓位/成交记 epoch='v2';v1 老仓位继续按新出场规则跑完,账本不清零,
+    审判时按 epoch 分开统计。"""
     state = _load_paper()
     positions: dict = state["positions"]
     closed: list = state["closed"]
+    pending: dict = state.get("pending", {})
     today = datetime.now().strftime("%Y-%m-%d")
+    cards = {r["ticker"]: r for r in results if not r.get("error")}
+    dfs = dfs or {}
 
+    # ── ① 挂单结算:回看挂单日之后的日线,触价成交 / 过期或转空撤单 ──
+    for t in list(pending):
+        po = pending[t]
+        card = cards.get(t)
+        if t in positions:
+            pending.pop(t); continue
+        if card and card.get("stance") == "偏空回避":
+            pending.pop(t); continue                     # 信号翻空,撤单
+        df = dfs.get(t)
+        if df is None or df.empty or not {"open", "low"}.issubset(df.columns):
+            continue                                     # 数据缺,挂单原样保留
+        try:
+            d0 = pd.Timestamp(po["placed_date"]).normalize()
+        except Exception:
+            pending.pop(t); continue
+        idx = pd.DatetimeIndex(df.index).normalize()
+        bars = df[idx > d0]
+        filled = False
+        for i, (ts, row) in enumerate(bars.iterrows()):
+            if i >= _PENDING_DAYS:
+                break
+            if float(row["low"]) <= po["limit"]:
+                fill = min(float(row["open"]), po["limit"])   # 跳空低开按开盘价成交
+                sp = po.get("stop_pct") or _stop_pct((card or {}).get("vol_annual"))
+                positions[t] = {
+                    "entry_date": str(pd.Timestamp(ts).date()),
+                    "entry_price": round(fill, 2),
+                    "shares": round(_TRADE_USD * (1 - _COST_PER_SIDE) / fill, 4),
+                    "cost": _TRADE_USD,
+                    "target": po.get("target"),
+                    "stop_price": round(fill * (1 - sp), 2), "stop_pct": round(sp, 4),
+                    "epoch": "v2", "limit_fill": True,
+                }
+                filled = True
+                break
+        if filled or len(bars) >= _PENDING_DAYS:
+            pending.pop(t, None)                         # 已成交 / 过期撤单
+
+    # ── ② 持仓出场 + ③ 新信号进场/挂单 ──
     for r in results:
         if r.get("error"):
             continue
@@ -270,17 +319,21 @@ def run_paper_trades(results: list[dict], market_regime: str | None = None) -> d
             pos = positions[t]
             if pos.get("entry_date") == today:               # just entered; no same-day flip
                 continue
-            # real stop fixed at entry (legacy positions without one → derive a fallback).
-            # NOT the UI's soft 'below 20/50 MA' hint, which stopped trades the same day
-            # they opened (买入区 needs close>20MA but can sit <50MA → 'risk' → whipsaw).
-            # 止盈锚定到入场当天的目标——浮动目标会随回落塌到现价,把亏损误判成止盈。
             sp_price = pos.get("stop_price") or round(
                 pos["entry_price"] * (1 - _stop_pct(r.get("vol_annual"))), 2)
             tgt = pos.get("target")
             hit_target = isinstance(tgt, (int, float)) and tgt > 0 and price >= tgt
+            # 无目标仓位(突破票/盈亏比veto)的跟踪出场:收盘破 10 日线
+            trail_break = False
+            if not (isinstance(tgt, (int, float)) and tgt > 0):
+                df = dfs.get(t)
+                if df is not None and len(df) >= 10:
+                    sma10 = float(df["close"].rolling(10).mean().iloc[-1])
+                    trail_break = price < sma10
             reason = ("止损"        if price <= sp_price
                       else "转空"    if stance == "偏空回避"
                       else "到目标止盈" if hit_target
+                      else "破10日线跟踪出场" if trail_break
                       else None)
             if reason:
                 positions.pop(t)
@@ -293,18 +346,28 @@ def run_paper_trades(results: list[dict], market_regime: str | None = None) -> d
                     "shares": pos["shares"], "cost": pos["cost"],
                     "pnl": round(pnl, 2), "pnl_pct": round(pnl / pos["cost"], 4),
                     "reason": reason, "days": _bdays(pos["entry_date"], today),
+                    "epoch": pos.get("epoch", "v1"),
                 })
-        elif stance == "买入区" and not r.get("thin_data"):   # flat → maybe enter
+        elif stance == "买入区" and not r.get("thin_data") and t not in pending:
             if market_regime == "risk_off":                  # tape filter: don't fight a selloff
                 continue
             sp = _stop_pct(r.get("vol_annual"))
-            shares = _TRADE_USD * (1 - _COST_PER_SIDE) / price   # buy-side cost baked in
-            positions[t] = {"entry_date": today, "entry_price": round(price, 2),
-                            "shares": round(shares, 4), "cost": _TRADE_USD,
-                            "target": r.get("target_num"),          # anchor for 止盈
-                            "stop_price": round(price * (1 - sp), 2), "stop_pct": round(sp, 4)}
+            limit = r.get("entry_limit")
+            if isinstance(limit, (int, float)) and limit > 0 and price > limit * 1.005:
+                # 现价还没回到买点 → 照卡片打法挂回踩限价单,而不是追价
+                pending[t] = {"placed_date": today, "limit": round(float(limit), 2),
+                              "target": r.get("target_num"),
+                              "stop_pct": round(sp, 4), "signal_price": round(price, 2)}
+            else:
+                # 已在买点之内(或无可表达的回踩参照)→ 当日收盘进场
+                positions[t] = {"entry_date": today, "entry_price": round(price, 2),
+                                "shares": round(_TRADE_USD * (1 - _COST_PER_SIDE) / price, 4),
+                                "cost": _TRADE_USD,
+                                "target": r.get("target_num"),          # 已过 1.5R 门
+                                "stop_price": round(price * (1 - sp), 2), "stop_pct": round(sp, 4),
+                                "epoch": "v2"}
 
-    _save_paper({"positions": positions, "closed": closed})
+    _save_paper({"positions": positions, "closed": closed, "pending": pending})
 
     # ── display summary with live unrealized P&L (today's prices) ──
     px = {r["ticker"]: r.get("price") for r in results if not r.get("error")}
@@ -322,9 +385,14 @@ def run_paper_trades(results: list[dict], market_regime: str | None = None) -> d
     open_rows.sort(key=lambda x: -x["pnl"])
     realized = sum(c["pnl"] for c in closed)
     n_win = sum(1 for c in closed if c["pnl"] > 0)
+    pending_rows = [{
+        "ticker": t, "limit": po.get("limit"), "placed_date": po.get("placed_date"),
+        "signal_price": po.get("signal_price"), "target": po.get("target"),
+    } for t, po in pending.items()]
     return {
         "trade_usd": _TRADE_USD,
         "open": open_rows,
+        "pending": pending_rows,
         "closed": list(reversed(closed))[:30],          # newest first
         "totals": {
             "realized": round(realized, 2), "unrealized": round(unreal, 2),
