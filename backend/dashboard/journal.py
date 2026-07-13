@@ -151,9 +151,16 @@ def record(decision: dict, price_at_decision: float, as_of: str) -> None:
         "conviction": decision.get("conviction"),
         "p_up_5d":    decision.get("p_up_5d"),
         "bold_call_5d": decision.get("bold_call_5d"),
-        # DeepSeek 影子考场:只记表态,评分与 Fable 同一套 5 日口径
+        # DeepSeek 影子考场:表态每日评分(与 Fable 同一套 fwd5 口径),
+        # 计划三价/行动一并存档供日后回测(用户 2026-07-13:决策都要存好。
+        # 全文档在 dashboard_state 行里永久累积,这里存结构化字段免挖快照)
         "ds_bold_call": (decision.get("shadow_ds") or {}).get("bold_call_5d"),
         "ds_p_up":      (decision.get("shadow_ds") or {}).get("p_up_5d"),
+        "ds_action":     (decision.get("shadow_ds") or {}).get("action"),
+        "ds_conviction": (decision.get("shadow_ds") or {}).get("conviction"),
+        "ds_entry":  ((decision.get("shadow_ds") or {}).get("trade_plan") or {}).get("qbts_entry"),
+        "ds_stop":   ((decision.get("shadow_ds") or {}).get("trade_plan") or {}).get("qbts_stop"),
+        "ds_target": ((decision.get("shadow_ds") or {}).get("trade_plan") or {}).get("qbts_target"),
         "price":      round(float(price_at_decision), 2),
         "entry":      tp.get("qbts_entry"),
         "stop":       tp.get("qbts_stop"),
