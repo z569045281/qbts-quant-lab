@@ -82,7 +82,7 @@ def analyze_structure(df: pd.DataFrame, swing_highs: list[dict], swing_lows: lis
     return {
         "trend": "bullish" if trend > 0 else ("bearish" if trend < 0 else "neutral"),
         "last_event": last_event,
-        "recent_events": events[-40:],   # 窗口够 15m CHoCH 回看;下游 find_order_blocks 仍取 [-4:]
+        "recent_events": events[-40:],   # 窗口够 15m CHoCH 回看;find_order_blocks 全扫(未回补即保留)
     }
 
 
@@ -117,13 +117,18 @@ def find_fvgs(df: pd.DataFrame, lookback: int = 90) -> list[dict]:
 
 def find_order_blocks(df: pd.DataFrame, structure_events: list[dict]) -> list[dict]:
     """
-    For each recent structure break, the last opposite-direction candle before
-    the breaking move = order block. Unmitigated = price hasn't closed through it.
+    For each structure break, the last opposite-direction candle before the
+    breaking move = order block. Unmitigated = price hasn't closed through it.
+
+    2026-07-13 修:原来只看最近 4 次结构事件 —— 单边下跌里事件全是向下 BOS,
+    需求侧 OB 被整个滚出窗口(5 月突破 OB $18-19 一直未回补,TradingView/LuxAlgo
+    还记得,我们忘了)。改成扫全部传入事件:未回补的 OB 不论新旧都保留,与 FVG
+    同等待遇;时效筛选交给展示层(最近 2 个/侧)与 playbook 的区域相交逻辑。
     """
     out = []
     o, c, h, l = df["open"].values, df["close"].values, df["high"].values, df["low"].values
     n = len(df)
-    for ev in structure_events[-4:]:
+    for ev in structure_events:
         i = ev["i"]
         if ev["dir"] == "bullish":
             # last bearish candle before i
