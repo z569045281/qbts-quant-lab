@@ -142,3 +142,4 @@ Format (newest at top):
 2026-07-13 17:20 [fable] 大胆预测可测量(用户反省:整月观望回测无意义): decision.py 必填 bold_call_5d(up/down 强制二选一,与action解耦)+sanitize兜底 / journal 影子分优先用它 / audit ②段新增每日方向表态+p_up骑墙率 / 决策卡押涨押跌章 + v2.13.0 [done]
 2026-07-13 18:10 [fable] SMC需求侧盲区修复(用户TV对比暴露): find_order_blocks 弃[-4:]改全事件扫描,未回补OB不论新旧保留 → 5/19需求OB $17.74-18.77 回归(=用户LuxAlgo蓝带) [done]
 2026-07-13 18:55 [fable] 第二十二轮(用户点名): 供需区买卖回测 → 无晋升,FVG触碰=接刀第三证,阻力卖会卖飞,V5往返+270%是彩票幻觉 → mining.md [done]
+2026-07-13 19:40 [fable] AI自检07-12三连修: 地缘alert×盘面risk_on交叉验证注 / 持仓天数改ET日期(UTC虚高1天影响军规) / 周末报价跨日标注'上一交易日' + 持仓现价隐含公允价口径标签 [done]

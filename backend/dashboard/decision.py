@@ -195,9 +195,15 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                      default=None)
         rows = []
         fresh_chg: dict[str, float] = {}      # 仅收集"非旧价"的涨跌,做 2× 一致性自检
+        asof_date = str(lq.get("asof_et") or "")[:10]
         for sym, q in lq["quotes"].items():
             chg = f"{q['change_pct']*100:+.2f}%" if q.get("change_pct") is not None else "—"
             bt, m = str(q.get("bar_time") or "")[11:16], _bt_min(q)
+            # 跨日标注:周末/盘前 bar 是上一交易日的,只显示 HH:MM 会像"今天 19:59
+            # 还在成交"——补日期防误读(AI 自检 07-12 报过周日快照像错标周六)
+            bar_date = str(q.get("bar_time") or "")[:10]
+            if bt and bar_date and asof_date and bar_date != asof_date:
+                bt = f"{bar_date[5:]} {bt}(上一交易日)"
             note = ""
             if newest is not None and m is not None and newest - m > 15:
                 note = f"（⚠️ 旧价:最后成交 {bt},比最新报价旧 {newest - m} 分钟 — 薄流动性 ETF 盘后成交稀疏,勿据此核对 2× 换算关系）"
@@ -285,12 +291,25 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                 f"{it.get('title','')[:80]} — {it.get('note_cn','')}"
                 for it in (geo.get("items") or [])
                 if it.get("relevance") in ("high", "medium")][:6]
+        # 交叉验证:新闻情绪(雷达)与市场定价(VIX/大盘)矛盾时明说,
+        # 免得模型各信各的(AI 自检 07-12 报过两模块直接打架)
+        ml_ = snapshot.get("market_light") or {}
+        cross = ""
+        if geo.get("risk_level") == "alert" and ml_.get("regime") == "risk_on":
+            cross = (f"\n  ⚠️ 交叉验证:雷达 alert 但盘面并未定价该风险(VIX {ml_.get('vix')}、"
+                     "大盘 risk-on)——两种解释:市场自满(风险真实,波动将至)或新闻滞后于"
+                     "实际缓和。处理:以盘面为主、雷达降为『提高警觉』,不机械降信心;"
+                     "但失效条件仍须写明「若 VIX 抬头/避险资产异动则按 alert 全额处理」。")
+        elif geo.get("risk_level") == "calm" and ml_.get("regime") == "risk_off":
+            cross = (f"\n  ⚠️ 交叉验证:雷达 calm 但盘面 risk-off(VIX {ml_.get('vix')})——"
+                     "市场在担心雷达三条战线之外的东西(宏观/流动性),勿因地缘平静而放松。")
         parts.append(
             f"## 🌍 地缘政治/政策雷达 {geo.get('risk_cn','?')} — {geo.get('headline_cn','')}\n"
             f"  {geo.get('summary_cn','')}\n"
             + ("\n".join(rows) + "\n" if rows else "")
             + "  （QBTS 与伊朗战局/川普政策强联动 — 07-07 暴跌即谈判破裂所致。alert 级别下"
               "技术面买点先让位:降信心/缩仓位,并把「局势再升级」写进失效条件。）"
+            + cross
         )
 
     # ── 期权流 ────────────────────────────────────────────────
@@ -593,13 +612,21 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                 continue
             line = f"{t}: {qty:g} 股 @ ${cost:.2f}"
             try:
-                held = (_date.today() - _date.fromisoformat(str(p.get("date"))[:10])).days
+                # 用美东"今天"——Lambda 是 UTC,美东周日晚 today() 已翻到周一,
+                # 持有天数虚高 1 天会直接影响军规判定(AI 自检 07-12 报过)
+                from zoneinfo import ZoneInfo as _ZI
+                _today_et = datetime.now(_ZI("America/New_York")).date()
+                held = (_today_et - _date.fromisoformat(str(p.get("date"))[:10])).days
                 line += f"(买入 {p['date']},已持有 {held} 个日历日)"
             except Exception:
                 pass
             px = now_px.get(t)
             if px:
-                line += f" · 现价 ${px:.2f} · 浮动 {px / cost - 1:+.1%}(${(px - cost) * qty:+,.0f})"
+                # 杠杆腿现价来自隐含公允价时标注口径,与实时报价行的成交价同屏
+                # 不一致会被(自检/读者)当矛盾
+                q_ = (((extras or {}).get("live_quote") or {}).get("quotes") or {}).get(t.lower()) or {}
+                fair_tag = "(隐含公允价)" if q_.get("implied_px") and abs(px - q_["implied_px"]) < 1e-6 else ""
+                line += f" · 现价 ${px:.2f}{fair_tag} · 浮动 {px / cost - 1:+.1%}(${(px - cost) * qty:+,.0f})"
             rows.append(line)
         if rows:
             parts.append("## 用户实盘持仓（真金！请按规则 16 逐笔在 position_advice 给操作建议，"
