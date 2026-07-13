@@ -815,11 +815,36 @@ export interface SpacexDecision {
   model: string;
 }
 export interface SpacexNews { title: string; published: string; source: string; }
+/* 抢先量三条腿(不吃日线历史长度)*/
+export interface SpacexOptionTerm { expiry: string; dte: number | null; expected_move_pct: number | null; atm_iv: number | null; }
+export interface SpacexOptions {
+  spot: number;
+  term: SpacexOptionTerm[];
+  event_expiry: SpacexOptionTerm | null;
+  event_date: string;
+  near_expected_move_pct: number | null;
+  skew_put_minus_call: number | null;
+}
+export interface SpacexIntraday {
+  interval: string; n_bars: number;
+  rsi14: number | null; atr14: number | null; atr_pct: number | null;
+  sma20: number | null; above_sma20: boolean | null;
+  sma50: number | null; above_sma50: boolean | null;
+  vwap: number | null; above_vwap: boolean | null;
+}
+export interface SpacexPeer { ticker: string; name: string; vol: number; pure: boolean; }
+export interface SpacexPeerPrior {
+  spcx_own_vol: number | null; peer_prior: number | null;
+  peers: SpacexPeer[]; shrink_weight: number | null; blended_vol: number | null; n_bars: number;
+}
 export interface SpacexState {
   generated_at: string;
   engine: string;
   data: SpacexData;
   news: SpacexNews[];
+  options?: SpacexOptions | null;
+  intraday?: SpacexIntraday | null;
+  peer_prior?: SpacexPeerPrior | null;
   catalysts: SpacexCatalyst[];
   catalyst_asof: string;
   decision: SpacexDecision | null;

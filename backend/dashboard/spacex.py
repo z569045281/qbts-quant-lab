@@ -22,7 +22,7 @@ import json
 import logging
 import os
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -153,13 +153,189 @@ def fetch_spacex_news(limit: int = 7) -> list[dict]:
     return out
 
 
+# ── 抢先量三条腿(2026-07-13,用户要求)──────────────────────────────────────
+# 新 IPO 日线只有 ~20 根,标准技术指标失真。这三条腿都**不吃日线历史长度**:
+#   ① 期权隐含波动:前瞻预测,零历史需求 —— IV/跨式=市场对未来 ATR/幅度的预测
+#   ② 盘中时间框:同样 20 个交易日,1h 线有 ~130 根,RSI/ATR/均线全预热完毕、可用
+#   ③ 同业波动先验:借太空同业的一年历史估波动,收缩到自己抖动的短样本上
+_EVENT_DATE = "2026-08-06"          # 首财报+首解禁,期权在这前后定价事件溢价
+_PEERS = {
+    "RKLB": {"name": "火箭实验室", "pure": True},
+    "ASTS": {"name": "AST太空移动", "pure": True},
+    "LUNR": {"name": "直觉机器", "pure": True},
+    "PLTR": {"name": "Palantir·纳入对照", "pure": False},
+    "ARKX": {"name": "太空主题ETF", "pure": False},
+}
+_SHRINK_K = 60      # 收缩常数:自己攒到 ~60 根 bar 前,先验(同业)占主导
+
+
+def _opt_price(row) -> float | None:
+    """期权成交价:盘中用买卖中值,盘后 bid/ask 归零则退回 lastPrice。"""
+    bid, ask, last = row.get("bid"), row.get("ask"), row.get("lastPrice")
+    if bid and ask and bid > 0 and ask > 0:
+        return (float(bid) + float(ask)) / 2
+    return float(last) if last and last > 0 else None
+
+
+def fetch_spacex_options(spot: float) -> dict | None:
+    """① 期权隐含波动:ATM 跨式→预期波动%,ATM IV,期限结构,事件到期溢价,IV 偏斜。
+    全 best-effort:无期权/数据异常 → None(不阻断)。"""
+    try:
+        t = yf.Ticker(TICKER)
+        exps = list(getattr(t, "options", None) or [])
+    except Exception as e:
+        logger.warning(f"spacex options list failed: {e}")
+        return None
+    if not exps:
+        return None
+    today = datetime.now(timezone.utc).date()
+    # 关注 ~70 天内(覆盖 8/6 事件),最多 6 个到期
+    chosen = [e for e in exps if e <= "2026-09-30"][:6] or exps[:4]
+    term: list[dict] = []
+    skew = None
+    for exp in chosen:
+        try:
+            oc = t.option_chain(exp)
+            calls, puts = oc.calls, oc.puts
+            if calls.empty or puts.empty:
+                continue
+            calls = calls.assign(_d=(calls["strike"] - spot).abs())
+            puts = puts.assign(_d=(puts["strike"] - spot).abs())
+            ac = calls.nsmallest(1, "_d").iloc[0]
+            ap = puts.nsmallest(1, "_d").iloc[0]
+            cp, pp = _opt_price(ac), _opt_price(ap)
+            if not cp or not pp:
+                continue
+            straddle = cp + pp
+            ivs = [float(x) for x in (ac.get("impliedVolatility"), ap.get("impliedVolatility"))
+                   if isinstance(x, (int, float)) and x > 0]
+            atm_iv = sum(ivs) / len(ivs) if ivs else None
+            try:
+                dte = (date.fromisoformat(exp) - today).days
+            except ValueError:
+                dte = None
+            term.append({
+                "expiry": exp, "dte": dte,
+                "expected_move_pct": round(straddle / spot, 4) if spot else None,
+                "atm_iv": round(atm_iv, 4) if atm_iv else None,
+            })
+            # 事件到期上算一次 IV 偏斜(~10% OTM 看跌 IV − 看涨 IV;正=下行恐惧买盘)
+            if exp >= _EVENT_DATE and skew is None:
+                try:
+                    otm_p = puts[puts["strike"] <= spot * 0.9]
+                    otm_c = calls[calls["strike"] >= spot * 1.1]
+                    if not otm_p.empty and not otm_c.empty:
+                        pv = float(otm_p.iloc[(otm_p["strike"] - spot * 0.9).abs().argmin()]["impliedVolatility"])
+                        cv = float(otm_c.iloc[(otm_c["strike"] - spot * 1.1).abs().argmin()]["impliedVolatility"])
+                        if pv > 0 and cv > 0:
+                            skew = round(pv - cv, 4)
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.warning(f"spacex opt chain {exp} failed: {e}")
+    if not term:
+        return None
+    event_expiry = next((x for x in term if x["expiry"] >= _EVENT_DATE), None)
+    near = term[0]
+    return {
+        "spot": round(spot, 2),
+        "term": term,
+        "event_expiry": event_expiry,
+        "event_date": _EVENT_DATE,
+        "near_expected_move_pct": near.get("expected_move_pct"),
+        "skew_put_minus_call": skew,       # 正=看跌 IV 更高=下行恐惧;负=追涨
+    }
+
+
+def fetch_spacex_intraday() -> dict | None:
+    """② 盘中时间框(1h):同样 20 个交易日,~130 根 1h bar → RSI/ATR/均线全可用。"""
+    try:
+        d = yf.download(TICKER, period="1mo", interval="1h",
+                        auto_adjust=True, progress=False)
+        if d is None or d.empty:
+            return None
+        close = _series(d, "Close")
+        if len(close) < 30:
+            return None
+        price = float(close.iloc[-1])
+        sma20 = float(close.rolling(20).mean().iloc[-1]) if len(close) >= 20 else None
+        sma50 = float(close.rolling(50).mean().iloc[-1]) if len(close) >= 50 else None
+        rsi = _rsi(close)
+        atr = _atr(d)
+        # 锚定 VWAP(从窗口起点累计):年轻股缺月/年锚,窗口锚是诚实的参考线
+        tp = (_series(d, "High") + _series(d, "Low") + close) / 3
+        vol = _series(d, "Volume")
+        vwap = float((tp * vol).cumsum().iloc[-1] / vol.cumsum().iloc[-1]) \
+            if float(vol.sum()) > 0 else None
+        return {
+            "interval": "1h",
+            "n_bars": int(len(close)),
+            "rsi14": round(rsi, 1) if rsi is not None else None,
+            "atr14": round(atr, 2) if atr else None,
+            "atr_pct": round(atr / price, 4) if atr and price else None,
+            "sma20": round(sma20, 2) if sma20 else None,
+            "above_sma20": (price > sma20) if sma20 else None,
+            "sma50": round(sma50, 2) if sma50 else None,
+            "above_sma50": (price > sma50) if sma50 else None,
+            "vwap": round(vwap, 2) if vwap else None,
+            "above_vwap": (price > vwap) if vwap else None,
+        }
+    except Exception as e:
+        logger.warning(f"spacex intraday failed: {e}")
+        return None
+
+
+def fetch_spacex_peer_prior() -> dict | None:
+    """③ 同业波动先验 + 收缩估计:借太空同业一年历史,拉住 SPCX 抖动的 20 根短样本。"""
+    try:
+        s = yf.download(TICKER, period="1mo", interval="1d",
+                        auto_adjust=True, progress=False)["Close"]
+        s = s.iloc[:, 0] if hasattr(s, "columns") else s
+        n = int(len(s))
+        own_vol = float(s.pct_change().std() * np.sqrt(252)) if n > 3 else None
+        peers = []
+        for p, meta in _PEERS.items():
+            try:
+                c = yf.download(p, period="1y", interval="1d",
+                                auto_adjust=True, progress=False)["Close"]
+                c = c.iloc[:, 0] if hasattr(c, "columns") else c
+                vol = float(c.pct_change().std() * np.sqrt(252))
+                peers.append({"ticker": p, "name": meta["name"],
+                              "vol": round(vol, 3), "pure": meta["pure"]})
+            except Exception:
+                pass
+        pure = [x["vol"] for x in peers if x["pure"]]
+        prior = float(np.median(pure)) if pure else None
+        shrink_w = blended = None
+        if own_vol is not None and prior is not None:
+            shrink_w = round(n / (n + _SHRINK_K), 3)
+            blended = round(shrink_w * own_vol + (1 - shrink_w) * prior, 3)
+        return {
+            "spcx_own_vol": round(own_vol, 3) if own_vol else None,
+            "peer_prior": round(prior, 3) if prior else None,
+            "peers": peers,
+            "shrink_weight": shrink_w,
+            "blended_vol": blended,
+            "n_bars": n,
+        }
+    except Exception as e:
+        logger.warning(f"spacex peer prior failed: {e}")
+        return None
+
+
 _SYSTEM = """你是一位专注单一个股 SPCX(Space Exploration Technologies,SpaceX)的交易决策助手。
 你的唯一任务:基于给定的实时技术读数、新闻头条和事件日历,给出今天对 SPCX 的可执行判断。
 
 铁律:
-1. SPCX 是 2026 年新上市的股票,历史极短。**机械技术位对事件全盲**——你必须把
-   事件日历(尤其是锁定期解禁/财报)当作压倒技术位的第一优先。若解禁临近(数日内),
-   即便技术面偏多也要显式下调信心、优先回避供给冲击。
+1. SPCX 是 2026 年新上市的股票,日线历史极短(~20 根),**日线的 RSI/均线预热失真、
+   不可信**。要看技术面,优先用三条不吃日线长度的"抢先量":
+   ① 期权隐含波动(前瞻):ATM 跨式给出的预期波动% 与 IV 期限结构 = 市场对未来幅度的
+      预测;事件到期(覆盖 8/6)的预期波动就是市场已定价的解禁+财报冲击。IV 偏斜为正
+      = 下行恐惧买盘更重。**这是幅度预测,不是方向**。
+   ② 盘中 1h 时间框:~130 根,RSI/ATR/均线已预热、可用 —— 技术判断以它为准,别用日线。
+   ③ 同业波动先验(收缩后的 blended_vol):设仓位/止损宽度时用它,而非日线 ATR。
+   同时,**机械技术位对事件全盲**——事件日历(锁定期解禁/财报)仍是压倒一切的第一优先。
+   若解禁临近(数日内),即便技术偏多也要显式下调信心、优先回避供给冲击。
 2. 这是一只普通个股、只做多视角(散户直接买卖 SPCX,无配对做空工具)。动作只有三种:
    - "BUY":建仓或加仓做多
    - "HOLD":持有观望,不新开仓
@@ -185,7 +361,10 @@ JSON 字段:
 }"""
 
 
-def _build_prompt(data: dict, news: list[dict]) -> str:
+def _build_prompt(data: dict, news: list[dict],
+                  options: dict | None = None,
+                  intraday: dict | None = None,
+                  peer_prior: dict | None = None) -> str:
     def _ma(label, val, above):
         if val is None:
             return f"{label} 数据不足"
@@ -208,9 +387,45 @@ def _build_prompt(data: dict, news: list[dict]) -> str:
     ]
     if data.get("thin_data"):
         lines.append(
-            f"⚠️ 上市仅 {data['n_bars']} 根日线 —— RSI/均线尚在预热、极不可靠(新 IPO 通病)。"
-            f"请**忽略技术指标的绝对读数**,以事件日历、价格结构(距高点/近5日动能/量能)"
-            f"和风险管理为准。")
+            f"⚠️ 上市仅 {data['n_bars']} 根日线 —— 上面日线的 RSI/均线预热失真、别信绝对值。"
+            f"技术判断请用下面的【盘中1h】与【期权隐含】,风险/仓位用【同业波动先验】。")
+
+    # ① 期权隐含波动(前瞻)
+    if options and options.get("term"):
+        lines += ["", "# ① 期权隐含波动(前瞻·零历史需求)"]
+        for x in options["term"]:
+            em = f"±{x['expected_move_pct']*100:.1f}%" if x.get("expected_move_pct") else "—"
+            iv = f"{x['atm_iv']*100:.0f}%" if x.get("atm_iv") else "—"
+            tag = " ←覆盖8/6事件" if options.get("event_expiry") and x["expiry"] == options["event_expiry"]["expiry"] else ""
+            lines.append(f"- 到期 {x['expiry']}(还有{x.get('dte','?')}天):预期波动 {em} · ATM IV {iv}{tag}")
+        ev = options.get("event_expiry")
+        if ev and ev.get("expected_move_pct"):
+            lines.append(f"→ 市场已给 8/6 事件定价:到期 {ev['expiry']} 预期波动 ±{ev['expected_move_pct']*100:.1f}%。")
+        sk = options.get("skew_put_minus_call")
+        if sk is not None:
+            lines.append(f"→ IV 偏斜(看跌−看涨)={sk*100:+.0f} 个点:{'下行恐惧买盘更重' if sk > 0 else '偏追涨/下行担忧不重'}。")
+
+    # ② 盘中 1h(数据充足,技术面以此为准)
+    if intraday:
+        i = intraday
+        lines += ["", f"# ② 盘中 {i['interval']} 时间框({i['n_bars']} 根,已预热·技术面看这个)"]
+        lines.append(
+            f"RSI14 {i.get('rsi14')} · ATR ${i.get('atr14')}(≈{(i.get('atr_pct') or 0)*100:.1f}%/时)"
+            f" · vs 20周期均线 {'上方' if i.get('above_sma20') else '下方'}"
+            + (f" · vs 50周期均线 {'上方' if i.get('above_sma50') else '下方'}" if i.get("sma50") else "")
+            + (f" · vs 锚定VWAP ${i.get('vwap')} {'上方' if i.get('above_vwap') else '下方'}" if i.get("vwap") else "")
+            + "。")
+
+    # ③ 同业波动先验(收缩)
+    if peer_prior and peer_prior.get("blended_vol") is not None:
+        pp = peer_prior
+        peers_s = "、".join(f"{x['ticker']} {x['vol']*100:.0f}%" for x in pp.get("peers", []) if x.get("pure"))
+        lines += ["", "# ③ 同业波动先验(设仓位/止损宽度用这个,别用日线 ATR)"]
+        lines.append(
+            f"SPCX 自算 20日年化波动 {(pp.get('spcx_own_vol') or 0)*100:.0f}%(样本短·不稳);"
+            f"纯太空同业中位 {(pp.get('peer_prior') or 0)*100:.0f}%({peers_s});"
+            f"收缩权重 {pp.get('shrink_weight')} → **可用波动估计 {(pp.get('blended_vol') or 0)*100:.0f}%**。")
+
     lines += [
         "",
         f"# 事件日历(as of {_CATALYST_ASOF},需复核)",
@@ -259,7 +474,10 @@ def _sanitize(dec: dict, data: dict) -> dict:
     return dec
 
 
-def generate_spacex_decision(data: dict, news: list[dict]) -> dict | None:
+def generate_spacex_decision(data: dict, news: list[dict],
+                             options: dict | None = None,
+                             intraday: dict | None = None,
+                             peer_prior: dict | None = None) -> dict | None:
     """**只调 DeepSeek V4 Pro**。无 key 或任何失败 → None(不回退 Claude)。"""
     key = os.getenv("DEEPSEEK_API_KEY")
     if not key:
@@ -272,7 +490,8 @@ def generate_spacex_decision(data: dict, news: list[dict]) -> dict | None:
         }, json={
             "model": _DS_MODEL,
             "messages": [{"role": "system", "content": _SYSTEM},
-                         {"role": "user", "content": _build_prompt(data, news)}],
+                         {"role": "user", "content": _build_prompt(
+                             data, news, options, intraday, peer_prior)}],
             "response_format": {"type": "json_object"},
             "max_tokens": 4000,
             "stream": False,
@@ -292,15 +511,21 @@ def generate_spacex_decision(data: dict, news: list[dict]) -> dict | None:
 
 
 def compute_spacex(force_refresh: bool = False) -> dict:
-    """整合 数据 + 新闻 + DeepSeek 决策 → 一个 payload(spacex_state.data)。"""
+    """整合 数据 + 新闻 + 三条抢先量 + DeepSeek 决策 → 一个 payload(spacex_state.data)。"""
     data = fetch_spacex_data()
     news = fetch_spacex_news()
-    decision = generate_spacex_decision(data, news)
+    options = fetch_spacex_options(data["price"])       # ① 期权隐含(前瞻)
+    intraday = fetch_spacex_intraday()                  # ② 盘中 1h(已预热)
+    peer_prior = fetch_spacex_peer_prior()              # ③ 同业波动先验(收缩)
+    decision = generate_spacex_decision(data, news, options, intraday, peer_prior)
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "engine": _DS_MODEL,
         "data": data,
         "news": news,
+        "options": options,
+        "intraday": intraday,
+        "peer_prior": peer_prior,
         "catalysts": _CATALYSTS,
         "catalyst_asof": _CATALYST_ASOF,
         "decision": decision,          # None = 未生成(无 key / 失败),前端显示占位
@@ -331,7 +556,21 @@ if __name__ == "__main__":
     out = compute_spacex()
     d = out["data"]
     print(f"SPCX ${d['price']}  距高点 {d['drawdown_from_ath']*100:+.0f}%  "
-          f"RSI {d['rsi14']}  20日{'上' if d['above_sma20'] else '下'}方")
+          f"日线RSI {d['rsi14']}(薄数据={d['thin_data']})")
+    op = out.get("options")
+    if op:
+        ev = op.get("event_expiry") or {}
+        print(f"① 期权:近月预期波动 ±{(op.get('near_expected_move_pct') or 0)*100:.1f}% · "
+              f"事件到期 {ev.get('expiry')} ±{(ev.get('expected_move_pct') or 0)*100:.1f}% · "
+              f"偏斜 {op.get('skew_put_minus_call')}")
+    iq = out.get("intraday")
+    if iq:
+        print(f"② 盘中{iq['interval']}({iq['n_bars']}根):RSI {iq['rsi14']} · "
+              f"ATR {(iq.get('atr_pct') or 0)*100:.1f}%/时 · 20周期{'上' if iq.get('above_sma20') else '下'}方")
+    pp = out.get("peer_prior")
+    if pp:
+        print(f"③ 同业先验:自算{(pp.get('spcx_own_vol') or 0)*100:.0f}% + 同业{(pp.get('peer_prior') or 0)*100:.0f}%"
+              f" → 收缩后 {(pp.get('blended_vol') or 0)*100:.0f}%(权重{pp.get('shrink_weight')})")
     print(f"新闻 {len(out['news'])} 条")
     dec = out["decision"]
     if dec:

@@ -137,6 +137,16 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   `postSpacexRefresh` POST `action:"spacex"` 到 Function URL(云)/ `/scan/watch`(本地)→
   `publish_handler` 与 api.py 各有 `spacex` 分支跑 `publish_spacex()`(~30-60s,DeepSeek 推理);
   云端每日 publish(`_publish_decision_only`)也已带上 SpaceX,和 scan/dca 一样 best-effort。
+  **抢先量三条腿(v2.16.0,用户:"三条腿都加")** —— 新 IPO 日线只 ~20 根、指标失真,
+  这三条都不吃日线历史长度,全 best-effort(None 不阻断)、均喂进 DeepSeek prompt:
+  **① 期权隐含波动** `fetch_spacex_options`(前瞻·零历史):ATM 跨式→预期波动%,IV 期限结构,
+  事件到期(≥`_EVENT_DATE` 2026-08-06)溢价,~10% OTM 看跌−看涨 IV 偏斜。实测近月 ±6.5%、
+  8/07 到期 ±17.7%(市场已给解禁+财报定价)。**② 盘中 1h** `fetch_spacex_intraday`:同 20 个
+  交易日但 ~130 根 1h bar,RSI/ATR/均线/锚定VWAP 全预热可用 —— 杀手锏对比:日线 RSI 73(失真)
+  vs 盘中 RSI ~27(可信)。**③ 同业波动先验** `fetch_spacex_peer_prior`:`_PEERS`(RKLB/ASTS/
+  LUNR 纯太空 + PLTR 纳入对照 + ARKX)一年历史,收缩估计 `blended=w·自算+(1−w)·同业中位`,
+  `w=n/(n+_SHRINK_K=60)`(20 根→w≈0.24,主要借同业)。前端 /spacex 三个彩色区块 + data.ts 类型。
+  IV 预测幅度不预测方向;仍无法 front-run 8/6 解禁供给(事件永远第一优先)。
 - **Big image push to ECR occasionally times out** in CI — just re-run "Deploy AWS jobs".
 - **Nadaraya-Watson 包络** (`backend/dashboard/nadaraya_watson.py::analyze_nw_envelope`):
   non-repainting Gaussian-kernel mean-reversion band (causal one-sided kernel — does
