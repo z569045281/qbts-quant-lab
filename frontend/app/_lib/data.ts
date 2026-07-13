@@ -414,6 +414,7 @@ export interface Decision {
   action:     "LONG_QBTX" | "SHORT_QBTZ" | "HOLD";
   conviction: number;          // 0-10
   p_up_5d:    number;          // 0-1
+  bold_call_5d?: "up" | "down"; // 强制二选一的5日方向表态(与 action 解耦,每日影子评分)
   summary:    string;
   trade_plan: {
     qbts_entry:  number;

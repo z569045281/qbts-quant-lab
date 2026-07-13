@@ -129,6 +129,22 @@ def run_audit() -> dict:
             **_verdict(h_hit, h_n),
             "rule": "|决策日QBTS涨跌|<3% 判对(双向工具在架,错过≥3%行情=漏判)",
         }
+        # 每日方向表态(2026-07-13 加,用户要求"大胆预测可测量"):方向单的 correct
+        # 与 HOLD 影子分(bold_call_5d 强制二选一;旧记录回退 p_up≷0.5)合并成
+        # 一条日频方向台账 —— 观望月也能攒方向样本。附 p_up 骑墙率作病征指标
+        # (07-13 体检:21 天 95% 挤在 [0.45,0.55],方向能力整月不可测)。
+        lean = []
+        for r in recs:
+            res = r.get("result") or {}
+            v = res.get("correct") if res.get("correct") is not None else res.get("shadow_correct")
+            if v is not None:
+                lean.append(bool(v))
+        p_all = [float(r["p_up_5d"]) for r in recs if r.get("p_up_5d") is not None]
+        fence = sum(1 for p in p_all if 0.45 <= p <= 0.55)
+        report["sections"]["decision_journal"]["daily_call"] = {
+            **_verdict(sum(lean), len(lean)),
+            "p_up_fence_pct": round(fence / len(p_all), 3) if p_all else None,
+        }
     except Exception as e:
         report["sections"]["decision_journal"] = {"error": str(e)[:120]}
 
@@ -204,6 +220,13 @@ def format_report(report: dict) -> str:
         if hr and hr.get("n"):
             L.append(f"   HOLD 判读(|当日|<3%=对) n={hr['n']} 命中{hr['hit_rate']*100:.0f}% "
                      f"CI[{hr['ci95'][0]*100:.0f},{hr['ci95'][1]*100:.0f}] {hr['verdict']}")
+        dc = dj.get("daily_call")
+        if dc and dc.get("n"):
+            fence = dc.get("p_up_fence_pct")
+            L.append(f"   每日方向表态(方向单+HOLD影子) n={dc['n']} 命中{dc['hit_rate']*100:.0f}% "
+                     f"CI[{dc['ci95'][0]*100:.0f},{dc['ci95'][1]*100:.0f}] {dc['verdict']}"
+                     + (f" · p_up骑墙率 {fence*100:.0f}%(目标应随 bold_call 上线归零)"
+                        if fence is not None else ""))
     hs = report["sections"].get("paper_horses", {})
     if hs and "error" not in hs:
         L.append("\n③ 纸面马竞速:")

@@ -139,3 +139,4 @@ Format (newest at top):
 2026-07-10 15:50 [fable] AI自检07-10三连修: news时间戳UTC→ET / QBTX·QBTZ隐含公允价+折溢价(quote_pusher)+失效价换算锚改公允(decision._anchor_prices) / rel_strength补姐妹单日+追赶触发判定+peers TTL刷新+滞后守卫 [done]
 2026-07-13 14:05 [fable] 定投菜单补全(用户:都加): dca.py +AVDV(股80: 30/20/14/8/8)+压舱石档BND 12/GLDM 8(ballast_etfs卡片+权重,deploy改固定比例不择时) + dca页压舱石卡片区/7色权重条/计算器并入压舱石 + v2.12.0 [done]
 2026-07-13 16:05 [fable] 仪表盘回测审计三连修(用户:1/3/4都修): holdings.py 13F陈旧度闸(主动持有人报告期,75/120天衰减静音)+Vanguard/Geode误分类修 + audit.py HOLD判读(|当日|<3%=对,预注册)+纸面马补买入持有对照 + CLAUDE.md教训 [done]
+2026-07-13 17:20 [fable] 大胆预测可测量(用户反省:整月观望回测无意义): decision.py 必填 bold_call_5d(up/down 强制二选一,与action解耦)+sanitize兜底 / journal 影子分优先用它 / audit ②段新增每日方向表态+p_up骑墙率 / 决策卡押涨押跌章 + v2.13.0 [done]

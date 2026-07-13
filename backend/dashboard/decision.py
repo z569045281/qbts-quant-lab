@@ -125,6 +125,11 @@ D. 执行军规（第七轮实测）：QBTX 年拖累−24%/QBTZ−34%;持有≤
              即使 action=HOLD，也要给出你诚实的方向概率，绝不要因为决定观望就把它压到 0.50 附近。
              真的毫无方向感才填 ~0.50；有几成把握就如实给（如 0.62 / 0.38）。系统会逐日记录这个值
              并在5天后用真实价格自动评判，这是检验系统到底有没有预测力的唯一信号——压平它=自废度量>,
+  "bold_call_5d": "up"|"down" <强制二选一，没有中间选项：如果今天【必须】押未来5日方向，你押哪边？
+             与 action 完全解耦——HOLD 照样要押。这是测量场不是钱：错了没有任何代价，
+             真实资金的谨慎由 action/conviction 把关；这里拒绝表态才是唯一的错误答案。
+             历史教训：过去21天 p_up 有 95% 挤在 [0.45,0.55] 骑墙区，导致整月方向能力
+             不可测量。用你读到的全部证据（一级信号/宏观/地缘/SMC）咬牙选一边>,
   "summary": "<2-3 句话：今天的核心判断和为什么>",
   "trade_plan": {
     "qbts_entry": <入场触发价>, "qbts_stop": <止损价>, "qbts_target": <目标价>,
@@ -683,6 +688,11 @@ def _sanitize_decision(decision: dict, snapshot: dict, extras: dict | None) -> d
     conv = int(decision.get("conviction", 0) or 0)
     action = decision.get("action")
 
+    # bold_call_5d 兜底:模型漏给/非法时从 p_up 推导(≥0.5→up),台账必须天天有表态
+    if decision.get("bold_call_5d") not in ("up", "down"):
+        p = _num(decision.get("p_up_5d"))
+        decision["bold_call_5d"] = "up" if (p is None or p >= 0.5) else "down"
+
     # conviction ≤4 → HOLD (no edge worth the cost)
     if action in ("LONG_QBTX", "SHORT_QBTZ") and conv <= 4:
         action = "HOLD"
@@ -739,7 +749,7 @@ _NUM = {"type": ["number", "null"]}
 _DECISION_SCHEMA = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["action", "conviction", "p_up_5d", "summary", "trade_plan",
+    "required": ["action", "conviction", "p_up_5d", "bold_call_5d", "summary", "trade_plan",
                  "key_drivers", "risks", "upcoming_catalysts", "invalidation",
                  "invalidation_price", "vivienne_note", "position_advice",
                  "system_notes"],
@@ -747,6 +757,7 @@ _DECISION_SCHEMA = {
         "action": {"type": "string", "enum": ["LONG_QBTX", "SHORT_QBTZ", "HOLD"]},
         "conviction": {"type": "integer"},
         "p_up_5d": {"type": "number"},
+        "bold_call_5d": {"type": "string", "enum": ["up", "down"]},
         "summary": {"type": "string"},
         "trade_plan": {
             "type": "object", "additionalProperties": False,

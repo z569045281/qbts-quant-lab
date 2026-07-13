@@ -150,6 +150,7 @@ def record(decision: dict, price_at_decision: float, as_of: str) -> None:
         "action":     decision.get("action"),
         "conviction": decision.get("conviction"),
         "p_up_5d":    decision.get("p_up_5d"),
+        "bold_call_5d": decision.get("bold_call_5d"),
         "price":      round(float(price_at_decision), 2),
         "entry":      tp.get("qbts_entry"),
         "stop":       tp.get("qbts_stop"),
@@ -227,13 +228,18 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
                 outcome, correct = "hold", None
 
         # Shadow grade for HOLD: even when we sat out, was the model's lean
-        # (p_up_5d ≷ 0.5) directionally right? Builds a falsifiable record while
-        # the system is HOLD-heavy, WITHOUT polluting real-trade accuracy.
+        # directionally right? 2026-07-13 起优先用 bold_call_5d(强制二选一表态,
+        # 无骑墙选项)——此前用 p_up_5d≷0.5,但 21 天里 95% 挤在 [0.45,0.55],
+        # 影子方向只是 0.5 附近的噪声。老记录无 bold_call 时回退 p_up 口径。
         shadow_dir = shadow_correct = None
         if action == "HOLD" and ret_pct is not None:
+            bc = r.get("bold_call_5d")
             p_up = r.get("p_up_5d")
-            if p_up is not None:
+            if bc in ("up", "down"):
+                shadow_dir = 1 if bc == "up" else -1
+            elif p_up is not None:
                 shadow_dir = 1 if p_up >= 0.5 else -1
+            if shadow_dir is not None:
                 shadow_correct = (shadow_dir > 0) == (ret_pct > 0)
 
         r["status"] = "graded"

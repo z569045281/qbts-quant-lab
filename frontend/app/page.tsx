@@ -394,7 +394,15 @@ export default function Dashboard() {
               <div className="w-full mt-4">
                 <div className="flex justify-between text-[10px] opacity-70 mb-1">
                   <span>信心 {d.conviction}/10</span>
-                  <span>P(up,5d) {(d.p_up_5d * 100).toFixed(0)}%</span>
+                  <span>
+                    P(up,5d) {(d.p_up_5d * 100).toFixed(0)}%
+                    {d.bold_call_5d && (
+                      <span className={`ml-1.5 px-1.5 py-0.5 rounded-full font-bold ${
+                        d.bold_call_5d === "up" ? "bg-emerald-500/20" : "bg-red-500/20"}`}>
+                        押{d.bold_call_5d === "up" ? "涨 ▲" : "跌 ▼"}
+                      </span>
+                    )}
+                  </span>
                 </div>
                 <div className="h-2 bg-white/70 rounded-full overflow-hidden border border-current/10">
                   <div className={`h-full ${meta.bar}`} style={{ width: `${d.conviction * 10}%` }} />
