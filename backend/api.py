@@ -1253,6 +1253,14 @@ async def scan_watch(req: Request):
     body = await req.json()
     action = body.get("action")
     ticker = (body.get("ticker") or "").strip().upper()
+    if action == "spacex":
+        # 🚀 单独重跑 SpaceX 生成(DeepSeek-only)。本地 .env 无 DEEPSEEK_API_KEY 时
+        # decision 会是 None(不回退 Claude),但数据/新闻照常刷新写入。
+        from dashboard import spacex
+        sx = await asyncio.to_thread(spacex.publish_spacex)
+        dec = sx.get("decision")
+        return {"ok": True, "decision": (
+            {"action": dec["action"], "conviction": dec["conviction"]} if dec else None)}
     if action in ("pos_add", "pos_remove"):
         # 💼 实盘持仓编辑(走同一条编辑通道;不触发重扫,建议在下次生成决策时更新)
         from dashboard import positions as upos

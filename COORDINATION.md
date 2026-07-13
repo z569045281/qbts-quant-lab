@@ -147,3 +147,4 @@ Format (newest at top):
 2026-07-13 21:30 [fable] 交易计划卡加同卷对照区块(用户要求): 另一模型的独立判断常驻显示(方向/信心/押注/ETF三价/RR/仓位/入场条件+同向分歧章),随切换互换 + v2.14.1 [done]
 2026-07-13 21:55 [fable] 决策存档补全(用户:都要存好之后回测): journal 增 ds_action/conviction/entry/stop/target 结构化字段;确认 dashboard_state 全快照永久累积(81行) [done]
 2026-07-13 22:40 [opus] SpaceX第二仪表盘(用户:只用deepseek不用fable): backend/dashboard/spacex.py 自包含DeepSeek-only决策(BUY/HOLD/REDUCE,自抓yf+GoogleNews+事件日历,薄数据守卫,无key降级None不回退Claude) + sql/spacex_migration.sql(待用户跑) + publish.py §4.7 + frontend /spacex页/nav🚀/data.ts类型 + v2.15.0 [done]
+2026-07-13 23:20 [opus] SpaceX单独重跑按钮(用户:加个单独跑spacex的按钮): lambda_handlers action='spacex'分支+每日publish带上SpaceX / api.py /scan/watch同分支 / data.ts postSpacexRefresh / /spacex页🔄按钮(WATCH_EDITABLE门,30-60s spinner) + v2.15.1;表已建,本地写入回读确认(data/news/catalysts落库,decision云端填) [done]

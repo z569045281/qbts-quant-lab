@@ -209,6 +209,12 @@ def _publish_decision_only() -> dict:
             dca.publish_dca()
         except Exception as e:
             print(f"! DCA skipped: {e}")
+        # 🚀 SpaceX (SPCX · DeepSeek-only) — best-effort, never blocks the QBTS publish
+        try:
+            from dashboard import spacex
+            spacex.publish_spacex()
+        except Exception as e:
+            print(f"! SpaceX skipped: {e}")
     finally:
         loop.close()
     return {"ok": True, "decision": summary}
@@ -287,6 +293,15 @@ def publish_handler(event, context):
             scan = scan_store.publish_scan()
             return {"statusCode": 200, "body": json.dumps(
                 {"ok": True, "n": len(scan.get("results", []))})}
+
+        if action == "spacex":
+            # 🚀 单独重跑 SpaceX 生成(DeepSeek-only)→ 写 spacex_state。~30-60s。
+            from dashboard import spacex
+            sx = spacex.publish_spacex()
+            dec = sx.get("decision")
+            return {"statusCode": 200, "body": json.dumps(
+                {"ok": True, "decision": (
+                    {"action": dec["action"], "conviction": dec["conviction"]} if dec else None)})}
 
         if action in ("pos_add", "pos_remove"):
             # 💼 实盘持仓编辑(AI 建议在下次生成决策时更新)

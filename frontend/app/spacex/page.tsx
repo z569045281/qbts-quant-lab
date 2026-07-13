@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getSpacexState, type SpacexState, type SpacexDecision } from "../_lib/data";
+import { useCallback, useEffect, useState } from "react";
+import {
+  getSpacexState, postSpacexRefresh, WATCH_EDITABLE,
+  type SpacexState, type SpacexDecision,
+} from "../_lib/data";
 
 /* ─────────────────────────────────────────────────────────────────────────
    🚀 SpaceX (SPCX) 第二仪表盘 — 决策**只由 DeepSeek V4 Pro 生成**(不用 Fable)。
@@ -116,12 +119,32 @@ function DecisionHero({ d }: { d: SpacexDecision }) {
 export default function SpacexPage() {
   const [state, setState] = useState<SpacexState | null>(null);
   const [loading, setLoading] = useState(true);
+  const [running, setRunning] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    let stop = false;
-    (async () => { const s = await getSpacexState(); if (!stop) { setState(s); setLoading(false); } })();
-    return () => { stop = true; };
+  const load = useCallback(async () => {
+    const s = await getSpacexState();
+    setState(s);
+    setLoading(false);
   }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  async function regenerate() {
+    if (running) return;
+    setRunning(true);
+    setMsg("正在调用 DeepSeek 重新生成…(可能 30–60 秒)");
+    const res = await postSpacexRefresh();
+    if (res.ok) {
+      setMsg(res.decision
+        ? `✓ 完成:${res.decision.action} · 信心 ${res.decision.conviction}/10`
+        : "✓ 数据已刷新,但决策为空(云端未配 DeepSeek 密钥或本次调用失败)");
+      await load();
+    } else {
+      setMsg(`✗ 失败:${res.error ?? "未知错误"}`);
+    }
+    setRunning(false);
+  }
 
   const dd = state?.data;
   const up = (dd?.today_change ?? 0) >= 0;
@@ -145,6 +168,19 @@ export default function SpacexPage() {
           独立于 QBTS 主仪表盘的第二块屏 · 决策由 <b>DeepSeek V4 Pro</b> 单独生成(不调用 Fable)
           {state?.generated_at && <> · 更新于 {state.generated_at.slice(0, 10)}</>}
         </p>
+        {WATCH_EDITABLE && (
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
+            <button
+              onClick={regenerate} disabled={running}
+              className="px-3.5 py-1.5 rounded-lg bg-[#006FFF] text-white text-xs font-semibold
+                         disabled:opacity-50 hover:bg-[#0060DB] transition-colors inline-flex items-center gap-1.5">
+              {running
+                ? <><span className="inline-block w-2 h-2 rounded-full bg-white/90 animate-pulse" /> 生成中…</>
+                : <>🔄 立即用 DeepSeek 重新生成</>}
+            </button>
+            {msg && <span className="text-[11px] text-slate-300/90 font-mono">{msg}</span>}
+          </div>
+        )}
       </section>
 
       {loading ? (

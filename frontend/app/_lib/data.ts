@@ -833,6 +833,26 @@ export async function getSpacexState(): Promise<SpacexState | null> {
   return data.data as SpacexState;
 }
 
+/** 🚀 单独重跑 SpaceX 生成(DeepSeek-only)。云 → Lambda Function URL;本地 → FastAPI。
+ *  DeepSeek 推理可能 30–60s。成功后调用方应 re-fetch getSpacexState()。 */
+export async function postSpacexRefresh(): Promise<{
+  ok: boolean; decision?: { action: string; conviction: number } | null; error?: string;
+}> {
+  const url = process.env.NEXT_PUBLIC_PUBLISH_URL || `${API}/scan/watch`;
+  try {
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "spacex", client: clientHints() }),
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok) return { ok: false, error: j?.error || `HTTP ${r.status}` };
+    return j ?? { ok: false, error: "空响应" };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "请求失败" };
+  }
+}
+
 /* ── 🔮 月度复盘 (model-written review of the accumulated track record) ────────── */
 export interface Retrospective {
   generated_at:  string;

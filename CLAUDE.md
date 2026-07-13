@@ -133,7 +133,10 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   prompt 显式让模型忽略 RSI/均线绝对值、以事件+价格结构为准;**2026-08-06 首次财报+首次
   锁定期解禁(~20% 内部人)**是 `_CATALYSTS` 里点名的压倒性风险(日期/比例需复核,`catalyst_asof`)。
   **待跑迁移 `sql/spacex_migration.sql`**(见下)。本地 `.env` 无 DeepSeek key → 本地 publish
-  的 SPCX 决策必为 None,只有云端能生成。
+  的 SPCX 决策必为 None,只有云端能生成。**单独重跑按钮**(v2.15.1):/spacex 页 🔄 按钮 →
+  `postSpacexRefresh` POST `action:"spacex"` 到 Function URL(云)/ `/scan/watch`(本地)→
+  `publish_handler` 与 api.py 各有 `spacex` 分支跑 `publish_spacex()`(~30-60s,DeepSeek 推理);
+  云端每日 publish(`_publish_decision_only`)也已带上 SpaceX,和 scan/dca 一样 best-effort。
 - **Big image push to ECR occasionally times out** in CI — just re-run "Deploy AWS jobs".
 - **Nadaraya-Watson 包络** (`backend/dashboard/nadaraya_watson.py::analyze_nw_envelope`):
   non-repainting Gaussian-kernel mean-reversion band (causal one-sided kernel — does
