@@ -112,6 +112,15 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   via `DELETE /v2/positions/{sym}?cancel_orders=true` (round 1's "LIQUIDATE" never actually
   filled; stray position was cleaned 2026-07-08).
 - **Models**: Fable 5 (decision, fallback Opus 4.8) · Sonnet 4.6 (factor gen) · Haiku 4.5 (news / reflections).
+- **`DEEPSEEK_API_KEY`** (optional, root `.env` + GitHub Actions secret + `template.yaml`
+  `DeepSeekApiKey` → `deploy-aws.yml`): **DeepSeek V4 Pro 影子决策**
+  (`decision.py::generate_shadow_decision`, 2026-07-13) — 同一份 prompt 每天跑一遍
+  DeepSeek(`deepseek-v4-pro`, api.deepseek.com, ~$0.02/天),挂在主决策 `shadow_ds`
+  字段随缓存/payload 走。**零决策权**:不推送、不驱动交易、不进 edge;决策卡可
+  Fable/DeepSeek 切换(v2.14.0),journal 顺带记 `ds_bold_call` 与 Fable `bold_call_5d`
+  同一套 fwd5 口径评分(`audit.py` ② 🥊 表态vs5日两行同框)→ **8/15 影子考场宣判,
+  赢了才谈换岗**。Blank key = 影子全关,主决策零影响。方向单 <5 bar 提前触发评分的
+  日子 fwd5 无数据,该日两模型表态不计分(方向单稀有,可忽略)。
 - **Big image push to ECR occasionally times out** in CI — just re-run "Deploy AWS jobs".
 - **Nadaraya-Watson 包络** (`backend/dashboard/nadaraya_watson.py::analyze_nw_envelope`):
   non-repainting Gaussian-kernel mean-reversion band (causal one-sided kernel — does

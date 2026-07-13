@@ -145,6 +145,12 @@ def run_audit() -> dict:
             **_verdict(sum(lean), len(lean)),
             "p_up_fence_pct": round(fence / len(p_all), 3) if p_all else None,
         }
+        # 影子考场:Fable vs DeepSeek 的 bold_call 按统一 fwd5 口径同框
+        for fld, key in (("bold_correct", "bold_fable"), ("ds_bold_correct", "bold_deepseek")):
+            vals = [bool((r.get("result") or {}).get(fld))
+                    for r in recs if (r.get("result") or {}).get(fld) is not None]
+            if vals:
+                report["sections"]["decision_journal"][key] = _verdict(sum(vals), len(vals))
     except Exception as e:
         report["sections"]["decision_journal"] = {"error": str(e)[:120]}
 
@@ -227,6 +233,12 @@ def format_report(report: dict) -> str:
                      f"CI[{dc['ci95'][0]*100:.0f},{dc['ci95'][1]*100:.0f}] {dc['verdict']}"
                      + (f" · p_up骑墙率 {fence*100:.0f}%(目标应随 bold_call 上线归零)"
                         if fence is not None else ""))
+        for key, label in (("bold_fable", "🥊 表态vs5日 Fable"),
+                           ("bold_deepseek", "🥊 表态vs5日 DeepSeek影子")):
+            b = dj.get(key)
+            if b and b.get("n"):
+                L.append(f"   {label} n={b['n']} 命中{b['hit_rate']*100:.0f}% "
+                         f"CI[{b['ci95'][0]*100:.0f},{b['ci95'][1]*100:.0f}] {b['verdict']}")
     hs = report["sections"].get("paper_horses", {})
     if hs and "error" not in hs:
         L.append("\n③ 纸面马竞速:")

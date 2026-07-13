@@ -99,6 +99,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   // 👀 隐藏点击审计:版本号 1.5s 内连点 3 次打开
   const [auditOpen, setAuditOpen] = useState(false);
+  const [modelView, setModelView] = useState<"fable" | "ds">("fable");  // 决策卡 Claude/DeepSeek 切换
   const versionClicks = useRef<number[]>([]);
 
   const refresh = useCallback(async () => {
@@ -172,7 +173,10 @@ export default function Dashboard() {
   }
   if (!snap) return null;
 
-  const d = snap.decision ?? null;
+  // DeepSeek 影子决策(同一份数据、同一套规则、零决策权)—— 切换只换展示,
+  // 台账/推送/持仓建议的"官方口径"永远是 Fable 主决策
+  const dsd = snap.decision?.shadow_ds ?? null;
+  const d = modelView === "ds" && dsd ? dsd : (snap.decision ?? null);
   const meta = d ? getActionMeta(d.action, d.conviction) : null;
   const genAt = fmtLocalDateTime(snap.decision_generated_at);   // UTC → 浏览器本地时区
 
@@ -379,8 +383,26 @@ export default function Dashboard() {
                 还没有 AI 决策 — 在本地运行 <code className="font-mono bg-gray-100 px-1 rounded">python publish.py</code> 生成。
               </p>
             )}
+            {dsd && (
+              <div className="mt-3 flex items-center gap-1.5 flex-wrap">
+                {(["fable", "ds"] as const).map(m => (
+                  <button key={m} onClick={() => setModelView(m)}
+                    className={`text-[11px] px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                      modelView === m
+                        ? "bg-[#006FFF] text-white border-[#006FFF]"
+                        : "bg-white text-[#525461] border-[#EDEDF0] hover:border-gray-300"}`}>
+                    {m === "fable" ? "Fable 5 · 主决策" : "DeepSeek · 影子"}
+                  </button>
+                ))}
+                {modelView === "ds" && (
+                  <span className="text-[10px] text-amber-600 font-medium">
+                    影子对照:不驱动交易/推送/台账;方向表态另记分,8/15 与 Fable 同框宣判
+                  </span>
+                )}
+              </div>
+            )}
             <div className="mt-2 text-[10px] text-gray-400">
-              数据截至 {snap.as_of?.slice(0, 10)}{genAt ? ` · 决策生成于 ${genAt}` : ""} · 由 Claude 综合全部信号生成 · 非投资建议
+              数据截至 {snap.as_of?.slice(0, 10)}{genAt ? ` · 决策生成于 ${genAt}` : ""} · 由 {modelView === "ds" && dsd ? "DeepSeek V4 Pro(影子)" : "Claude"} 综合全部信号生成 · 非投资建议
             </div>
           </div>
 

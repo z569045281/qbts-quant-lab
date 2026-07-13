@@ -32,6 +32,13 @@ Parameters:
     Description: >
       Adanos API key (sk_live_…) — retail Reddit buzz + sentiment for the
       decision/edge. Optional: blank just leaves the sentiment signal off.
+  DeepSeekApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+    Description: >
+      DeepSeek API key — V4 Pro shadow decision (Claude/DeepSeek toggle on the
+      dashboard + bold-call shadow ledger, judged 8/15). Optional: blank = off.
   AllowOrigin:
     Type: String
     Default: "*"
@@ -72,6 +79,7 @@ Globals:
         SUPABASE_SECRET_KEY: !Ref SupabaseSecretKey
         FRED_API_KEY: !Ref FredApiKey
         ADANOS_API_KEY: !Ref AdanosApiKey
+        DEEPSEEK_API_KEY: !Ref DeepSeekApiKey
         NTFY_TOPIC: !Ref NtfyTopic
         NTFY_URL: !Ref NtfyUrl
         ALPACA_API_KEY: !Ref AlpacaApiKey

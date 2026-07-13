@@ -440,6 +440,8 @@ export interface Decision {
   model?:             string;    // which model actually produced this decision (fable-5 or fallback)
   system_notes?:      { kind: "数据问题" | "改进建议"; note: string }[];  // AI 每日自检:数据问题/改进建议(给维护者)
   position_advice?:   PositionAdvice[];  // 💼 用户实盘持仓的逐笔操作建议
+  shadow?:            boolean;   // true = 影子决策(零决策权,仅对照)
+  shadow_ds?:         Decision;  // DeepSeek V4 Pro 影子决策(卡上可切换;8/15 同框宣判)
 }
 
 /* ── 💼 用户实盘持仓 ─────────────────────────────────────────────────────── */

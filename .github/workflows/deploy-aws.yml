@@ -74,6 +74,7 @@ jobs:
               SupabaseSecretKey='${{ secrets.SUPABASE_SECRET_KEY }}' \
               FredApiKey='${{ secrets.FRED_API_KEY }}' \
               AdanosApiKey='${{ secrets.ADANOS_API_KEY }}' \
+              DeepSeekApiKey='${{ secrets.DEEPSEEK_API_KEY }}' \
               AllowOrigin='${{ vars.PUBLISH_ALLOW_ORIGIN || '*' }}' \
               $NTFY_PARAM $ALPACA_PARAMS
 

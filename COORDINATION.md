@@ -143,3 +143,4 @@ Format (newest at top):
 2026-07-13 18:10 [fable] SMC需求侧盲区修复(用户TV对比暴露): find_order_blocks 弃[-4:]改全事件扫描,未回补OB不论新旧保留 → 5/19需求OB $17.74-18.77 回归(=用户LuxAlgo蓝带) [done]
 2026-07-13 18:55 [fable] 第二十二轮(用户点名): 供需区买卖回测 → 无晋升,FVG触碰=接刀第三证,阻力卖会卖飞,V5往返+270%是彩票幻觉 → mining.md [done]
 2026-07-13 19:40 [fable] AI自检07-12三连修: 地缘alert×盘面risk_on交叉验证注 / 持仓天数改ET日期(UTC虚高1天影响军规) / 周末报价跨日标注'上一交易日' + 持仓现价隐含公允价口径标签 [done]
+2026-07-13 20:50 [fable] DeepSeek影子考场(用户要求Claude/DeepSeek切换): decision.py generate_shadow_decision(V4 Pro同prompt,零决策权,shadow_ds字段) / journal ds_bold_call+统一fwd5评分 / audit 🥊表态两行 / 决策卡切换UI + DEEPSEEK_API_KEY全链路接线 + v2.14.0 [done]

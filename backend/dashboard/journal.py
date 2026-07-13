@@ -151,6 +151,9 @@ def record(decision: dict, price_at_decision: float, as_of: str) -> None:
         "conviction": decision.get("conviction"),
         "p_up_5d":    decision.get("p_up_5d"),
         "bold_call_5d": decision.get("bold_call_5d"),
+        # DeepSeek 影子考场:只记表态,评分与 Fable 同一套 5 日口径
+        "ds_bold_call": (decision.get("shadow_ds") or {}).get("bold_call_5d"),
+        "ds_p_up":      (decision.get("shadow_ds") or {}).get("p_up_5d"),
         "price":      round(float(price_at_decision), 2),
         "entry":      tp.get("qbts_entry"),
         "stop":       tp.get("qbts_stop"),
@@ -242,6 +245,21 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
             if shadow_dir is not None:
                 shadow_correct = (shadow_dir > 0) == (ret_pct > 0)
 
+        # 纯 5 日漂移(与 action 路径无关)—— 两个模型 bold_call 的统一评分基准。
+        # 注:方向单若在 <5 根 bar 内触及止损/目标提前评分,当天 fwd5 可能还没
+        # 数据 → 该日两模型表态不计分(极少;方向单本就稀有)。
+        fwd5 = None
+        if len(after) >= _GRADE_AFTER_BARS:
+            fwd5 = (float(closes.loc[after[_GRADE_AFTER_BARS - 1]]) - p0) / p0
+        bold_correct = ds_correct = None
+        if fwd5 is not None:
+            bc = r.get("bold_call_5d")
+            if bc in ("up", "down"):
+                bold_correct = (bc == "up") == (fwd5 > 0)
+            dsc = r.get("ds_bold_call")
+            if dsc in ("up", "down"):
+                ds_correct = (dsc == "up") == (fwd5 > 0)
+
         r["status"] = "graded"
         r["result"] = {
             "graded_at": datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
@@ -252,6 +270,9 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
             "reflection": None,
             "shadow_dir":     shadow_dir,
             "shadow_correct": shadow_correct,
+            "fwd5_ret":       round(fwd5, 4) if fwd5 is not None else None,
+            "bold_correct":    bold_correct,
+            "ds_bold_correct": ds_correct,
         }
         newly_graded.append(r)
 

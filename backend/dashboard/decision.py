@@ -910,6 +910,54 @@ def generate_decision(snapshot: dict, extras: dict | None = None) -> dict:
     return decision
 
 
+_DS_MODEL = "deepseek-v4-pro"
+_DS_URL = "https://api.deepseek.com/chat/completions"
+
+
+def generate_shadow_decision(snapshot: dict, extras: dict | None = None) -> dict | None:
+    """DeepSeek V4 Pro 影子决策(2026-07-13,用户要求 Claude/DeepSeek 切换对照)。
+
+    同一份 system+user prompt、同一套 _sanitize 硬化;零决策权 —— 不推送、不驱动
+    交易、不进 edge;唯一的记账是 journal 顺带记它的 bold_call_5d 每日评分,
+    8/15 与 Fable 同框宣判(影子考场)。无 DEEPSEEK_API_KEY 或任何失败 → None,
+    主决策完全不受影响。成本 ~$0.02/天(V4 Pro $0.435/M in)。
+    """
+    key = os.getenv("DEEPSEEK_API_KEY")
+    if not key:
+        return None
+    try:
+        import requests
+        r = requests.post(_DS_URL, timeout=150, headers={
+            "Authorization": f"Bearer {key}", "Content-Type": "application/json",
+        }, json={
+            "model": _DS_MODEL,
+            "messages": [{"role": "system", "content": _SYSTEM},
+                         {"role": "user", "content": _build_user_msg(snapshot, extras)}],
+            # prompt 本身已要求"只输出一个 JSON 对象"(json_object 模式的前置条件)
+            "response_format": {"type": "json_object"},
+            "max_tokens": 8000,
+            "stream": False,
+        })
+        r.raise_for_status()
+        text = (r.json()["choices"][0]["message"]["content"] or "").strip()
+        if text.startswith("```"):                     # 保险:围栏剥离
+            text = text.split("```", 2)[1]
+            text = text[4:] if text.startswith("json") else text
+            text = text.rsplit("```", 1)[0]
+        d = json.loads(text)
+        if d.get("action") not in ("LONG_QBTX", "SHORT_QBTZ", "HOLD"):
+            raise ValueError(f"bad action: {d.get('action')}")
+        d["conviction"] = max(0, min(10, int(d.get("conviction", 0) or 0)))
+        d["system_notes"] = (d.get("system_notes") or [])[:4]
+        d["position_advice"] = (d.get("position_advice") or [])[:6]
+        d["model"] = _DS_MODEL
+        d["shadow"] = True
+        return _sanitize_decision(d, snapshot, extras)
+    except Exception as e:
+        logger.warning(f"deepseek shadow decision failed: {e}")
+        return None
+
+
 def get_or_generate_decision(
     snapshot: dict,
     force_refresh: bool = False,
@@ -936,6 +984,11 @@ def get_or_generate_decision(
     except Exception as e:
         logger.warning(f"Decision generation failed: {e}")
         return None, None, False
+
+    # DeepSeek 影子决策挂在主决策上随缓存/payload/前端一路带过去;失败=没有,零影响
+    ds = generate_shadow_decision(snapshot, extras)
+    if ds:
+        decision["shadow_ds"] = ds
 
     # NOTE: the intraday consistency guard (flip-flop detection) lives in
     # journal.record() — it reads/writes Supabase, so a phone tap on the deployed
