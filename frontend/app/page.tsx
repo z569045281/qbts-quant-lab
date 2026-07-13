@@ -641,6 +641,52 @@ export default function Dashboard() {
                   )}
                 </div>
               </details>
+
+              {/* 🥊 另一位考生的独立判断 — 同卷对照,常驻显示(不用切换) */}
+              {dsd && snap.decision && (() => {
+                const other = modelView === "ds" ? snap.decision : dsd;
+                const isDs = modelView !== "ds";   // 对照区显示的是不是 DeepSeek
+                const tp = other.trade_plan;
+                const agree = other.action === d.action;
+                return (
+                  <div className={`mt-3 rounded-lg border px-3 py-2.5 ${
+                    isDs ? "bg-violet-50/60 border-violet-200" : "bg-blue-50/60 border-blue-200"}`}>
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-[11px] font-bold text-gray-700">
+                        {isDs ? "🤖 DeepSeek 影子判断" : "🧠 Fable 5 主决策"}(同卷对照)
+                      </span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                        agree ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
+                        {agree ? "两模型同向 ✓" : "两模型分歧 ⚠️"}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 text-xs text-gray-700">
+                      {other.action === "LONG_QBTX" ? "📈 做多 — 买 QBTX"
+                       : other.action === "SHORT_QBTZ" ? "📉 做空 — 买 QBTZ" : "⏸️ 观望"}
+                      <span className="text-gray-400"> · </span>信心 {other.conviction}/10
+                      <span className="text-gray-400"> · </span>
+                      押{other.bold_call_5d === "up" ? "涨 ▲" : "跌 ▼"}(P(up) {(other.p_up_5d * 100).toFixed(0)}%)
+                    </div>
+                    {other.action !== "HOLD" && other.plan_valid !== false && tp?.etf_ticker && (
+                      <div className="mt-1 text-[11px] font-mono text-gray-600">
+                        {tp.etf_ticker} {fmtPx(tp.etf_entry)} / <span className="text-[#F03A3E]">{fmtPx(tp.etf_stop)}</span> / <span className="text-emerald-600">{fmtPx(tp.etf_target)}</span>
+                        <span className="text-gray-400"> · </span>1:{tp.rr_ratio?.toFixed(1) ?? "—"}
+                        <span className="text-gray-400"> · </span>{tp.suggested_position_pct}% 仓
+                      </div>
+                    )}
+                    {tp?.entry_condition && (
+                      <div className="mt-1 text-[10px] text-gray-500 leading-snug">
+                        入场条件:{tp.entry_condition.slice(0, 90)}
+                      </div>
+                    )}
+                    {isDs && (
+                      <div className="mt-1 text-[9px] text-amber-600">
+                        影子判断 · 不驱动交易/推送/台账;方向表态每日记分,8/15 与主决策同框宣判
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 关键驱动 + 风险 */}

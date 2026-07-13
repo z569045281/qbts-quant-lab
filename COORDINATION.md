@@ -144,3 +144,4 @@ Format (newest at top):
 2026-07-13 18:55 [fable] 第二十二轮(用户点名): 供需区买卖回测 → 无晋升,FVG触碰=接刀第三证,阻力卖会卖飞,V5往返+270%是彩票幻觉 → mining.md [done]
 2026-07-13 19:40 [fable] AI自检07-12三连修: 地缘alert×盘面risk_on交叉验证注 / 持仓天数改ET日期(UTC虚高1天影响军规) / 周末报价跨日标注'上一交易日' + 持仓现价隐含公允价口径标签 [done]
 2026-07-13 20:50 [fable] DeepSeek影子考场(用户要求Claude/DeepSeek切换): decision.py generate_shadow_decision(V4 Pro同prompt,零决策权,shadow_ds字段) / journal ds_bold_call+统一fwd5评分 / audit 🥊表态两行 / 决策卡切换UI + DEEPSEEK_API_KEY全链路接线 + v2.14.0 [done]
+2026-07-13 21:30 [fable] 交易计划卡加同卷对照区块(用户要求): 另一模型的独立判断常驻显示(方向/信心/押注/ETF三价/RR/仓位/入场条件+同向分歧章),随切换互换 + v2.14.1 [done]
