@@ -59,6 +59,15 @@ function IconChallenge() {  // 🎰 target-hit / $1000→+$100 challenge
     </svg>
   );
 }
+function IconSpacex() {  // 🚀 rocket / SpaceX second dashboard
+  return (
+    <svg width="25" height="25" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 2c3 2 4.5 5.5 4.5 9 0 2.2-.7 4.3-2 6h-5c-1.3-1.7-2-3.8-2-6C7.5 7.5 9 4 12 2z" {...ico} />
+      <circle cx="12" cy="9" r="1.8" {...ico} />
+      <path d="M7.5 15l-2.5 2v3l3-1.5M16.5 15l2.5 2v3l-3-1.5" {...ico} />
+    </svg>
+  );
+}
 function IconMine() {  // ⛏️ sparkles / AI factor lab (local only)
   return (
     <svg width="25" height="25" viewBox="0 0 24 24" aria-hidden="true">
@@ -74,6 +83,7 @@ const tabs = [
   { href: "/dca",     label: "📥 定投专区",   short: "定投", Icon: IconDca      },
   { href: "/factors", label: "🏇 策略战绩", short: "战绩", Icon: IconFactors  },
   { href: "/challenge", label: "🎰 千元挑战",  short: "挑战", Icon: IconChallenge },
+  { href: "/spacex",  label: "🚀 SpaceX",    short: "SPCX", Icon: IconSpacex   },
   // The mining console only works against the local backend — hide it on the
   // read-only public deployment.
   ...(READONLY ? [] : [{ href: "/mine", label: "⛏️ 因子挖矿", short: "挖矿", Icon: IconMine }]),

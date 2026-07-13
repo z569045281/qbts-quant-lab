@@ -787,6 +787,52 @@ export async function getDcaState(): Promise<DcaState | null> {
   return data.data as DcaState;
 }
 
+/* ── 🚀 SpaceX (SPCX) 第二仪表盘 · DeepSeek-only 决策 ─────────────────────────── */
+export interface SpacexData {
+  ticker: string;
+  price: number; prev_close: number; today_change: number;
+  sma20: number | null; sma50: number | null; sma200: number | null;
+  above_sma20: boolean | null; above_sma50: boolean | null; above_sma200: boolean | null;
+  rsi14: number | null; atr14: number | null; atr_pct: number | null;
+  ath: number; atl: number; drawdown_from_ath: number | null;
+  high_52w: number; low_52w: number;
+  ret_5d: number | null; ret_20d: number | null; vol_vs_20d: number | null;
+  n_bars: number; thin_data: boolean; as_of: string;
+}
+export interface SpacexDriver { factor: string; stance: "bull" | "bear" | "neutral"; note: string; }
+export interface SpacexCatalyst { date: string; event: string; impact: string; note: string; }
+export interface SpacexDecision {
+  action: "BUY" | "HOLD" | "REDUCE";
+  conviction: number;
+  summary: string;
+  entry: number | null; stop: number | null; target: number | null; rr: number | null;
+  horizon?: string;
+  drivers: SpacexDriver[];
+  catalysts_read?: string;
+  risks: string[];
+  lockup_note?: string;
+  system_notes?: string[];
+  model: string;
+}
+export interface SpacexNews { title: string; published: string; source: string; }
+export interface SpacexState {
+  generated_at: string;
+  engine: string;
+  data: SpacexData;
+  news: SpacexNews[];
+  catalysts: SpacexCatalyst[];
+  catalyst_asof: string;
+  decision: SpacexDecision | null;
+}
+
+/** Latest SpaceX read (single 'current' row; null if table missing / not generated). */
+export async function getSpacexState(): Promise<SpacexState | null> {
+  const { data, error } = await supabase
+    .from("spacex_state").select("data").eq("id", "current").maybeSingle();
+  if (error || !data) return null;
+  return data.data as SpacexState;
+}
+
 /* ── 🔮 月度复盘 (model-written review of the accumulated track record) ────────── */
 export interface Retrospective {
   generated_at:  string;

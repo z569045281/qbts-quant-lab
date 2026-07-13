@@ -219,3 +219,15 @@ create policy "anon read publish_audit"
   on public.publish_audit for select
   to anon, authenticated
   using (true);
+
+-- ── spacex_state (🚀 SpaceX/SPCX 第二仪表盘) ─────────────────────────────────
+-- Single row 'current' holding the SPCX snapshot + **DeepSeek-only** decision
+-- (backend/dashboard/spacex.py). Written by the daily publish (service key),
+-- READ by the anon frontend (/spacex) → needs an anon SELECT policy.
+create table if not exists public.spacex_state (
+  id text primary key, updated_at timestamptz not null default now(), data jsonb not null
+);
+alter table public.spacex_state enable row level security;
+drop policy if exists "anon read spacex_state" on public.spacex_state;
+create policy "anon read spacex_state" on public.spacex_state
+  for select to anon, authenticated using (true);

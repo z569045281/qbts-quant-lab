@@ -121,6 +121,19 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   同一套 fwd5 口径评分(`audit.py` ② 🥊 表态vs5日两行同框)→ **8/15 影子考场宣判,
   赢了才谈换岗**。Blank key = 影子全关,主决策零影响。方向单 <5 bar 提前触发评分的
   日子 fwd5 无数据,该日两模型表态不计分(方向单稀有,可忽略)。
+- **🚀 SpaceX (SPCX) 第二仪表盘** (`backend/dashboard/spacex.py`, 2026-07-13 用户要求):
+  **决策只由 DeepSeek 生成、绝不回退 Fable**(与影子决策共用 `DEEPSEEK_API_KEY`,但这是
+  一台**独立**的机器,不是影子)。SPCX 是普通个股 → 自包含:自抓 yfinance 技术读数 +
+  Google News RSS 头条 + 硬编码事件日历,自己的 SPCX 专用 prompt(动作空间 **BUY/HOLD/
+  REDUCE**,非 QBTX/QBTZ),`generate_spacex_decision` POST api.deepseek.com(json_object)→
+  `_sanitize`(夹信心/补 RR/剔离谱位)。**无 key 或失败 → decision=None**(前端显示"待生成",
+  不调 Claude)。接进 `publish.py` §4.7(每日 09:00 ET 云端 publish 刷新,DEEPSEEK_API_KEY
+  已在该 Lambda env),写 Supabase **`spacex_state`**(id='current')。前端 `/spacex` +
+  nav 🚀 标签 + `getSpacexState`。⚠️ SPCX 是**新 IPO**(~20 根日线):`thin_data` 标记 →
+  prompt 显式让模型忽略 RSI/均线绝对值、以事件+价格结构为准;**2026-08-06 首次财报+首次
+  锁定期解禁(~20% 内部人)**是 `_CATALYSTS` 里点名的压倒性风险(日期/比例需复核,`catalyst_asof`)。
+  **待跑迁移 `sql/spacex_migration.sql`**(见下)。本地 `.env` 无 DeepSeek key → 本地 publish
+  的 SPCX 决策必为 None,只有云端能生成。
 - **Big image push to ECR occasionally times out** in CI — just re-run "Deploy AWS jobs".
 - **Nadaraya-Watson 包络** (`backend/dashboard/nadaraya_watson.py::analyze_nw_envelope`):
   non-repainting Gaussian-kernel mean-reversion band (causal one-sided kernel — does
@@ -329,7 +342,9 @@ Frontend tabs (`frontend/app/`): **🎯 决策仪表盘** (`/`) · **🔭 自选
   出判决报告(backend/dashboard/audit.py;只读,权重改动仍走人工 review)。8/15 直接跑它。
 - **All Supabase migrations have been run** (decision_journal, calibration/predictions/
   source_weights, watchlist, scan_journal, finra_short, watchlist_scan, scan_paper,
-  dca_state) — **except `sql/publish_audit_migration.sql`(2026-07-09 点击审计表,待用户跑)**。
+  dca_state) — **except `sql/publish_audit_migration.sql`(2026-07-09 点击审计表,待用户跑)
+  和 `sql/spacex_migration.sql`(2026-07-13 SpaceX 第二仪表盘 `spacex_state` 表,待用户跑;
+  没跑之前 /spacex 显示建表提示、每日 publish 的 SpaceX 写入静默失败但不崩)**。
   点击审计:Lambda `_audit_click` 把每次真人按钮点击(出决策/自选/持仓)的 IP/UA/
   设备提示写进 `publish_audit`(cron 不记,失败不挡动作);前端版本号连点 3 次开
   隐藏查看窗(audit-modal)。浏览器拿不到计算机名——IP+系统/浏览器+时区就是全部口径。 Running cost ≈ **$20/mo**, almost all of it the one daily Opus decision at

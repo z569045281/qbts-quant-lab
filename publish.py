@@ -149,6 +149,19 @@ def main() -> None:
         except Exception as e:
             print(f"  ! DCA skipped: {e}")
 
+        # 4.7 SpaceX/SPCX 第二仪表盘 (DeepSeek-only 决策) --------------------
+        try:
+            from dashboard import spacex
+            print("→ computing SpaceX (SPCX · DeepSeek)…")
+            sx = spacex.publish_spacex()
+            dec = sx.get("decision")
+            if dec:
+                print(f"  ✓ {dec['action']} · 信心 {dec['conviction']}/10")
+            else:
+                print("  ! SPCX decision none (无 DEEPSEEK_API_KEY 或失败)")
+        except Exception as e:
+            print(f"  ! SpaceX skipped: {e}")
+
         # 5. Factors: metrics + code + chart ---------------------------------
         lb = get_leaderboard()                       # code/signal stripped, favorited added
         code_by_id = {e["id"]: e.get("code") for e in leaderboard}
