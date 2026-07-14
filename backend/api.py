@@ -1032,7 +1032,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
     except Exception as e:
         nw_env = {"active": False, "signal": 0, "rationale": f"NW 包络失败: {str(e)[:80]}"}
     try:
-        rel_strength = await asyncio.to_thread(analyze_relative_strength, df_d)
+        rel_strength = await asyncio.to_thread(analyze_relative_strength, df_d, market_light)
     except Exception as e:
         rel_strength = {"signal": 0, "label": "HOLD", "rationale": f"相对强度失败: {str(e)[:80]}"}
     try:

@@ -190,11 +190,17 @@ def _market_context() -> dict | None:
     The per-name scan is otherwise blind to the broad tape — a buy signal in a market-
     wide selloff is not the same as one in an uptrend."""
     try:
-        px = yf.download(["SPY", "QQQ", "^VIX"], period="6mo", interval="1d",
-                         auto_adjust=True, progress=False)["Close"]
+        # 顺带拉 IONQ/RGTI —— 这是全仪表盘唯一的新鲜宏观下载,让相对强度段复用它
+        # 的 VIX + 同行单日,避免与另一个(滞后 8h 的 parquet)数据源打架(AI 自检
+        # 2026-07-14 报过 VIX 16.5 vs 15.0 两处矛盾 + 同行单日因缓存滞后盲判)。
+        px = yf.download(["SPY", "QQQ", "^VIX", "IONQ", "RGTI"], period="6mo",
+                         interval="1d", auto_adjust=True, progress=False)["Close"]
         def vs50(sym: str) -> float:
             s = px[sym].dropna()
             return round(float(s.iloc[-1] / s.rolling(50).mean().iloc[-1] - 1), 4)
+        def ret1(sym: str) -> float | None:
+            s = px[sym].dropna()
+            return round(float(s.iloc[-1] / s.iloc[-2] - 1), 4) if len(s) >= 2 else None
         spy, qqq = vs50("SPY"), vs50("QQQ")
         vix = float(px["^VIX"].dropna().iloc[-1])
         ups = (spy >= 0) + (qqq >= 0)
@@ -205,7 +211,9 @@ def _market_context() -> dict | None:
         else:
             regime, note = "caution", "大盘中性偏震荡 —— 买入信号谨慎对待、小仓位为宜。"
         return {"regime": regime, "note": note, "vix": round(vix, 1),
-                "spy_vs_50dma": spy, "qqq_vs_50dma": qqq}
+                "spy_vs_50dma": spy, "qqq_vs_50dma": qqq,
+                "ionq_ret_1d": ret1("IONQ"), "rgti_ret_1d": ret1("RGTI"),
+                "qbts_ret_1d": None}   # QBTS 自身单日由 relative_strength 从主 df 取
     except Exception as e:
         logger.warning(f"market context failed: {e}")
         return None

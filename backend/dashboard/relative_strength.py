@@ -33,7 +33,7 @@ def _ret(series: pd.Series, n: int) -> float:
     return float(series.iloc[-1] / series.iloc[-1 - n] - 1)
 
 
-def analyze_relative_strength(df_d: pd.DataFrame) -> dict:
+def analyze_relative_strength(df_d: pd.DataFrame, market_light: dict | None = None) -> dict:
     # 走 enricher 的带 TTL 拉取(8h 内用缓存,过期自刷),不再裸读 parquet——
     # 裸读依赖别人恰好刷新过,滞后时 ffill 会造出"姐妹票 +0.0%"的伪读数。
     peers = None
@@ -83,8 +83,14 @@ def analyze_relative_strength(df_d: pd.DataFrame) -> dict:
     else:
         leadership = "inline"
 
-    # risk regime from VIX
-    vix = float(peers["vix"].iloc[-1]) if "vix" in peers.columns else None
+    # risk regime from VIX —— VIX 现价一律取自 market_light 的新鲜下载(与大盘
+    # 红绿灯段同源同时点,不再用滞后 8h 的 parquet,免两处 VIX 打架);vix_chg
+    # 的 5 日变化仍从 parquet 序列算(现价对齐,趋势口径不影响一致性)。
+    vix = None
+    if market_light and market_light.get("vix") is not None:
+        vix = float(market_light["vix"])
+    elif "vix" in peers.columns:
+        vix = float(peers["vix"].iloc[-1])
     vix_chg = _ret(peers["vix"], 5) if "vix" in peers.columns else 0.0
     if vix is not None and vix >= 22 and vix_chg > 0.10:
         risk = "off"
@@ -100,19 +106,29 @@ def analyze_relative_strength(df_d: pd.DataFrame) -> dict:
     # 一级信号「同行落后追赶」的直接读数(AI 自检 07-10:prompt 里只有 5/20 日
     # 相对强度,缺姐妹票单日数,导致该信号每天无法判定)。阈值照抄产线
     # strategy_peer_lead_lag 的 BUY-high 腿:同行均涨>3% 且 QBTS 落后 IONQ >1pp。
-    if peers_lag:
-        ionq_1d = rgti_1d = peer_avg_1d = None
+    # 同行单日:优先用 market_light 的新鲜下载(与 VIX 同源);它能给出当日
+    # (含盘中 partial bar)的 IONQ/RGTI 涨跌 → 治好"缓存滞后=追赶信号盲判"
+    # (AI 自检 07-14:新闻显示 IONQ 盘中 −8% 但该信号因缺同行实时价盲判)。
+    fresh_peer = bool(market_light and market_light.get("ionq_ret_1d") is not None)
+    if fresh_peer:
+        ionq_1d = market_light.get("ionq_ret_1d")
+        rgti_1d = market_light.get("rgti_ret_1d")
+        peer_stale = False
+    elif peers_lag:
+        ionq_1d = rgti_1d = None
+        peer_stale = True
     else:
         ionq_1d = _ret(peers["ionq"], 1) if "ionq" in peers.columns else None
         rgti_1d = _ret(peers["rgti"], 1) if "rgti" in peers.columns else None
-        sis = [v for v in (ionq_1d, rgti_1d) if v is not None]
-        peer_avg_1d = sum(sis) / len(sis) if sis else None
+        peer_stale = False
+    sis = [v for v in (ionq_1d, rgti_1d) if v is not None]
+    peer_avg_1d = sum(sis) / len(sis) if sis else None
     catchup = bool(peer_avg_1d is not None and peer_avg_1d > 0.03
                    and ionq_1d is not None and (qr["1d"] - ionq_1d) < -0.01)
 
     rationale = (f"QBTS 相对量子篮子(IONQ/RGTI)：5日 {rel['5d']*100:+.1f}%、"
                  f"20日 {rel['20d']*100:+.1f}% → {lead_cn}；")
-    if peers_lag:
+    if peer_stale:
         rationale += "⚠️ 同行数据滞后于 QBTS 最后交易日,单日追赶信号今日不可判定；"
     elif ionq_1d is not None:
         rationale += (f"最后交易日单日:IONQ {ionq_1d*100:+.1f}%/"
