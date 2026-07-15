@@ -426,6 +426,71 @@ def compute_replay(df_d: pd.DataFrame) -> dict | None:
     except Exception as e:
         logger.warning(f"replay: obs_levmr skipped — {e}")
 
+    # ⑫ 锁翻多×QBTX×3天(2026-07-15 第二十三轮副产品:持有军规状态化审判里
+    #    空腿全灭,唯独"锁翻多进场+日历3天"是全表最结实一格 —— 11笔9胜、
+    #    去最佳单笔仍+159%、Wilson下界52.3%。n=11 远未达预注册门槛,且与
+    #    特调/CHoCH↑ 同吃反转确认那块肉 → 观察组前向验证,8/15 与众马同审。)
+    try:
+        from dashboard.smc import analyze_structure, find_swings
+        locks: list[str] = []
+        for t in range(len(c)):
+            w_ = d.iloc[max(0, t - 119): t + 1]
+            if len(w_) < 30:
+                locks.append("neutral"); continue
+            sh_, sl_ = find_swings(w_, k=2)
+            locks.append(analyze_structure(w_, sh_, sl_)["trend"])
+        _DRAG3 = 0.00095            # QBTX 日拖累(第七轮实测 −9.5bp/日)
+        sret3 = pd.Series(0.0, index=idx)
+        tr3: list[dict] = []
+        e0 = None
+        for i in range(1, len(idx)):
+            if e0 is None:
+                if locks[i] == "bullish" and locks[i - 1] != "bullish":
+                    e0 = i
+                    sret3.iloc[i] -= _COST      # 收盘定仓付进场成本
+            else:
+                sret3.iloc[i] += 2 * float(ret.iloc[i]) - _DRAG3
+                closed3 = i - e0 >= 3
+                if closed3:
+                    sret3.iloc[i] -= _COST
+                if closed3 or i == len(idx) - 1:
+                    seg = float((1 + sret3.iloc[e0:i + 1]).prod() - 1)
+                    tr3.append({"buy_date": str(idx[e0].date()),
+                                "buy_px": round(float(c.iloc[e0]), 2),
+                                "open": not closed3,
+                                **({"sell_date": str(idx[i].date()),
+                                    "sell_px": round(float(c.iloc[i]), 2)}
+                                   if closed3 else {}),
+                                "days": int(i - e0), "ret": round(seg, 4)})
+                    e0 = None if closed3 else e0
+        stats3, _ = _nav_stats(sret3)
+        closed_tr3 = [t for t in tr3 if not t["open"]]
+        wins3 = sum(1 for t in closed_tr3 if t["ret"] > 0)
+        in_mkt3 = bool(tr3) and tr3[-1]["open"]
+        cur3 = {"in_market": in_mkt3, "exposure": 2.0 if in_mkt3 else 0.0,
+                "triggered_today": bool(len(locks) >= 2 and locks[-1] == "bullish"
+                                        and locks[-2] != "bullish")}
+        if in_mkt3:
+            cur3 |= {"since": tr3[-1]["buy_date"], "entry_px": tr3[-1]["buy_px"],
+                     "unreal": tr3[-1]["ret"]}
+        strategies.append({
+            "key": "obs_lockflip", "name": "锁翻多×QBTX×3天", "emoji": "👀",
+            "tier": "watch",
+            "rule": "日线 SMC 方向锁翻多(bullish BOS/CHoCH)当天收盘 → 按 QBTX 口径"
+                    "(2×日收益−9.5bp/日实测拖累)持 3 个交易日收盘卖。出身:第二十三轮"
+                    "持有军规审判副产品——空腿(QBTZ)全灭,此格总收益两种执行口径均"
+                    ">+500%,但胜率对口径脆弱(次日开盘进 9/11 vs 收盘定仓 5/11,差一天"
+                    "小单全翻号)——n=11 的胜率不可信,总收益靠 3-4 笔大单扛;与特调/"
+                    "CHoCH↑ 同吃反转确认肉——前向观察,8/15 与众马同审。",
+            "stats": stats3 | {"n_trades": len(closed_tr3), "n_wins": wins3,
+                               "win_rate": round(wins3 / len(closed_tr3), 3)
+                                           if closed_tr3 else None},
+            "current": cur3,
+            "trades": tr3[::-1][:12], "n_trades_total": len(tr3),
+        })
+    except Exception as e:
+        logger.warning(f"replay: obs_lockflip skipped — {e}")
+
     # B&H 基准
     bh_stats, _ = _nav_stats(ret)
 
