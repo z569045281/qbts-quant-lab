@@ -35,7 +35,9 @@ _CACHE_TTL  = 300       # 5 minutes
 
 def _fetch_intraday(ticker: str = "QBTS") -> dict:
     """Pull 1-day of 1-min bars and compute the surge metrics."""
-    df = yf.download(ticker, period="1d", interval="1m",
+    # 2d so we get the previous session's close — "当日" must mean 较昨收
+    # (same base as the price section's 今日), not open→last which hides the gap.
+    df = yf.download(ticker, period="2d", interval="1m",
                      progress=False, auto_adjust=True)
     if df is None or df.empty:
         return {}
@@ -43,6 +45,17 @@ def _fetch_intraday(ticker: str = "QBTS") -> dict:
     # yfinance returns MultiIndex columns when downloading a single ticker w/ certain flags
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = [c[0] for c in df.columns]
+
+    sessions = sorted({d for d in df.index.date})
+    prev_close = None
+    if len(sessions) >= 2:
+        prev_bars = df[df.index.date == sessions[-2]]
+        if not prev_bars.empty:
+            prev_close = float(prev_bars["Close"].iloc[-1])
+    session_date = sessions[-1].strftime("%m-%d")
+    df = df[df.index.date == sessions[-1]]
+    if df.empty:
+        return {}
 
     close = df["Close"].astype(float)
     vol   = df["Volume"].astype(float)
@@ -67,13 +80,18 @@ def _fetch_intraday(ticker: str = "QBTS") -> dict:
         last_hour_ret = 0.0
 
     intraday_ret = (last_p - open_p) / open_p if open_p > 0 else 0.0
+    # day_ret = 较昨收(含跳空) — the same base the price section's 今日 uses
+    day_ret = (last_p - prev_close) / prev_close if prev_close else None
 
     return {
         "n_bars":          n_bars,
+        "session":         session_date,
         "open":            round(open_p, 2),
         "last":            round(last_p, 2),
         "high":            round(high_p, 2),
         "low":             round(low_p, 2),
+        "prev_close":      round(prev_close, 2) if prev_close else None,
+        "day_ret":         round(day_ret, 4) if day_ret is not None else None,
         "intraday_ret":    round(intraday_ret, 4),
         "last_hour_ret":   round(last_hour_ret, 4),
         "avg_vol_per_min": int(avg_vol_per_min),
@@ -91,8 +109,10 @@ def _signal_from_intraday(s: dict) -> dict:
             "snapshot": s,
         }
     surge = s["surge_ratio"]
-    intraday = s["intraday_ret"]
+    # 当日 = 较昨收(含跳空), 与价格段今日同口径; 拿不到昨收才退回开盘基准
+    intraday = s["day_ret"] if s.get("day_ret") is not None else s["intraday_ret"]
     last_hour = s["last_hour_ret"]
+    tag = f"({s['session']}盘)" if s.get("session") else ""
 
     signal = 0
     confidence = "low"
@@ -126,6 +146,8 @@ def _signal_from_intraday(s: dict) -> dict:
 
     if not bits:
         bits.append(f"量比 {surge:.1f}× · 当日 {intraday*100:+.1f}%（正常区间）")
+    if tag:
+        bits[-1] += f" {tag}"
 
     return {
         "signal":             signal,

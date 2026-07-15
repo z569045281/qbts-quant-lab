@@ -78,6 +78,36 @@ def _normalize_item(raw: dict, ticker: str) -> dict:
     }
 
 
+# 正文主体识别 — yfinance 的 per-ticker feed 混板块稿(IONQ 连跌 9 天挂在 QBTS
+# feed 上, AI 自检 07-15), ticker 字段必须反映文章主体而非来源 feed。
+_SUBJECT_KEYWORDS = {
+    "QBTS": ("qbts", "d-wave", "dwave"),
+    "IONQ": ("ionq",),
+    "RGTI": ("rgti", "rigetti"),
+    "QUBT": ("qubt", "quantum computing inc"),
+}
+
+
+def _retag_subject(it: dict) -> dict:
+    """Re-attribute `ticker` to the article's actual subject company.
+
+    标题优先(标题点名=主体); 只有当来源 feed 的公司完全没被提及、而别家被点名时
+    才改标 — 单主体改成该家, 多主体混稿标 SECTOR。改过的留 `retagged_from`。
+    """
+    title = it["title"].lower()
+    text = f"{title} {str(it.get('summary') or '')[:280].lower()}"
+    def _mentioned(scope: str) -> list[str]:
+        return [t for t, kws in _SUBJECT_KEYWORDS.items()
+                if any(k in scope for k in kws)]
+    feed = it["ticker"]
+    subjects = _mentioned(title) or _mentioned(text)
+    if not subjects or feed in subjects:
+        return it
+    it["retagged_from"] = feed
+    it["ticker"] = subjects[0] if len(subjects) == 1 else "SECTOR"
+    return it
+
+
 def fetch_news_items() -> list[dict]:
     """Fetch recent news for QBTS + quantum peers, deduped, sorted by date."""
     items: list[dict] = []
@@ -85,7 +115,7 @@ def fetch_news_items() -> list[dict]:
         try:
             raw_list = yf.Ticker(sym).news[:_PER_TICKER_LIMIT]
             for raw in raw_list:
-                items.append(_normalize_item(raw, sym))
+                items.append(_retag_subject(_normalize_item(raw, sym)))
         except Exception as e:
             logger.warning(f"News fetch failed for {sym}: {e}")
 
@@ -120,6 +150,8 @@ Rules:
   the impact is at most sector-level (medium) — never attribute another company's
   initiatives/contracts to QBTS. (A QUBT headline was once summarized as "QBTS
   expanding manufacturing" — that misattribution polluted the sentiment signal.)
+- The [TICKER] tag before each headline is the pre-identified SUBJECT company
+  ([SECTOR] = multi-name sector piece). Trust it unless the text clearly contradicts it.
 - QBTS is a quantum-computing pure-play with low float; news cuts hard in both directions.
 - IONQ / RGTI news matters for sector-wide regime but less per-name.
 - Earnings, government contracts, partnerships = high impact — BUT only when concrete
