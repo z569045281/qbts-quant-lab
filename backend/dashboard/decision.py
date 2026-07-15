@@ -542,6 +542,11 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
             star = "🔴" if e.get("nuclear") else "·"
             if e.get("actual"):
                 fc = f"（✅已公布 实际 {e['actual']} vs 预测 {e['forecast'] or '—'} / 前值 {e['previous'] or '—'}）"
+            elif e.get("forecast") and (e.get("hours_until") or 0) < 0:
+                # 已发布但实际值未回填(FF/FRED 滞后, 09:00 publish 常撞上 08:30 数据) —
+                # 07-14 模型把前值 0.5% 当成当日 CPI 公布值喊"爆表",实际 -0.4% 方向全反
+                fc = (f"（🕐已发布·实际值尚未回填 — 预测 {e['forecast']} / 前值 {e['previous']};"
+                      f"前值是上期数据,严禁当作今日公布值;未知实际值前不得据此定方向）")
             elif e.get("forecast"):
                 fc = f"（预测 {e['forecast']} / 前值 {e['previous']}）"
             else:

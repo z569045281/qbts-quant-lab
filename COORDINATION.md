@@ -151,3 +151,4 @@ Format (newest at top):
 2026-07-13 23:55 [opus] SpaceX抢先量三条腿(用户:三条腿都加): spacex.py fetch_spacex_options(ATM跨式预期波动/IV期限结构/事件溢价/偏斜)+fetch_spacex_intraday(1h~130根RSI/ATR/均线/VWAP)+fetch_spacex_peer_prior(太空同业1年历史收缩估计) 全喂进DeepSeek prompt / 前端/spacex三彩色区块+data.ts类型 / 日线RSI73失真vs盘中RSI27对比 + v2.16.0;本地写入回读确认三腿落库 [done]
 2026-07-14 [opus] AI自检07-14两连修: VIX双源打架(rel_strength改用market_light新鲜VIX,弃滞后8h parquet) + 同行单日盲判(market_light顺带拉IONQ/RGTI,追赶信号从缓存滞后盲判→每日可判) [done]
 2026-07-15 [fable] AI自检07-15三连查: 价格段-7.12% vs 量能段-4.6%双口径 / CPI m/m预测-0.1%抓取可疑 / IONQ新闻误挂QBTS ticker(news.py主体重标) · CPI -0.1%销案(FF无误,实际-0.4%已验证): backend/dashboard/intraday.py, backend/dashboard/news.py [done]
+2026-07-15 [fable] QBTZ/QBTX持有军规状态化: 回测判死(QBTZ状态出场−99%最差/空腿全灭),军规不动零部署 → mining.md 第二十三轮; 顺带修07-14 CPI前值当实际bug(decision.py宏观段未回填标注) [done]
