@@ -1310,6 +1310,13 @@ async def refresh_decision():
     except Exception:
         pass
     try:
+        # 8-K 重大事件(近14天):换所/高管变动/重大合同这类媒体覆盖薄的公司行为,
+        # 新闻流会漏(07-14 换所 8-K 实证)→ 直接盯 EDGAR 原始 filings
+        from data.altdata import fetch_sec_events
+        extras["sec_events"] = await asyncio.to_thread(fetch_sec_events, "QBTS")
+    except Exception:
+        pass
+    try:
         today = await today_signals(top_n=5)
         extras["mined_factors"] = today.get("factors", [])
     except Exception:

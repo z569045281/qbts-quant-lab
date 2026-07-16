@@ -589,6 +589,75 @@ def fetch_sec_dilution(ticker: str, offering_days: int = 120, shelf_days: int = 
             "note": note}
 
 
+# 8-K item 代码 → (中文标签, 严重度)。9.01(附件)是纯噪声,直接跳过。
+_8K_ITEMS: dict[str, tuple[str, str]] = {
+    "1.01": ("签订重大协议", "warn"),
+    "1.02": ("重大协议终止", "warn"),
+    "1.03": ("破产/接管", "high"),
+    "2.01": ("资产并购完成", "warn"),
+    "2.02": ("业绩/经营结果公布", "info"),
+    "2.05": ("裁员/重组费用", "warn"),
+    "2.06": ("重大减值", "warn"),
+    "3.01": ("退市/转板通知", "warn"),
+    "3.02": ("非公开发行股票(稀释)", "high"),
+    "3.03": ("股东权利重大修改", "warn"),
+    "4.01": ("更换审计师", "warn"),
+    "4.02": ("既往财报不可依赖", "high"),
+    "5.01": ("控制权变更", "high"),
+    "5.02": ("高管/董事变动", "warn"),
+    "5.03": ("章程/财年变更", "info"),
+    "5.07": ("股东投票结果", "info"),
+    "7.01": ("Reg FD 自愿披露", "info"),
+    "8.01": ("其他重大事件", "info"),
+}
+
+
+def fetch_sec_events(ticker: str, days: int = 14) -> "dict | None":
+    """近 `days` 天的 8-K 重大事件(EDGAR submissions,免 key,item 代码解码)。
+
+    出身:2026-07-14 QBTS 换所 8-K(item 3.01)媒体覆盖薄,yfinance 新闻流全漏 —— 公司
+    行为(换所/高管变动/重大合同/审计问题)必须直接盯原始 filings。informational,
+    not a trade signal;None = 窗口内无 8-K 或查询失败(降级安静)。
+    """
+    cik = _sec_cik(ticker)
+    if cik is None:
+        return None
+    raw = _sec_get(_SEC_SUBMISSIONS.format(cik=cik))
+    if not raw:
+        return None
+    try:
+        recent = _json.loads(raw)["filings"]["recent"]
+        forms = recent.get("form", [])
+        dates = recent.get("filingDate", [])
+        items_l = recent.get("items", [])
+    except Exception:
+        return None
+    cut = datetime.now().date() - timedelta(days=days)
+    evs: list[dict] = []
+    for f, ds, its in zip(forms, dates, items_l):
+        if not (f or "").upper().startswith("8-K"):
+            continue
+        try:
+            if datetime.fromisoformat(ds).date() < cut:
+                continue
+        except Exception:
+            continue
+        decoded, top = [], "info"
+        for c in (its or "").split(","):
+            c = c.strip()
+            if not c or c == "9.01":
+                continue
+            label, sev = _8K_ITEMS.get(c, (f"item {c}", "info"))
+            decoded.append({"code": c, "label": label, "sev": sev})
+            if sev == "high" or (sev == "warn" and top == "info"):
+                top = sev
+        evs.append({"date": ds, "form": f, "items": decoded, "sev": top})
+    if not evs:
+        return None
+    evs.sort(key=lambda e: e["date"], reverse=True)
+    return {"events": evs[:5], "n": len(evs)}
+
+
 # ── Adanos retail sentiment (Reddit buzz + sentiment) ─────────────────────────
 # Replaces the dead Reddit signal — Reddit's own API is approval-gated + bans AI use
 # since 2026-06, and keyless StockTwits/Reddit .json are 403-blocked. Adanos is a

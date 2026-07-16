@@ -585,6 +585,19 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                      f"  纪律：只有近期实际增发(🔴)才会立即压顶、削弱上方目标;货架登记(🟠)只是注册容量,"
                      f"越旧越只是背景——按上面 note 的时效判断权重,别对一份几个月前、期间没动用的货架大幅打折做多。")
 
+    # ── SEC 8-K 重大事件(公司行为,媒体覆盖薄、新闻流会漏)──────
+    sev_icon = {"high": "🔴", "warn": "🟠", "info": "·"}
+    sec_ev = extras.get("sec_events")
+    if sec_ev and sec_ev.get("events"):
+        rows = []
+        for ev in sec_ev["events"]:
+            its = "、".join(i["label"] for i in ev.get("items", [])) or "未标注条目"
+            rows.append(f"  {sev_icon.get(ev.get('sev'), '·')} {ev['date']} {ev['form']}: {its}")
+        parts.append("## 📄 SEC 8-K 重大事件（近14天，EDGAR 原始文件——新闻流常漏的公司行为）\n"
+                     + "\n".join(rows)
+                     + "\n  纪律：🔴(稀释/控制权/财报问题)按供给冲击或信任冲击对待;🟠(换所/高管/合同)"
+                       "先判性质再定权重——如换所不换 ticker 属行政中性,别脑补方向;·(业绩公告/FD)通常已被新闻覆盖。")
+
     # ── 量化元模型（机械加权参考值）──────────────────────────
     edge = snapshot.get("edge")
     if edge and not edge.get("error"):

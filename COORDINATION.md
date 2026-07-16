@@ -157,3 +157,4 @@ Format (newest at top):
 2026-07-16 [fable] /dca 页 VTI/VEA/VWO/BND 价格全空: 盘前 yfinance 当日占位bar close=NaN 静默传染四字段(error=None) → dca.py dropna 修复,价格退回昨收 [done]
 2026-07-16 [fable] AI自检扩展全站(用户拍板): selfcheck.py 规则层(六页,历史事故化检查)+Haiku语义层 → publish §4.8 + lambda 同步接线,site_check 回写 snapshot;前端 getSiteCheck 轻量切片 + SelfCheckCard 六页嵌入 + 主页汇总卡 + v2.17.0;真数据验证抓到 PPI/dca 两个已知bug [done]
 2026-07-16 [fable] 体检首日调校: Haiku 4/4误报(口径不懂) → prompt 加字段语义表+正反例; 跨页同票价格检查下沉规则层(_check_cross,毒测实证LLM抓不稳) [done]
+2026-07-16 [fable] EDGAR 监控扩展 8-K 重大事件(用户拍板): altdata.fetch_sec_events(item解码/严重度分级) + snapshot extras + decision prompt 渲染;实测抓到 07-14 换所 8-K(3.01) [done]
