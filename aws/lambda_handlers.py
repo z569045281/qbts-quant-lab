@@ -193,28 +193,50 @@ def _publish_decision_only() -> dict:
             print(f"! calibration skipped: {e}")
             cal = None
 
-        sb.table("dashboard_state").insert(
+        ins = sb.table("dashboard_state").insert(
             {"snapshot": clean(snap), "calibration": clean(cal)}
         ).execute()
+        state_row_id = (ins.data or [{}])[0].get("id")
 
         # Watchlist scan (diversified buy-setup scan → 🔭 自选扫描 tab). Best-effort:
         # a scan failure must never block the daily decision publish.
+        scan_payload = dca_payload = sx_payload = None
         try:
             from dashboard import scan_store
-            scan_store.publish_scan()
+            scan_payload = scan_store.publish_scan()
         except Exception as e:
             print(f"! watchlist scan skipped: {e}")
         try:
             from dashboard import dca
-            dca.publish_dca()
+            dca_payload = dca.publish_dca()
         except Exception as e:
             print(f"! DCA skipped: {e}")
         # 🚀 SpaceX (SPCX · DeepSeek-only) — best-effort, never blocks the QBTS publish
         try:
             from dashboard import spacex
-            spacex.publish_spacex()
+            sx_payload = spacex.publish_spacex()
         except Exception as e:
             print(f"! SpaceX skipped: {e}")
+        # 🔬 全站 AI 系统自检(规则层+Haiku,~$0.01)→ 回写 snapshot['site_check'],
+        # 各页渲染自己的切片。best-effort,绝不挡 publish。
+        try:
+            from dashboard.selfcheck import build_site_check
+            chall = None
+            try:
+                rows = (sb.table("crypto_challenge").select("data")
+                          .eq("id", "current").execute().data)
+                chall = rows[0]["data"] if rows else None
+            except Exception:
+                pass
+            check = build_site_check(snap, scan=scan_payload, dca=dca_payload,
+                                     challenge=chall, spacex=sx_payload)
+            snap["site_check"] = check
+            if state_row_id is not None:
+                sb.table("dashboard_state").update(
+                    {"snapshot": clean(snap)}).eq("id", state_row_id).execute()
+            print(f"✓ site check: {check['n_issues']} issue(s)")
+        except Exception as e:
+            print(f"! site check skipped: {e}")
     finally:
         loop.close()
     return {"ok": True, "decision": summary}

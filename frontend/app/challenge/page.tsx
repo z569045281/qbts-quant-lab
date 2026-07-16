@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getCryptoChallenge, type CryptoChallenge } from "../_lib/data";
+import { SelfCheckCard } from "../_components/self-check";
 
 const money = (n: number | undefined) =>
   typeof n === "number" ? `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}` : "—";
@@ -67,6 +68,7 @@ export default function ChallengePage() {
 
   return (
     <main className="max-w-[900px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-5">
+      <SelfCheckCard page="challenge" />
       {/* ── Hero: equity + progress toward +$100 ── */}
       <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-5">
         <div className="flex items-start justify-between flex-wrap gap-3">

@@ -61,6 +61,7 @@ export interface Snapshot {
   as_of:        string;
   price:        number;
   today_change: number;
+  site_check?:  SiteCheck;   // 🔬 全站六页体检(publish §4.8 回写)
   strategies:   StrategySignal[];
   strategy_consensus: {
     label: "BUY" | "SELL" | "HOLD"; raw_score: number;
@@ -444,6 +445,19 @@ export interface Decision {
   shadow_ds?:         Decision;  // DeepSeek V4 Pro 影子决策(卡上可切换;8/15 同框宣判)
 }
 
+/* ── 🔬 全站 AI 系统自检(publish §4.8 · 规则层+Haiku 六页体检) ──────────── */
+export interface SiteCheckIssue {
+  kind: "数据问题" | "改进建议";
+  note: string;
+  src?: "rule" | "ai";      // rule=确定性检查 · ai=Haiku 语义层
+}
+export type SiteCheckPage = "home" | "watch" | "dca" | "factors" | "challenge" | "spacex";
+export interface SiteCheck {
+  generated_at: string;
+  n_issues:     number;
+  pages:        Partial<Record<SiteCheckPage, SiteCheckIssue[]>>;
+}
+
 /* ── 💼 用户实盘持仓 ─────────────────────────────────────────────────────── */
 export interface UserPosition {
   ticker: "QBTS" | "QBTX" | "QBTZ" | string;
@@ -581,6 +595,25 @@ export async function getSnapshot(): Promise<Snapshot> {
   if (error) throw new Error(error.message);
   if (!data) throw new Error(NO_DATA);
   return data.snapshot as Snapshot;
+}
+
+/** 只取 snapshot 里的 site_check 切片(~2KB),各页横幅用——不用为一条横幅拉整个快照 */
+export async function getSiteCheck(): Promise<SiteCheck | null> {
+  if (!SUPABASE_CONFIGURED) {
+    try {
+      const r = await fetch(`${API}/dashboard/snapshot`);
+      if (!r.ok) return null;
+      return ((await r.json()) as Snapshot).site_check ?? null;
+    } catch { return null; }
+  }
+  const { data, error } = await supabase
+    .from("dashboard_state")
+    .select("check:snapshot->site_check")
+    .order("published_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return null;
+  return (data as { check: SiteCheck | null }).check ?? null;
 }
 
 /* ── live quote (written by quote_pusher.py every ~60s) ──────────────────── */

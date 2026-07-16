@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { getSnapshot, type StrategyReplay, type ReplayStrategy } from "../_lib/data";
+import { SelfCheckCard } from "../_components/self-check";
 
 const pct = (v: number | null | undefined, digits = 0) =>
   typeof v === "number" && !isNaN(v) ? `${v >= 0 ? "+" : ""}${(v * 100).toFixed(digits)}%` : "—";
@@ -102,6 +103,7 @@ export default function StrategyRecordPage() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+    <SelfCheckCard page="factors" />
       <div>
         <h1 className="text-xl font-bold text-[#1C1C1E]">🏇 策略战绩</h1>
         <p className="text-[12px] text-gray-400 mt-1">

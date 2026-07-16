@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getDcaState, type DcaState, type DcaResult } from "../_lib/data";
 import { DcaCalculator } from "../_components/dca-calculator";
+import { SelfCheckCard } from "../_components/self-check";
 
 /* ─────────────────────────────────────────────────────────────────────────
    📥 定投专区 — 闲钱定投的「全球估值菜单」。不是择时:决定结果的是 多投>早投>
@@ -106,6 +107,7 @@ export default function DcaPage() {
 
   return (
     <main className="max-w-[1100px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-4">
+      <SelfCheckCard page="dca" />
       {/* 标题 + 大盘估值背景 */}
       <section className="bg-white rounded-2xl border border-[#EDEDF0] p-5 shadow-sm">
         <div className="flex items-center gap-2 flex-wrap">

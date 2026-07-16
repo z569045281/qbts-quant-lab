@@ -6,6 +6,7 @@ import { AuditModal } from "./_components/audit-modal";
 import { ControlPanel } from "./_components/control-panel";
 import PositionsCard from "./_components/positions-card";
 import { RetrospectivePanel } from "./_components/retrospective-panel";
+import { SiteCheckOverview } from "./_components/self-check";
 import { getSnapshot, getLiveQuote, type Snapshot, type Decision, type LiveQuote, type LiveQuoteEntry } from "./_lib/data";
 import { fmtLocalDateTime, parseUtc, etMelbSuffix, epochMelbTime, macroSurprise } from "./_lib/format";
 import versionData from "../public/version.json";
@@ -1462,6 +1463,9 @@ export default function Dashboard() {
           </div>
         </section>
       )}
+
+      {/* ══ 🔬 全站系统体检(publish §4.8 · 六页规则层+Haiku)═══════════════ */}
+      <SiteCheckOverview check={snap?.site_check ?? null} />
 
       {/* ══ 4.95 🌍 地缘政治雷达 — 伊朗战局/川普政策/量子政策(07-07 暴跌的驱动)═══ */}
       {geo && (

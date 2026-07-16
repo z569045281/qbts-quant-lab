@@ -7,6 +7,7 @@ import {
 } from "../_lib/data";
 import { fmtLocalDateTime } from "../_lib/format";
 import { RotationMap } from "../_components/rotation-map";
+import { SelfCheckCard } from "../_components/self-check";
 
 /* ─────────────────────────────────────────────────────────────────────────
    🔭 自选扫描 — 分散高波动篮子的每日买点扫描（独立于 QBTS 决策仪表盘）。
@@ -319,6 +320,7 @@ export default function WatchScanPage() {
 
   return (
     <main className="max-w-[1100px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-4">
+      <SelfCheckCard page="watch" />
       {/* 标题 */}
       <section className="bg-white rounded-2xl border border-[#EDEDF0] p-5 shadow-sm">
         <div className="flex items-center gap-2 flex-wrap">

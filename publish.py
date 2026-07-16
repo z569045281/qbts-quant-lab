@@ -128,16 +128,18 @@ def main() -> None:
 
         # 4. Write the dashboard_state row -----------------------------------
         print("→ writing dashboard_state…")
-        sb.table("dashboard_state").insert(
+        ins = sb.table("dashboard_state").insert(
             {"snapshot": clean(snap), "calibration": clean(cal)}
         ).execute()
+        state_row_id = (ins.data or [{}])[0].get("id")
 
         # 4.5 Watchlist scan (diversified buy-setup scan, drives the 🔭 tab) --
+        scan_payload = dca_payload = sx_payload = None
         try:
             from dashboard import scan_store
             print("→ scanning watchlist…")
-            scan = scan_store.publish_scan()
-            print(f"  ✓ scanned {len(scan['results'])} tickers")
+            scan_payload = scan_store.publish_scan()
+            print(f"  ✓ scanned {len(scan_payload['results'])} tickers")
         except Exception as e:
             print(f"  ! watchlist scan skipped: {e}")
 
@@ -145,7 +147,7 @@ def main() -> None:
         try:
             from dashboard import dca
             print("→ computing DCA seasonality…")
-            dca.publish_dca()
+            dca_payload = dca.publish_dca()
         except Exception as e:
             print(f"  ! DCA skipped: {e}")
 
@@ -153,14 +155,36 @@ def main() -> None:
         try:
             from dashboard import spacex
             print("→ computing SpaceX (SPCX · DeepSeek)…")
-            sx = spacex.publish_spacex()
-            dec = sx.get("decision")
+            sx_payload = spacex.publish_spacex()
+            dec = sx_payload.get("decision")
             if dec:
                 print(f"  ✓ {dec['action']} · 信心 {dec['conviction']}/10")
             else:
                 print("  ! SPCX decision none (无 DEEPSEEK_API_KEY 或失败)")
         except Exception as e:
             print(f"  ! SpaceX skipped: {e}")
+
+        # 4.8 全站 AI 系统自检 (规则层 + Haiku,~$0.01) — 六页体检,结果回写
+        #     dashboard_state.snapshot['site_check'],前端各页渲染自己的切片
+        try:
+            from dashboard.selfcheck import build_site_check
+            print("→ running site-wide self-check…")
+            chall = None
+            try:
+                rows = (sb.table("crypto_challenge").select("data")
+                          .eq("id", "current").execute().data)
+                chall = rows[0]["data"] if rows else None
+            except Exception:
+                pass
+            check = build_site_check(snap, scan=scan_payload, dca=dca_payload,
+                                     challenge=chall, spacex=sx_payload)
+            snap["site_check"] = check
+            if state_row_id is not None:
+                sb.table("dashboard_state").update(
+                    {"snapshot": clean(snap)}).eq("id", state_row_id).execute()
+            print(f"  ✓ site check: {check['n_issues']} issue(s) across 6 pages")
+        except Exception as e:
+            print(f"  ! site check skipped: {e}")
 
         # 5. Factors: metrics + code + chart ---------------------------------
         lb = get_leaderboard()                       # code/signal stripped, favorited added

@@ -5,6 +5,7 @@ import {
   getSpacexState, postSpacexRefresh, WATCH_EDITABLE,
   type SpacexState, type SpacexDecision,
 } from "../_lib/data";
+import { SelfCheckCard } from "../_components/self-check";
 
 /* ─────────────────────────────────────────────────────────────────────────
    🚀 SpaceX (SPCX) 第二仪表盘 — 决策**只由 DeepSeek V4 Pro 生成**(不用 Fable)。
@@ -151,6 +152,7 @@ export default function SpacexPage() {
 
   return (
     <main className="max-w-[900px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-4">
+      <SelfCheckCard page="spacex" />
       {/* 标题 */}
       <section className="rounded-2xl border border-[#EDEDF0] bg-gradient-to-br from-slate-900 to-slate-800 p-5 shadow-sm text-white">
         <div className="flex items-center gap-2 flex-wrap">
