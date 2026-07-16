@@ -112,6 +112,12 @@ def _compute_etf(ticker: str) -> dict:
         if isinstance(close, pd.DataFrame):  close = close.iloc[:, 0]
         mclose = m["Close"]
         if isinstance(mclose, pd.DataFrame): mclose = mclose.iloc[:, 0]
+        # 盘前 yfinance 会给当日占位 bar(close=NaN) — 07-15 09:03 publish 把
+        # VTI/VEA/VWO/BND 四张卡的 price/52周/200日线 全污染成 null 且 error=None
+        # (float(nan) 不抛异常,JSON 落库变 null)。掐掉 NaN 行,价格退回上一交易日收盘。
+        close, mclose = close.dropna(), mclose.dropna()
+        if len(close) < 2:
+            raise ValueError("no valid daily bars after dropna")
 
         price = float(close.iloc[-1])
         prev = float(close.iloc[-2])

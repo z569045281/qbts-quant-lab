@@ -154,3 +154,4 @@ Format (newest at top):
 2026-07-15 [fable] QBTZ/QBTX持有军规状态化: 回测判死(QBTZ状态出场−99%最差/空腿全灭),军规不动零部署 → mining.md 第二十三轮; 顺带修07-14 CPI前值当实际bug(decision.py宏观段未回填标注) [done]
 2026-07-15 [fable] 观察组第5号卡(用户拍板): 锁翻多×QBTX×3天 → replay.py obs_lockflip(纯后端,factors页数据驱动免改); 补注:82%胜率对执行口径脆弱(收盘定仓5/11),总收益两口径>+500% [done]
 2026-07-16 [fable] AI自检07-16: PPI '已公布1.1%'=FRED未更新期错位污染(上月值冒充实际,值容差被巧合击穿) → fred.py 全系列参考期硬校验 _ref_ok + core ppi 显式不支持 [done]
+2026-07-16 [fable] /dca 页 VTI/VEA/VWO/BND 价格全空: 盘前 yfinance 当日占位bar close=NaN 静默传染四字段(error=None) → dca.py dropna 修复,价格退回昨收 [done]
