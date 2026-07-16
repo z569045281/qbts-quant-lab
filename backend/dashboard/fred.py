@@ -17,6 +17,16 @@ FRED not yet updated minutes after the release, or a same-period revision whose
 feed `previous` is the earlier estimate — means we skip silently; the card shows
 no actual rather than a wrong one.
 
+**Plus a hard reference-period check (`_ref_ok`, added 2026-07-16)**: the value
+tolerance alone was defeated on 2026-07-15 — 33 min after the PPI release FRED
+still held May as its latest obs; May's pre-revision print (1.1%) happened to
+equal the feed's `previous`, the adjacent-month values sat inside the tolerance,
+and last month's number was published as today's actual (the decision prompt
+then showed "✅已公布 实际 1.1%" for a release whose true print was −0.3%).
+Values can coincide; periods cannot — the latest obs must be the exact reference
+period of the release (monthly first-prints: event month −1; UoM: same month;
+GDP: 3–5 months; weekly claims: ≤10 days).
+
 Consequence: first-print weekly/monthly series (Core PCE, CPI, PPI, NFP,
 unemployment claims, UoM *preliminary*) validate cleanly and show. SAME-period
 REVISIONS (Final GDP, Revised UoM) won't validate — their feed `previous` is the
@@ -58,6 +68,9 @@ _FRED_MAP: list[tuple[tuple[str, ...], str | None, str, str]] = [
     (("pce price index", "pce"),          "PCEPI",             "pch", "pct"),
     (("core cpi",),                       "CPILFESL",          "pch", "pct"),
     (("cpi",),                            "CPIAUCSL",          "pch", "pct"),
+    # core PPI: PPIFES/WPSFD4131 都对不齐 FF 的口径(2026-07 实测 May 0.1%/0.3%
+    # vs FF 前值 0.4%) — 显式不支持,防止落到 headline PPIFIS
+    (("core ppi",),                       None,                "pch", "pct"),
     (("ppi",),                            "PPIFIS",            "pch", "pct"),
     (("gdp price index",),                None,                "lin", "pct"),
     (("final gdp", "gdp"),                "A191RL1Q225SBEA",   "lin", "pct"),
@@ -77,6 +90,28 @@ _FRED_MAP: list[tuple[tuple[str, ...], str | None, str, str]] = [
 # revisions/rounding between FF and FRED, small enough to reject a same-period
 # revision (whose feed `previous` is a whole period away from FRED's prior obs).
 _TOL = {"pct": 0.15, "claims": 5000.0, "num": 1.0}   # jobs 不走值容差 → 参考期日期精确校验
+
+
+def _ref_ok(series: str, kind: str, ev_date: _dt.date, latest_date: str) -> bool:
+    """参考期校验:FRED 最新观测必须是本次发布对应的数据期。
+
+    值容差挡不住"FRED 未更新 → 上期值冒充今日实际"(2026-07-15 PPI 事故:发布后
+    33 分钟 FRED 还停在 5 月,5 月旧口径 1.1% 恰好等于 feed 前值,期错位骗过值校验,
+    决策 prompt 拿上月值当今日实际)。期数是硬校验:一期都不能错。"""
+    try:
+        od = _dt.date.fromisoformat(latest_date)
+    except ValueError:
+        return False
+    if kind == "claims":                      # 周度:上周六截止,发布滞后 ~5 天
+        return 0 < (ev_date - od).days <= 10
+    if series in ("UMCSENT", "MICH"):         # 密歇根:当月中旬发当月
+        lo = hi = 0
+    elif series == "A191RL1Q225SBEA":         # GDP:季度,advance/second/final 滞后 3-5 月
+        lo, hi = 3, 5
+    else:                                     # 月度首发(CPI/PPI/PCE/零售/时薪/失业率/非农)
+        lo = hi = 1
+    lag = (ev_date.year - od.year) * 12 + (ev_date.month - od.month)
+    return lo <= lag <= hi
 
 
 def _match(title: str) -> tuple[str, str, str] | None:
@@ -151,6 +186,10 @@ def enrich_actuals(events: list[dict]) -> None:
             continue
         series, units, kind = m
         try:
+            ev_date = _dt.date.fromisoformat(str(e.get("date", ""))[:10])
+        except ValueError:
+            continue
+        try:
             obs = cache.get(series)
             if obs is None:
                 obs = _fetch_obs(series, units)
@@ -158,18 +197,14 @@ def enrich_actuals(events: list[dict]) -> None:
             if len(obs) < 2:
                 continue
             (latest_date, latest), (_, prev) = obs[0], obs[1]
+            # 参考期硬校验(全系列):FRED 未更新时最新观测=上一期,值容差挡不住
+            # (07-15 PPI 事故),期错位一律拒。
+            if not _ref_ok(series, kind, ev_date, latest_date):
+                continue
             if kind == "jobs":
                 # 非农月修 40-100K 是常态 — 值容差会把合法修正当错期拒掉
-                # (实例 2026-07:5月 172K 下修至 129K,43K > 40K 容差 → actual 永远空)。
-                # 改用参考期精确校验:M 月发布的非农必须是 (M-1) 月 1 号那期观测 —
-                # 修正多大都无所谓,期一错必拒(也天然挡住 FRED 未更新的过期数据)。
-                try:
-                    ev_date = _dt.date.fromisoformat(str(e.get("date", ""))[:10])
-                except ValueError:
-                    continue
-                ref = (ev_date.replace(day=1) - _dt.timedelta(days=1)).replace(day=1)
-                if latest_date == ref.isoformat():
-                    e["actual"] = _fmt(latest, kind)
+                # (实例 2026-07:5月 172K 下修至 129K)。期校验已在上面,直接采纳。
+                e["actual"] = _fmt(latest, kind)
                 continue
             ff_prev = _num(e.get("previous", ""))
             fred_prev = _num(_fmt(prev, kind))
