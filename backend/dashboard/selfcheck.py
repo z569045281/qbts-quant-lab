@@ -165,12 +165,49 @@ def _check_spacex(sx: dict | None) -> list[dict]:
     return out
 
 
+def _check_cross(snap: dict, scan: dict | None, sx: dict | None) -> list[tuple[str, dict]]:
+    """跨页同票价格一致性(确定性,不托付给 LLM——毒测实证 Haiku 抓不稳这个)。
+    同一 ticker 在两个页面价格相差 >2% → 双方页面各记一条。"""
+    px: dict[str, dict[str, float]] = {}
+    if isinstance(snap.get("price"), (int, float)) and snap["price"] > 0:
+        px.setdefault("QBTS", {})["home"] = float(snap["price"])
+    for r in (scan or {}).get("results") or []:
+        if r.get("ticker") and isinstance(r.get("price"), (int, float)) and r["price"] > 0:
+            px.setdefault(str(r["ticker"]), {})["watch"] = float(r["price"])
+    sp = ((sx or {}).get("data") or {}).get("price")
+    if isinstance(sp, (int, float)) and sp > 0:
+        px.setdefault("SPCX", {})["spacex"] = float(sp)
+    out: list[tuple[str, dict]] = []
+    for tk, srcs in px.items():
+        if len(srcs) < 2:
+            continue
+        vals = list(srcs.values())
+        if min(vals) > 0 and max(vals) / min(vals) - 1 > 0.02:
+            note = (f"{tk} 价格跨页打架: "
+                    + " vs ".join(f"{p}=${v:,.2f}" for p, v in srcs.items())
+                    + " ——同一票两处相差 >2%(参见 review-cross-source-consistency 教训)")
+            for p in srcs:
+                out.append((p if p in _PAGES else "home", _issue("数据问题", note)))
+    return out
+
+
 # ── Haiku 语义层 ─────────────────────────────────────────────────────────
 
 _AI_PROMPT = """你是量化交易仪表盘的数据质检员。下面是六个页面数据的压缩摘要(JSON)。
-只找【数据矛盾/异常】:同一事实两处数字打架、时间戳倒挂、数值量级离谱、字段之间逻辑冲突。
+
+字段语义(先读——把口径差异当 bug 是首日 4/4 全误报的教训):
+- day_ret = 较昨收(含跳空缺口); intraday_ret = 较开盘(不含跳空)。两者本就不同,差值≈跳空。
+- as_of = 行情数据的交易日(日期); generated_at = 发布时的墙钟时间(UTC)。收盘后发布,
+  generated_at 晚于/跨日于 as_of 完全正常。
+- catalyst_asof = 事件日历上次人工复核的日期,静态字段,30 天内都正常(有独立守卫)。
+- 不同数据源的同一价格允许 ±0.1% 的舍入/时点差,不算矛盾。
+
+只报你能说出【具体伤害】的矛盾。该报的例子:同一 ticker 在两个页面价格相差 >2%;
+交易记录买入日期晚于卖出日期;负价格/胜率>100%/权重合计明显≠100;标记在场但敞口为 0;
+equity 与 cash+持仓明显对不上。
+宁缺勿滥:凡是能用口径/舍入/时区/缓存节奏解释的都不要报;拿不准就不报。
 不要评论策略好坏,不要复述已在 known_issues 里的问题。
-输出 JSON 数组(无 markdown 围栏),最多 6 条,没有就输出 []:
+输出 JSON 数组(无 markdown 围栏),最多 4 条,没有就输出 []:
 [{"page": "home|watch|dca|factors|challenge|spacex", "kind": "数据问题|改进建议", "note": "<中文一句话,引用具体数字>"}]"""
 
 
@@ -260,6 +297,8 @@ def build_site_check(snap: dict, scan: dict | None = None, dca: dict | None = No
         "challenge": _check_challenge(challenge),
         "spacex":    _check_spacex(spacex),
     }
+    for page, iss in _check_cross(snap or {}, scan, spacex):
+        pages[page].append(iss)
     try:
         for page, iss in _ai_layer(_digest(snap or {}, scan, dca, challenge, spacex, pages)):
             pages[page].append(iss)
