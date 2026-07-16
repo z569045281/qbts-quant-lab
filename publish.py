@@ -182,7 +182,9 @@ def main() -> None:
             if state_row_id is not None:
                 sb.table("dashboard_state").update(
                     {"snapshot": clean(snap)}).eq("id", state_row_id).execute()
-            print(f"  ✓ site check: {check['n_issues']} issue(s) across 6 pages")
+                print(f"  ✓ site check: {check['n_issues']} issue(s) across 6 pages")
+            else:
+                print("  ! site check computed but NOT persisted (insert returned no id)")
         except Exception as e:
             print(f"  ! site check skipped: {e}")
 

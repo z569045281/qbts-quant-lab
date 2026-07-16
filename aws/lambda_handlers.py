@@ -234,7 +234,9 @@ def _publish_decision_only() -> dict:
             if state_row_id is not None:
                 sb.table("dashboard_state").update(
                     {"snapshot": clean(snap)}).eq("id", state_row_id).execute()
-            print(f"✓ site check: {check['n_issues']} issue(s)")
+                print(f"✓ site check: {check['n_issues']} issue(s)")
+            else:
+                print("! site check computed but NOT persisted (insert returned no id)")
         except Exception as e:
             print(f"! site check skipped: {e}")
     finally:
