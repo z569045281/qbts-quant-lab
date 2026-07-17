@@ -38,12 +38,22 @@ def compute_signals(df_d: pd.DataFrame) -> dict | None:
         s = wpr(112).rolling(3).mean()
         up = lambda x, lv: (x.iloc[-1] > lv) and (x.iloc[-2] <= lv)
         dn = lambda x, lv: (x.iloc[-1] < lv) and (x.iloc[-2] >= lv)
+        # 抄底腿预计触发价(AI 自检 07-16 建议):快%R 贴地(≤-80)时,反解"明日收盘
+        # 高于多少 ⇒ %R 上穿 -80"。%R>-80 ⟺ C > HH-0.8×(HH-LL);明日窗口 = 最近
+        # 21 根旧 bar + 明日 bar,近似假设明日不破 21 日极值(触发价在区间高处,破低
+        # 概率小)。把"事后确认"变成可挂单的具体价位;慢腿 <-50 的过滤条件另列。
+        buy_trigger_px = None
+        if float(f.iloc[-1]) <= -80 and float(s.iloc[-1]) < -50:
+            hh21, ll21 = float(h.tail(21).max()), float(l.tail(21).min())
+            if hh21 > ll21:
+                buy_trigger_px = round(hh21 - 0.80 * (hh21 - ll21), 2)
         return {
             "fast": round(float(f.iloc[-1]), 1),
             "slow": round(float(s.iloc[-1]), 1),
             "buy_base":   bool(up(f, -80) and s.iloc[-1] < -50),
             "sell_trim":  bool(dn(f, -20) and s.iloc[-1] >= -20),
             "sell_clear": bool(dn(f, -50) and s.iloc[-1] < -20),
+            "buy_trigger_px": buy_trigger_px,   # None = 未贴地/慢腿不满足,不适用
             "bar_date": str(pd.Timestamp(d.index[-1]).date()),
         }
     except Exception as e:

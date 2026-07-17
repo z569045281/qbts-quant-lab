@@ -159,3 +159,4 @@ Format (newest at top):
 2026-07-16 [fable] 体检首日调校: Haiku 4/4误报(口径不懂) → prompt 加字段语义表+正反例; 跨页同票价格检查下沉规则层(_check_cross,毒测实证LLM抓不稳) [done]
 2026-07-16 [fable] EDGAR 监控扩展 8-K 重大事件(用户拍板): altdata.fetch_sec_events(item解码/严重度分级) + snapshot extras + decision prompt 渲染;实测抓到 07-14 换所 8-K(3.01) [done]
 2026-07-17 [fable] 自选账本 v1 学费归档展示(用户要求删v1,改为折叠归档保数据): watch/page.tsx PaperPanel 头部四格只算v2 + v1 details折叠 + data.ts epoch 字段 + v2.17.1 [done]
+2026-07-17 [fable] 自读 AI 自检修当日 bug: ①edge命中21%→prompt Wilson上界<50%动态反向警告 ②Philly Fed回填映射(41.4实测)/Core Retail显式不支持 ③特调buy_trigger_px反解%R(实测$18.80) ④挑战digest字段名sleeve_cash/floor_line [done]

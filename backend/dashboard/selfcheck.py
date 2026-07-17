@@ -139,7 +139,7 @@ def _check_challenge(ch: dict | None) -> list[dict]:
     eq = ch.get("equity")
     if _bad_num(eq) or (isinstance(eq, (int, float)) and eq <= 0):
         out.append(_issue("数据问题", f"挑战账户 equity 异常({eq!r})"))
-    floor = ch.get("floor") or 4250
+    floor = ch.get("floor_line") or ch.get("floor") or 4250
     if isinstance(eq, (int, float)) and eq < floor and ch.get("status") not in ("halted", "stopped"):
         out.append(_issue("数据问题", f"equity ${eq:.0f} 已破 floor ${floor} 但状态未停手"))
     curve = ch.get("equity_curve") or []
@@ -242,8 +242,14 @@ def _digest(snap: dict, scan, dca, ch, sx, known: dict) -> str:
             "strategies": [{"name": s.get("name"), **(s.get("stats") or {})}
                            for s in (snap.get("strategy_replay") or {}).get("strategies", [])],
         },
-        "challenge": ch and {k: _f(ch.get(k)) for k in ("equity", "cash", "status", "floor",
-                                                        "updated_at")},
+        # 字段名对齐 challenge2.py 实际 schema(cash→sleeve_cash/floor→floor_line;
+        # 07-17 自检误报'cash 为 null'就是这里映射错)
+        "challenge": ch and {"equity": _f(ch.get("equity")),
+                             "sleeve_cash": _f(ch.get("sleeve_cash")),
+                             "pnl": _f(ch.get("pnl")),
+                             "status": ch.get("status"),
+                             "floor_line": _f(ch.get("floor_line")),
+                             "updated_at": ch.get("updated_at")},
         "spacex": sx and {
             "as_of": (sx.get("data") or {}).get("as_of"),
             "price": _f((sx.get("data") or {}).get("price")),

@@ -469,8 +469,12 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
     if tj:
         legs = [nm for k, nm in (("buy_base", "🟢抄底建仓触发"), ("sell_trim", "🔴止盈减仓触发"),
                                  ("sell_clear", "⚠️破位清仓触发")) if tj.get(k)]
+        trig = tj.get("buy_trigger_px")
+        trig_s = (f";抄底腿预计触发价≈${trig}(明日收盘高于此价≈快%R上穿-80,"
+                  f"可作 entry_condition 的具体挂单位;近似值,假设明日不破21日极值)"
+                  if trig else "")
         lv1.append(f"特调双腿: 快%R {tj.get('fast')} / 慢%R {tj.get('slow')} → "
-                   + ("、".join(legs) if legs else "无触发"))
+                   + ("、".join(legs) if legs else "无触发") + trig_s)
     z40 = _fresh("z40", "veto", "z40")
     if z40 is not None:
         lv1.append(f"相对估值: QBTS vs IONQ 价差 40日z={z40:+.1f}"
@@ -601,9 +605,25 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
     # ── 量化元模型（机械加权参考值）──────────────────────────
     edge = snapshot.get("edge")
     if edge and not edge.get("error"):
-        parts.append(f"## 量化元模型参考（log-odds 机械加权，仅作交叉验证）\n"
-                     f"  {edge.get('label','?')} · P(up)={edge.get('p_up',0)*100:.0f}% · "
-                     f"EV={edge.get('expected_return_pct',0)*100:+.1f}%")
+        line = (f"## 量化元模型参考（log-odds 机械加权，仅作交叉验证）\n"
+                f"  {edge.get('label','?')} · P(up)={edge.get('p_up',0)*100:.0f}% · "
+                f"EV={edge.get('expected_return_pct',0)*100:+.1f}%")
+        # 用它自己的实盘校准记录给读数定性(AI 自检 07-16):n≥15 且 Wilson95% 上界
+        # <50% = 显著劣于随机 → 顺向引用禁令。只改标注不改权重——权重重推等 8/15 审判。
+        cal0 = extras.get("calibration") or {}
+        n0, hr0 = cal0.get("n_graded", 0), cal0.get("overall_hit_rate")
+        if n0 >= 15 and hr0 is not None:
+            import math as _math
+            _z = 1.96
+            _den = 1 + _z * _z / n0
+            _ctr = hr0 + _z * _z / (2 * n0)
+            _mrg = _z * _math.sqrt(hr0 * (1 - hr0) / n0 + _z * _z / (4 * n0 * n0))
+            if (_ctr + _mrg) / _den < 0.5:
+                line += (f"\n  ⚠️ 此元模型历史 {n0} 条命中率 {hr0*100:.0f}%"
+                         f"(Wilson95%上界 {(_ctr+_mrg)/_den*100:.0f}%<50%)——显著劣于随机。"
+                         f"它的 BUY/SELL 本日只可作【反向或零权重】参考,严禁当顺向交叉验证;"
+                         f"权重正式重推等 8/15 审判。")
+        parts.append(line)
 
     # ── 历史校准 ─────────────────────────────────────────────
     cal = extras.get("calibration")

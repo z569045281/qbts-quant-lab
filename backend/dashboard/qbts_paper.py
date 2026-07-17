@@ -383,8 +383,9 @@ def analyze_champs(df_d: pd.DataFrame) -> dict | None:
             "qtum_green": qg,
             "z40": round(z40, 2) if z40 is not None else None,
             "clv": round(clv_val, 2) if clv_val is not None else None,
-            "tj_sig": ({k: ts[k] for k in ("fast", "slow", "buy_base",
-                                           "sell_trim", "sell_clear")}
+            "tj_sig": ({k: ts.get(k) for k in ("fast", "slow", "buy_base",
+                                               "sell_trim", "sell_clear",
+                                               "buy_trigger_px")}
                        if ts is not None else None),
         }
         if pos:

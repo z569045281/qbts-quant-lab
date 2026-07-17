@@ -81,6 +81,10 @@ _FRED_MAP: list[tuple[tuple[str, ...], str | None, str, str]] = [
                                           "PAYEMS",            "chg", "jobs"),
     (("average hourly earnings",),        "CES0500000003",     "pch", "pct"),
     (("retail sales",),                   "RSAFS",             "pch", "pct"),
+    # core retail sales: RSFSXMV 与 FF 口径对不齐(2026-07 实测 May 1.0% vs FF 前值
+    # 0.8%) — 显式不支持,防落 headline RSAFS
+    (("core retail sales",),              None,                "pch", "pct"),
+    (("philly fed",),                     "GACDFSA066MSFRBPHI", "lin", "num"),
     (("consumer sentiment", "michigan sentiment"),
                                           "UMCSENT",           "lin", "num"),
     (("inflation expectations",),         "MICH",              "lin", "pct"),
@@ -104,7 +108,7 @@ def _ref_ok(series: str, kind: str, ev_date: _dt.date, latest_date: str) -> bool
         return False
     if kind == "claims":                      # 周度:上周六截止,发布滞后 ~5 天
         return 0 < (ev_date - od).days <= 10
-    if series in ("UMCSENT", "MICH"):         # 密歇根:当月中旬发当月
+    if series in ("UMCSENT", "MICH", "GACDFSA066MSFRBPHI"):  # 密歇根/费城联储:当月发当月
         lo = hi = 0
     elif series == "A191RL1Q225SBEA":         # GDP:季度,advance/second/final 滞后 3-5 月
         lo, hi = 3, 5
