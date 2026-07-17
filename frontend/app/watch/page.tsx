@@ -183,32 +183,40 @@ function pctSigned(n: number): string {
 function PaperPanel({ p }: { p: PaperSim }) {
   const t = p.totals;
   const tone = (n: number) => (n > 0 ? "text-emerald-600" : n < 0 ? "text-[#F03A3E]" : "text-gray-500");
+  // 账本按机制代际分开看:v1 = 07-13 六连修之前的旧机制(已定性为学费,折叠归档),
+  // v2 = 现行机制。头部四格只算 v2 —— 别让旧账污染对现行机制的判断。原始数据不删,8/15 审判按代际分开。
+  const closedV2 = p.closed.filter(c => c.epoch === "v2");
+  const closedV1 = p.closed.filter(c => c.epoch !== "v2");
+  const realizedV2 = closedV2.reduce((s, c) => s + c.pnl, 0);
+  const realizedV1 = closedV1.reduce((s, c) => s + c.pnl, 0);
+  const winV2 = closedV2.filter(c => c.pnl > 0).length;
   return (
     <section className="rounded-2xl border border-[#E6E6EA] bg-white p-4 shadow-sm">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm">📊</span>
         <span className="text-xs font-semibold text-gray-800">模拟战绩 · 每个买入信号投 ${p.trade_usd.toFixed(0)}</span>
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-400">模拟 · 非真实交易</span>
+        <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700">现行机制 v2 · 07-14 起</span>
       </div>
 
-      {/* 总览 */}
+      {/* 总览(只算现行机制 v2;旧机制 v1 的学费在下方折叠归档) */}
       <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
         <div className="bg-[#FAFAFC] rounded-xl px-2 py-2">
-          <div className="text-[10px] text-gray-400">总盈亏</div>
-          <div className={`text-lg font-bold font-mono ${tone(t.total)}`}>{money(t.total)}</div>
+          <div className="text-[10px] text-gray-400">v2 总盈亏</div>
+          <div className={`text-lg font-bold font-mono ${tone(realizedV2 + t.unrealized)}`}>{money(realizedV2 + t.unrealized)}</div>
         </div>
         <div className="bg-[#FAFAFC] rounded-xl px-2 py-2">
-          <div className="text-[10px] text-gray-400">已平仓(落袋)</div>
-          <div className={`text-sm font-semibold font-mono ${tone(t.realized)}`}>{money(t.realized)}</div>
+          <div className="text-[10px] text-gray-400">v2 已平仓(落袋)</div>
+          <div className={`text-sm font-semibold font-mono ${tone(realizedV2)}`}>{money(realizedV2)}</div>
         </div>
         <div className="bg-[#FAFAFC] rounded-xl px-2 py-2">
           <div className="text-[10px] text-gray-400">持仓浮动</div>
           <div className={`text-sm font-semibold font-mono ${tone(t.unrealized)}`}>{money(t.unrealized)}</div>
         </div>
         <div className="bg-[#FAFAFC] rounded-xl px-2 py-2">
-          <div className="text-[10px] text-gray-400">平仓胜率</div>
+          <div className="text-[10px] text-gray-400">v2 平仓胜率</div>
           <div className="text-sm font-semibold font-mono text-gray-700">
-            {t.win_rate != null ? `${(t.win_rate * 100).toFixed(0)}% (${t.n_win}/${t.n_closed})` : "—"}
+            {closedV2.length > 0 ? `${((winV2 / closedV2.length) * 100).toFixed(0)}% (${winV2}/${closedV2.length})` : "—"}
           </div>
         </div>
       </div>
@@ -248,12 +256,12 @@ function PaperPanel({ p }: { p: PaperSim }) {
         </div>
       )}
 
-      {/* 已平仓 */}
-      {p.closed.length > 0 && (
+      {/* 已平仓 — 现行机制 v2 */}
+      {closedV2.length > 0 && (
         <div className="mt-3">
-          <div className="text-[11px] text-gray-500 mb-1">已平仓(最近 {p.closed.length} 笔)</div>
+          <div className="text-[11px] text-gray-500 mb-1">已平仓 · 现行机制 v2({closedV2.length} 笔)</div>
           <div className="space-y-1">
-            {p.closed.map((c, i) => (
+            {closedV2.map((c, i) => (
               <div key={`${c.ticker}-${c.exit_date}-${i}`} className="flex items-center gap-2 text-[12px] bg-[#FAFAFC] rounded-lg px-2.5 py-1.5">
                 <span className="font-bold text-gray-800 w-12">{c.ticker}</span>
                 <span className="text-gray-400 text-[11px]">{c.entry_date.slice(5)}→{c.exit_date.slice(5)} · {c.days}天</span>
@@ -263,6 +271,26 @@ function PaperPanel({ p }: { p: PaperSim }) {
             ))}
           </div>
         </div>
+      )}
+
+      {/* 旧机制 v1 — 折叠归档(07-13 六连修前的学费;审判需要,数据不删) */}
+      {closedV1.length > 0 && (
+        <details className="mt-3">
+          <summary className="text-[11px] text-gray-400 cursor-pointer select-none">
+            📦 旧机制 v1 已归档({closedV1.length} 笔,合计 <span className={`font-mono ${tone(realizedV1)}`}>{money(realizedV1)}</span>)
+            — 07-13 六连修前的学费,不代表现行机制;点开查看
+          </summary>
+          <div className="space-y-1 mt-1 opacity-70">
+            {closedV1.map((c, i) => (
+              <div key={`${c.ticker}-${c.exit_date}-${i}`} className="flex items-center gap-2 text-[12px] bg-[#FAFAFC] rounded-lg px-2.5 py-1.5">
+                <span className="font-bold text-gray-800 w-12">{c.ticker}</span>
+                <span className="text-gray-400 text-[11px]">{c.entry_date.slice(5)}→{c.exit_date.slice(5)} · {c.days}天</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{c.reason}</span>
+                <span className={`ml-auto font-mono font-semibold ${tone(c.pnl)}`}>{money(c.pnl)} ({pctSigned(c.pnl_pct)})</span>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
 
       {p.open.length === 0 && p.closed.length === 0 && (p.pending?.length ?? 0) === 0 && (

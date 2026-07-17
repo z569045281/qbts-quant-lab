@@ -729,6 +729,7 @@ export interface PaperClosed {
   ticker: string; theme?: string | null;
   entry_date: string; entry_price: number; exit_date: string; exit_price: number;
   pnl: number; pnl_pct: number; reason: string; days: number;
+  epoch?: "v1" | "v2";   // 缺省 = v1(2026-07-13 机制大修前的旧账,展示时归档)
 }
 export interface PaperPending {
   ticker: string; limit: number; placed_date: string;
