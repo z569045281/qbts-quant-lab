@@ -629,7 +629,8 @@ def fetch_sec_events(ticker: str, days: int = 14) -> "dict | None":
         recent = _json.loads(raw)["filings"]["recent"]
         forms = recent.get("form", [])
         dates = recent.get("filingDate", [])
-        items_l = recent.get("items", [])
+        # items 键缺失时 zip 会静默吞掉全部 8-K(zip 按最短截断)→ 补空串占位
+        items_l = recent.get("items") or [""] * len(forms)
     except Exception:
         return None
     cut = datetime.now().date() - timedelta(days=days)
