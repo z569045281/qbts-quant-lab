@@ -194,6 +194,24 @@ export function RotationMap({ data }: { data: SectorRotation }) {
         ))}
       </div>
 
+      {/* 象限速览条:图上 17 个点挤时(07-17 用户找不到能源/金矿),文字条保底可扫 */}
+      <div className="mt-1.5 space-y-0.5">
+        {(Object.keys(QUAD) as QuadKey[]).map(q => {
+          const members = data.sectors.filter(s => (s.quadrant ?? "lagging") === q);
+          if (members.length === 0) return null;
+          return (
+            <div key={q} className="text-[12px] leading-relaxed">
+              <span className="font-semibold" style={{ color: QUAD[q].color }}>
+                {QUAD[q].label}{QUAD[q].glyph}
+              </span>
+              <span className="text-[#52514e] ml-1.5">
+                {members.map(s => `${s.emoji}${s.label}`).join(" · ")}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
       {/* 数据表(可及性兜底) */}
       <details className="mt-2">
         <summary className="text-[11px] text-gray-400 cursor-pointer hover:text-gray-600">数据表</summary>

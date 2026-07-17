@@ -161,3 +161,4 @@ Format (newest at top):
 2026-07-17 [fable] 自选账本 v1 学费归档展示(用户要求删v1,改为折叠归档保数据): watch/page.tsx PaperPanel 头部四格只算v2 + v1 details折叠 + data.ts epoch 字段 + v2.17.1 [done]
 2026-07-17 [fable] 自读 AI 自检修当日 bug: ①edge命中21%→prompt Wilson上界<50%动态反向警告 ②Philly Fed回填映射(41.4实测)/Core Retail显式不支持 ③特调buy_trigger_px反解%R(实测$18.80) ④挑战digest字段名sleeve_cash/floor_line [done]
 2026-07-17 [fable] 元模型 edge v2 重设计(用户下令): 单源帽±0.35+软信号帽±0.50+实测regime门(锁±0.14/QQQ50 +0.13/−0.29)+死区42-58%+model:v2分代记账 → mining.md 第二十四轮 [done]
+2026-07-17 [fable] 轮动图加商品点+象限速览条(用户拍板): sector_rotation.py +GLD/USO(商品vs股市相对强度) + rotation-map.tsx 象限分组文字条(17点挤图找不到能源金矿的保底) + v2.18.0 [done]
