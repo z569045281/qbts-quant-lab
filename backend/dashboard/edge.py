@@ -31,7 +31,7 @@ from dashboard.calibration import load_learned_weights
 @dataclass
 class Contribution:
     source:   str
-    kind:     str        # "mined" / "classic" / "news"
+    kind:     str        # "mined" / "classic" / "news" / "regime"(v2 实测机制门)
     signal:   int        # -1 / 0 / +1
     weight:   float      # max log-odds magnitude (always >= 0)
     log_odds: float      # signal × weight (signed)
@@ -212,6 +212,41 @@ def compute_edge(
             detail=f"{lead}量子篮子 · {rs.get('rationale', '')[:60]}",
         ))
 
+    # ══ v2 聚合(2026-07-17 重设计;出身:v1 上线一个月 22 条 21% 命中的审判)══
+    # v1 两个病根,都是结构性的:
+    #  ① 相关信号当独立证据裸加 —— 单边下跌里新闻/情绪/超卖类集体看多,log-odds
+    #     无上限堆叠(v1 在 07-02→07-16 −25% 一路上天天喊 BUY)。
+    #     → 单源帽 ±0.35(13F 教训)+ 软信号合计帽 ±0.50(相关性收缩)。
+    #  ② 模型没有任何趋势/机制项,感知不到"现在是下跌趋势"。
+    #     → regime 项,常数为 2 年 walk-forward 实测(第二十四轮,2024-07~2026-07,
+    #       产线同款锁引擎零前视):基准 P(5d up)=49.1%;日线锁 bull 52.6%/bear
+    #       45.7%(相对 log-odds ±0.14);QQQ 50 日线上 52.5%(+0.13)/线下 41.9%
+    #       (−0.29,n=160,全场最强单项)。
+    _SRC_CAP, _SOFT_CAP = 0.35, 0.50
+    soft = sum(max(-_SRC_CAP, min(_SRC_CAP, c.log_odds)) for c in contributions)
+    soft = max(-_SOFT_CAP, min(_SOFT_CAP, soft))
+
+    regime_lo = 0.0
+    lock = (((snapshot.get("smc") or {}).get("playbook")) or {}).get("lock")
+    if lock in ("bull", "bear"):
+        lo_lock = 0.14 if lock == "bull" else -0.14
+        regime_lo += lo_lock
+        contributions.append(Contribution(
+            source="日线方向锁", kind="regime", signal=1 if lock == "bull" else -1,
+            weight=abs(lo_lock), log_odds=lo_lock,
+            detail=f"lock={lock} · 实测 P(5d up)={'52.6%' if lock=='bull' else '45.7%'}(2年walk-forward)"))
+    qqq_vs = ((snapshot.get("market_light") or {}).get("qqq_vs_50dma"))
+    if isinstance(qqq_vs, (int, float)):
+        lo_q = 0.13 if qqq_vs > 0 else -0.29
+        regime_lo += lo_q
+        contributions.append(Contribution(
+            source="大盘机制(QQQ vs 50日线)", kind="regime", signal=1 if qqq_vs > 0 else -1,
+            weight=abs(lo_q), log_odds=lo_q,
+            detail=f"QQQ {'上方' if qqq_vs > 0 else '下方'}{abs(qqq_vs)*100:.1f}% · "
+                   f"实测 P(5d up)={'52.5%' if qqq_vs > 0 else '41.9%'}"))
+
+    log_odds = soft + regime_lo
+
     # Probability and expected return
     p_up = 1.0 / (1.0 + math.exp(-log_odds))
 
@@ -226,23 +261,27 @@ def compute_edge(
     raw_kelly = expected_return / var if var > 1e-9 else 0.0
     kelly = max(-0.5, min(0.5, 0.5 * raw_kelly))
 
-    abs_ev = abs(expected_return)
-    if abs_ev < 0.01:
-        label, signal = "HOLD", 0
-    elif expected_return > 0:
+    # v2 死区:p_up 出 [42%, 58%] 才给方向(v1 用 EV±1% 判,54% 就敢喊 BUY —— 22 条
+    # 21% 命中里一多半是这种弱信号;方向弱就承认没方向)
+    if p_up >= 0.58:
         label, signal = "BUY", 1
-    else:
+    elif p_up <= 0.42:
         label, signal = "SELL", -1
+    else:
+        label, signal = "HOLD", 0
 
     contributions.sort(key=lambda c: abs(c.log_odds), reverse=True)
 
     return {
         "signal":               signal,
         "label":                label,
+        "model":                "v2",     # 2026-07-17 重设计;校准/审判按代际分开
         "p_up":                 round(p_up, 4),
         "expected_return_pct":  round(expected_return, 4),
         "kelly_fraction":       round(kelly, 4),
         "log_odds":             round(log_odds, 4),
+        "log_odds_soft":        round(soft, 4),
+        "log_odds_regime":      round(regime_lo, 4),
         "n_signals":            len(contributions),
         "contributions":        [c.to_dict() for c in contributions[:10]],
     }

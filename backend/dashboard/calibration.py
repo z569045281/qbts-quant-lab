@@ -80,6 +80,7 @@ def log_prediction(price: float, as_of: str, edge: dict) -> None:
         "ts":           time.time(),
         "as_of":        as_of,
         "price_then":   price,
+        "model":        edge.get("model", "v1"),   # v2 起分代记账,审判按代际分开
         "label":        edge.get("label"),
         "p_up":         edge.get("p_up"),
         "log_odds":     edge.get("log_odds"),
