@@ -201,6 +201,8 @@ _AI_PROMPT = """你是量化交易仪表盘的数据质检员。下面是六个�
   generated_at 晚于/跨日于 as_of 完全正常。
 - catalyst_asof = 事件日历上次人工复核的日期,静态字段,30 天内都正常(有独立守卫)。
 - 不同数据源的同一价格允许 ±0.1% 的舍入/时点差,不算矛盾。
+- challenge: in_position=false(空仓)时 equity==sleeve_cash 是恒等式,pnl<0 只是已实现
+  亏损(equity−sleeve_start),不是"持仓价值未计入"。
 
 只报你能说出【具体伤害】的矛盾。该报的例子:同一 ticker 在两个页面价格相差 >2%;
 交易记录买入日期晚于卖出日期;负价格/胜率>100%/权重合计明显≠100;标记在场但敞口为 0;
@@ -247,6 +249,11 @@ def _digest(snap: dict, scan, dca, ch, sx, known: dict) -> str:
         "challenge": ch and {"equity": _f(ch.get("equity")),
                              "sleeve_cash": _f(ch.get("sleeve_cash")),
                              "pnl": _f(ch.get("pnl")),
+                             # 空仓事实必须显式给出:缺它时 equity==cash+pnl<0 被误判
+                             # "持仓未计入"(07-20 误报——空仓+已实现亏损本是正常状态)
+                             "in_position": bool(ch.get("position")),
+                             "sleeve_start": _f(ch.get("sleeve_start")),
+                             "cooldown_date": ch.get("cooldown_date"),
                              "status": ch.get("status"),
                              "floor_line": _f(ch.get("floor_line")),
                              "updated_at": ch.get("updated_at")},

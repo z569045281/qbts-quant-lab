@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-20 · [fable] selfcheck-0720 · AI自检07-20四查:①13F措辞矛盾(decision.py陈旧标注改用active_report_date对齐holdings口径)②8-K 3.01标签补"不分自愿换所/被迫退市"③财报日历段缺失时显式标注数据缺口+补倒计时④全站体检挑战页误报(digest补in_position/sleeve_start,空仓+已实现亏损≠矛盾);特调盘中vs收盘回测建议因挖矿冻结令待用户拍板 · files: backend/dashboard/decision.py, backend/data/altdata.py, backend/dashboard/selfcheck.py
+
 - [done] 2026-07-13 · [fable] scan-mech-v2 · 自选扫描买卖机制六连修(用户点单"全修"):P0 盈亏比门(目标须≥1.5×止损距离,不合格往上找磁吸)+P0 模拟器改回踩限价单(照卡片打法,5日有效期)+P1 买入区改顺风×回踩合取+P1 板块轮动象限门(左半边降级)+P2 避雷横幅+P2 无目标仓位破10日线跟踪出场;账本 epoch 划线 v2,旧仓按新出场规则跑完 · files: backend/dashboard/scan.py, backend/dashboard/scan_store.py, frontend/app/watch/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, CLAUDE.md
 
 - [done] 2026-07-10 · [fable] mining-round22 · 第二十二轮:周末信息→周一 系统性专题(用户点单,冻结豁免纯研究)。预注册四候选:A 纳指期货周日夜盘(NQ=F 1h) B 亚洲周一领先(N225/HSI,美开盘前收盘) C ETH周末对BTC周末的增量 D 金价周日夜盘避险读数;判活=|t|≥2 且对在册周末BTC有增量 且姐妹≥2/3 同向;赢家最多进观察名单 · files: mining.md

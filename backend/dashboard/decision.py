@@ -324,13 +324,15 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
     hold = snapshot.get("holdings")
     if hold:
         s = hold.get("snapshot", {})
-        rd = s.get("report_date") or ""
+        # 陈旧度口径对齐 holdings.py:用主动持有人报告期(全体 max 会被月报共同基金
+        # 洗白成"新鲜",与 rationale 里的推力衰减自相矛盾 —— AI 自检 07-20)
+        rd = s.get("active_report_date") or s.get("report_date") or ""
         stale = ""
         if rd:
             try:
                 age = (datetime.now().date() - datetime.fromisoformat(rd).date()).days
-                stale = (f"\n  ⏳ 申报季度截至 {rd}（距今 {age} 天）——13F 法定滞后至季末后45天,"
-                         f"{'数据已陈旧、可能与当前持仓不符,作背景权重' if age > 75 else '相对新鲜'}。")
+                stale = (f"\n  ⏳ 主动持有人报告期 {rd}（距今 {age} 天）——13F 法定滞后至季末后45天,"
+                         f"{'数据已陈旧、推力已按陈旧度衰减(见上),作背景权重' if age > 75 else '相对新鲜'}。")
             except Exception:
                 pass
         parts.append(f"## 13F 机构持仓\n  [{hold.get('label','?')}/{hold.get('confidence','?')}] {hold.get('rationale','')}\n"
@@ -571,11 +573,20 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                      + "\n" + risk_line + "\n" + coef_line)
 
     # ── 财报日历 ─────────────────────────────────────────────
+    # 缺数据时显式说缺(AI 自检 07-20:段落静默消失 → 模型只能从新闻猜财报临近)
     earnings = extras.get("earnings_dates") or []
-    if earnings:
-        future = [d for d in earnings if d >= datetime.now().strftime("%Y-%m-%d")][:2]
-        if future:
-            parts.append("## 财报日历（已确认日期）\n  下次财报: " + ", ".join(future))
+    future = [d for d in earnings if d >= datetime.now().strftime("%Y-%m-%d")][:2]
+    if future:
+        try:
+            days_to = (datetime.fromisoformat(future[0]).date() - datetime.now().date()).days
+            cd = f"（{days_to} 天后）"
+        except ValueError:
+            cd = ""
+        parts.append(f"## 财报日历（已确认日期）\n  下次财报: {', '.join(future)}{cd}"
+                     "——财报是 QBTS 单票最大的已知波动源,临近时其权重高于任何宏观日。")
+    else:
+        parts.append("## 财报日历\n  ⚠️ 财报日期未获取到（数据源失败或暂无排期）"
+                     "——若新闻提示财报临近,以新闻为准,并在 system_notes 标注此数据缺口。")
 
     # ── SEC 增发/稀释文件(供给冲击,价格信号看不见的事件面)──────
     dil = extras.get("dilution")
