@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-20 · [opus] intrabar-profile · 新增 Intrabar Profile 辅助卡(用户点单,仿 Kioseff TradingView editor's pick):用日内 1h 子bar 重构最近日线bar 内部的成交量画像+签名delta(吸收/投降/派发读数),回答"价格到需求区时买盘在吸收还是继续投降"。地图非信号——不进 edge/机械打分,只展示+喂决策prompt作确认腿参考(同 POC/NW 待遇)。files: backend/dashboard/intrabar_profile.py(new), backend/api.py, backend/dashboard/decision.py, frontend/app/_lib/data.ts, frontend/app/page.tsx, frontend/public/version.json
+
 - [done] 2026-07-20 · [fable] tiaojiu-exec-timing · 第二十五轮(用户点单,冻结豁免):特调抄底腿执行口径回测——盘中上穿即进(预挂单,吃假突破) vs 收盘确认进(现行,每次买贵),同出场规则隔离执行差;结论定该挂单还是等收盘 · files: mining.md
 
 - [done] 2026-07-20 · [fable] selfcheck-0720 · AI自检07-20四查:①13F措辞矛盾(decision.py陈旧标注改用active_report_date对齐holdings口径)②8-K 3.01标签补"不分自愿换所/被迫退市"③财报日历段缺失时显式标注数据缺口+补倒计时④全站体检挑战页误报(digest补in_position/sleeve_start,空仓+已实现亏损≠矛盾);特调盘中vs收盘回测建议因挖矿冻结令待用户拍板 · files: backend/dashboard/decision.py, backend/data/altdata.py, backend/dashboard/selfcheck.py

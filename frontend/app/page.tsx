@@ -1235,6 +1235,75 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* Intrabar Profile — 单根日线 bar 内部:吸收/投降/派发(辅助地图) */}
+        {snap.intrabar_profile?.available && (
+          <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+                🔬 K线内画像 · Intrabar
+              </span>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                snap.intrabar_profile.stance === "偏多" ? "bg-emerald-100 text-emerald-700"
+                : snap.intrabar_profile.stance === "偏空" ? "bg-red-100 text-red-700"
+                : "bg-gray-100 text-gray-500"}`}>
+                {snap.intrabar_profile.read}
+              </span>
+            </div>
+            <div className="text-[11px] text-gray-400 mb-3">
+              {snap.intrabar_profile.bar_date} 单日 · {snap.intrabar_profile.n_subbars}根1h 重构 · 辅助非信号
+            </div>
+            {/* 买卖 delta 条 */}
+            <div className="mb-2">
+              <div className="flex h-5 rounded-md overflow-hidden text-[10px] font-bold text-white">
+                <div className="bg-emerald-500 flex items-center justify-center"
+                     style={{ width: `${Math.max((snap.intrabar_profile.up_vol_pct ?? 0) * 100, 6)}%` }}>
+                  买{Math.round((snap.intrabar_profile.up_vol_pct ?? 0) * 100)}%
+                </div>
+                <div className="bg-red-500 flex items-center justify-center"
+                     style={{ width: `${Math.max((snap.intrabar_profile.down_vol_pct ?? 0) * 100, 6)}%` }}>
+                  卖{Math.round((snap.intrabar_profile.down_vol_pct ?? 0) * 100)}%
+                </div>
+              </div>
+              <div className="flex justify-between text-[11px] text-[#525461] mt-1 px-0.5">
+                <span>净delta <span className={`font-mono font-semibold ${
+                  (snap.intrabar_profile.net_delta_pct ?? 0) > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                  {(snap.intrabar_profile.net_delta_pct ?? 0) > 0 ? "+" : ""}{Math.round((snap.intrabar_profile.net_delta_pct ?? 0) * 100)}%</span></span>
+                <span>VPOC <span className="font-mono">${snap.intrabar_profile.intrabar_poc?.toFixed(2)}</span>
+                  <span className="text-gray-400">（{Math.round((snap.intrabar_profile.poc_position ?? 0) * 100)}%位）</span></span>
+              </div>
+            </div>
+            {/* 读数 */}
+            <div className="flex items-start gap-2 text-xs bg-indigo-50/70 border border-indigo-100 rounded-lg px-3 py-2 mb-2 leading-snug">
+              <span className={`shrink-0 px-1.5 py-0.5 rounded font-bold ${
+                snap.intrabar_profile.stance === "偏多" ? "bg-emerald-100 text-emerald-700"
+                : snap.intrabar_profile.stance === "偏空" ? "bg-red-100 text-red-700"
+                : "bg-gray-100 text-gray-500"}`}>
+                {snap.intrabar_profile.read}
+              </span>
+              <span className="text-gray-700">{snap.intrabar_profile.read_note}</span>
+            </div>
+            {snap.intrabar_profile.delta_disagree && (
+              <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1 mb-2 leading-snug">
+                ⚠️ 净 delta 方向与读数背离,降级参考
+              </div>
+            )}
+            {/* 近N日 delta 趋势条 */}
+            {(snap.intrabar_profile.delta_strip?.length ?? 0) > 0 && (
+              <div className="flex items-center gap-2 text-[11px] text-[#525461]">
+                <span className="shrink-0">近{snap.intrabar_profile.delta_strip!.length}日抛压/承接</span>
+                <div className="flex gap-1">
+                  {snap.intrabar_profile.delta_strip!.map((s) => (
+                    <div key={s.date}
+                         title={`${s.date}: 净delta ${s.delta_pct > 0 ? "+" : ""}${Math.round(s.delta_pct * 100)}%`}
+                         className={`w-4 h-4 rounded-sm ${s.sign > 0 ? "bg-emerald-400" : "bg-red-400"}`} />
+                  ))}
+                </div>
+                <span className="text-gray-400">🟢买 / 🔴卖</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 空头动向(原挤空燃料,2026-07-04 依第五轮实证翻转:空头=聪明钱) */}
         {snap.squeeze?.short_z != null && (
           <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">

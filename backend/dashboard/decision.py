@@ -436,6 +436,23 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
             f"  → 设目标优先用 naked POC / 邻近 HVN；止损放在 LVN 之外；入场参考价值区边缘"
         )
 
+    # ── Intrabar Profile（最近一根日线 bar 内部:吸收/投降/派发,辅助确认腿）────
+    ib = snapshot.get("intrabar_profile")
+    if ib and ib.get("available"):
+        strip = ib.get("delta_strip") or []
+        strip_s = "".join("🟢" if s.get("sign", 0) > 0 else "🔴" for s in strip)
+        disagree = ";⚠️净delta方向与读数背离,降级参考" if ib.get("delta_disagree") else ""
+        parts.append(
+            f"## 日内画像 Intrabar（{ib.get('bar_date')} 单bar内部,{ib.get('note','')}）\n"
+            f"  日内VPOC ${ib.get('intrabar_poc')}(区间位置{ib.get('poc_position')}),"
+            f"收盘位置CLV {ib.get('clv')},净delta {ib.get('net_delta_pct',0)*100:+.0f}%"
+            f"(买{ib.get('up_vol_pct',0)*100:.0f}%/卖{ib.get('down_vol_pct',0)*100:.0f}%)\n"
+            f"  读数【{ib.get('read')}·{ib.get('stance')}】: {ib.get('read_note','')}{disagree}\n"
+            f"  近{len(strip)}日delta趋势: {strip_s}(🟢买盘主导/🔴卖盘主导)\n"
+            f"  → 辅助地图非独立信号:价格到需求/供给区时用它判『吸收 vs 投降』作确认腿,"
+            f"别单凭它开仓(1h 近似,无 tick;方向已在 B 级信号里定)"
+        )
+
     # ── 空头动向（原挤空燃料，2026-07-04 依第五轮实证翻转）────
     sq = snapshot.get("squeeze")
     if sq and sq.get("rationale"):

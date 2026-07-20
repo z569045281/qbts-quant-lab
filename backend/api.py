@@ -39,6 +39,7 @@ from dashboard.decision    import get_or_generate_decision, get_cached_decision
 from dashboard.macro       import get_macro_calendar
 from dashboard.smc         import analyze_smc
 from dashboard.volume_profile    import analyze_volume_profile
+from dashboard.intrabar_profile   import analyze_intrabar_profile
 from dashboard.regime            import analyze_regime
 from dashboard.nadaraya_watson    import analyze_nw_envelope
 from dashboard.squeeze           import analyze_squeeze
@@ -989,6 +990,11 @@ async def dashboard_snapshot(force_refresh: bool = False):
     except Exception as e:
         vol_profile = {"signal": 0, "label": "HOLD", "rationale": f"成交量画像失败: {str(e)[:80]}"}
     try:
+        # Intrabar profile — 最近一根日线 bar 内部的成交量/delta 画像(辅助地图,吸收/投降读数)
+        intrabar = await asyncio.to_thread(analyze_intrabar_profile, df_h, _live_px)
+    except Exception as e:
+        intrabar = {"available": False, "rationale": f"日内画像失败: {str(e)[:80]}"}
+    try:
         regime = await asyncio.to_thread(analyze_regime, df_d)
     except Exception as e:
         regime = {"regime": "normal", "rationale": f"波动率 regime 失败: {str(e)[:80]}"}
@@ -1067,6 +1073,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["market_light"]   = market_light
     payload["smc"]            = smc
     payload["volume_profile"] = vol_profile
+    payload["intrabar_profile"] = intrabar
     payload["regime"]         = regime
     payload["dip_buy"]        = dip_buy
     payload["champs"]         = champs

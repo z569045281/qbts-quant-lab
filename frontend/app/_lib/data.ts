@@ -119,6 +119,7 @@ export interface Snapshot {
   geopolitics?: GeoRadar | null;
   smc?: SmcAnalysis | null;
   volume_profile?:    VolumeProfile | null;
+  intrabar_profile?:  IntrabarProfile | null;
   regime?:            VolatilityRegime | null;
   dip_buy?:           DipBuy | null;
   champs?:            Champs | null;
@@ -215,6 +216,29 @@ export interface VolumeProfile {
   action_hint:   string;
   rationale: string;
   note: string;
+}
+
+/* ── intrabar profile (单根日线 bar 内部:吸收/投降/派发) ──────────────────── */
+export interface IntrabarProfile {
+  available:      boolean;
+  bar_date?:      string;
+  n_subbars?:     number;
+  day_high?:      number;
+  day_low?:       number;
+  close?:         number;
+  intrabar_poc?:  number;
+  poc_position?:  number;   // 0=贴当日低, 1=贴当日高
+  clv?:           number;   // -1=收最低, +1=收最高
+  up_vol_pct?:    number;
+  down_vol_pct?:  number;
+  net_delta_pct?: number;   // -1..+1
+  read?:          "吸收" | "投降" | "派发" | "突破接受" | "低位承接" | "高位换手" | "均衡";
+  stance?:        "偏多" | "偏空" | "中性";
+  read_note?:     string;
+  delta_disagree?: boolean;
+  delta_strip?:   { date: string; delta_pct: number; sign: 1 | -1 }[];
+  rationale?:     string;
+  note?:          string;
 }
 
 /* ── volatility regime ───────────────────────────────────────────────────── */
