@@ -24,7 +24,11 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-_LOOKBACK_DAYS = 60      # naked-POC / daily-POC scan window (long → magnet coverage)
+_LOOKBACK_DAYS = 250     # naked-POC / daily-POC scan window ≈ 1 交易年。原 60 日在 07-20
+                         # 被用户 TV 对比暴露盲区:3-4 月 $13-14.5 需求带(全场 45.8% 的
+                         # 历史成交在 $15 下)整体落在窗外 → 卡片谎称"下方无磁吸"。
+                         # 与 07-13 SMC 需求侧修复同一原则:未回补 POC 不论新旧保留
+                         # (naked 过滤 + top-3 截断本就防陈旧堆积;价值区 20 日窗不动)
 _VA_LOOKBACK   = 20      # value-area window (short → 现价 vs 价值区 判断灵敏、可被突破)
 _N_BINS        = 50      # price resolution
 _VALUE_AREA    = 0.70    # fraction of volume defining the value area

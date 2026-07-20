@@ -293,6 +293,15 @@ Mistakes worth not repeating — when you learn one, add a dated bullet here.
     lockup unlock. Mechanical levels need a live-research sanity check for fresh IPOs /
     event-driven names.
 
+- **2026-07-20 · 滚动窗口截断的地图不得宣称"某侧无参照"——这是第二次栽在同一类
+  bug 上。** 07-13 SMC `find_order_blocks` 只扫 `[-4:]` 丢了 5/19 需求 OB;07-20
+  volume_profile 的 naked-POC 60 日窗把 3-4 月 $13-14.5 需求带(全 2 年 45.8% 的成交
+  在 $15 下)整体挡在窗外,卡片对用户说"下方真空"——两次都是用户拿 TradingView 对比
+  才暴露。原则:**结构性记忆(未回补 OB/naked POC/Strong Low)只因"被回补"而失效,
+  不因"太老"而失效**;滚动窗口只该用于需要灵敏可破的读数(价值区/趋势),不该用于
+  "找最近的下方参照"这类会因窗口空转而输出假否定的查询。新增此类地图时先问:
+  窗口截断时它会不会把"看不见"说成"不存在"。
+
 ## Surfaces & standing decisions (as of 2026-06-25)
 
 Frontend tabs (`frontend/app/`): **🎯 决策仪表盘** (`/`) · **🔭 自选扫描** (`/watch`) ·
