@@ -240,6 +240,20 @@ def _try_enter(st: dict, now_et: datetime) -> None:
     today = now_et.date().isoformat()
     if st.get("cooldown_date") == today:
         return                                   # 平仓当日不再进场
+    # 大盘风向闸门(2026-07-21 三连亏复盘加:扫描器此前对大盘环境全盲,三笔全买
+    # 在动量榜首却全撞上 risk_off 回撤 regime —— 复用 scan.py 同款判定,与自选扫描
+    # 纸面台账同一条纪律:risk_off 时不逆势买"上升趋势"信号,宁可空仓等风向转)
+    try:
+        from dashboard.scan import _market_context
+        mkt_ctx = _market_context()
+    except Exception as e:
+        mkt_ctx = None
+        logger.warning(f"challenge2: market context failed — {e}")
+    if mkt_ctx and mkt_ctx.get("regime") == "risk_off":
+        if st.get("no_signal_date") != today:
+            st["no_signal_date"] = today
+            _log(st, f"SKIP 大盘 risk_off({mkt_ctx.get('note','')}) —— 按纪律空仓等风向转")
+        return
     from dashboard.challenge_basket import analyze_challenge_basket
     scan = analyze_challenge_basket()
     mkt = (scan or {}).get("market") or {}
@@ -285,6 +299,10 @@ def _try_enter(st: dict, now_et: datetime) -> None:
 
 def _finish(sb, st: dict, status: str, title: str, body: str, tags: str) -> None:
     st["status"] = status
+    # 2026-07-21 复盘发现:halt/end 走这条早退路径,从没到过下面主循环里的 pnl 重算行,
+    # 导致停手那一刻显示的 pnl 是上一跳的旧值、对不上最终 equity —— 这里补算一次。
+    st["pnl"] = round(st["equity"] - _START_CAP, 2)
+    st["pnl_pct"] = round(st["pnl"] / _START_CAP * 100, 1)
     curve = st.get("equity_curve") or []
     curve.append([_now_iso(), st["equity"]])          # 曲线收个尾
     st["equity_curve"] = curve[-_CURVE_CAP:]
@@ -341,13 +359,14 @@ def maybe_challenge_tick(now_et: datetime, force: bool = False) -> "dict | None"
         st["equity"] = round(st["sleeve_cash"] + mv, 2)
         if unreal / entry_val >= _TP_TOUCH:
             _liquidate(st, sym, f"触碰 +{_TP_TOUCH*100:.0f}% 落袋", now_et)
-        elif st["equity"] <= st["floor_line"]:
+        elif st.get("floor_line") is not None and st["equity"] <= st["floor_line"]:
             _liquidate(st, sym, f"权益触地板 ${st['floor_line']:,.0f}", now_et)
 
     # ── 空仓:到期/判定/进场 ──
     if st.get("position") is None:
         st["equity"] = st["sleeve_cash"]
-        if st["equity"] <= st["floor_line"]:
+        # floor_line=None(2026-07-21 用户复盘后拍板取消地板,跑到期)→ 跳过此闸
+        if st.get("floor_line") is not None and st["equity"] <= st["floor_line"]:
             _finish(sb, st, "halted", "CHALLENGE HALTED.",
                     f"🛑 第二期触地板停手:${st['equity']:,.2f}", "octagonal_sign")
             return {"status": "halted"}

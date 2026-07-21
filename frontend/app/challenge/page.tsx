@@ -125,7 +125,7 @@ export default function ChallengePage() {
           </div>
           <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-mono">
             <span>本金 {money(c.sleeve_start)}</span>
-            <span>地板 {money(c.floor_line)}</span>
+            <span>{c.floor_line != null ? `地板 ${money(c.floor_line)}` : "地板：无(跑到期)"}</span>
             <span>{marathon ? "里程碑" : "达标"} {money(c.win_line)}</span>
           </div>
         </div>
@@ -191,7 +191,8 @@ export default function ChallengePage() {
            {(c.round ?? 1) > 1 && <>（第 {c.round} 期起扩到<b>全场 ~40 只宇宙</b>，同款门槛）</>}，
            进场即挂 <b className="text-emerald-600">止盈</b> + <b className="text-[#F03A3E]">−12% 止损</b> 的 bracket 单，浮盈触 +10% 即落袋{marathon && <>（落袋当日冷却，次日再进场）</>}。
            {marathon
-             ? <>🏁 <b>马拉松模式</b>：不设收手线，持续交易到 <b>{c.deadline}</b>，到期看 {money(c.sleeve_start)} 滚成多少；{money(c.win_line)} 只是里程碑，−15% 地板仍<b>硬性停手</b>。</>
+             ? <>🏁 <b>马拉松模式</b>：不设收手线，持续交易到 <b>{c.deadline}</b>，到期看 {money(c.sleeve_start)} 滚成多少；{money(c.win_line)} 只是里程碑，
+                {c.floor_line != null ? <>−15% 地板仍<b>硬性停手</b>。</> : <><b>已取消地板</b>，跑到期为止(2026-07-21 触发两次地板停手复盘后拍板)。</>}</>
              : <>权益触碰 <b>+{money(target)} 判赢收手</b>，−15% 触及地板则本期停手。</>}</p>
         <p className="text-[13px] bg-[#F6F6F8] rounded-md px-3 py-2 border border-[#EDEDF0]">
           📊 {c.odds_note}
@@ -219,7 +220,7 @@ export default function ChallengePage() {
 
 /** 纯 SVG 资金曲线:时间 × 权益,参考线 = 本金/里程碑/地板。静态导出零依赖。 */
 function EquityChart({ curve, start, winLine, floorLine }:
-    { curve: [string, number][]; start: number; winLine: number; floorLine: number }) {
+    { curve: [string, number][]; start: number; winLine: number; floorLine: number | null }) {
   const W = 640, H = 240, PAD = { l: 54, r: 14, t: 12, b: 22 };
   const pts = curve
     .map(([t, v]) => ({ ms: new Date(t).getTime(), v }))
@@ -229,7 +230,7 @@ function EquityChart({ curve, start, winLine, floorLine }:
 
   const x0 = pts[0].ms, x1 = pts[pts.length - 1].ms || x0 + 1;
   const vs = pts.map(p => p.v);
-  const yLo = Math.min(floorLine, ...vs) * 0.995;
+  const yLo = Math.min(floorLine ?? Infinity, ...vs) * 0.995;
   const yHi = Math.max(winLine, ...vs) * 1.005;
   const X = (ms: number) => PAD.l + ((ms - x0) / Math.max(1, x1 - x0)) * (W - PAD.l - PAD.r);
   const Y = (v: number) => PAD.t + (1 - (v - yLo) / (yHi - yLo)) * (H - PAD.t - PAD.b);
@@ -256,7 +257,7 @@ function EquityChart({ curve, start, winLine, floorLine }:
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="挑战资金曲线">
       <Ref v={winLine}   color="#059669" label={`$${winLine.toLocaleString()}`} />
       <Ref v={start}     color="#9CA3AF" label={`$${start.toLocaleString()}`} />
-      <Ref v={floorLine} color="#F03A3E" label={`$${floorLine.toLocaleString()}`} />
+      {floorLine != null && <Ref v={floorLine} color="#F03A3E" label={`$${floorLine.toLocaleString()}`} />}
       <path d={area} fill={line} opacity="0.08" />
       <path d={path} fill="none" stroke={line} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
       <circle cx={X(last.ms)} cy={Y(last.v)} r="3.5" fill={line} />

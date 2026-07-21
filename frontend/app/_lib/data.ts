@@ -969,7 +969,7 @@ export interface CryptoChallenge {
   pnl_pct:      number;
   peak_equity:  number;
   win_line:     number;
-  floor_line:   number;
+  floor_line:   number | null;      // 2026-07-21 三连亏复盘后可取消(null=不设地板,跑到期)
   position:     ChallengePosition | null;
   basket:       string[];
   deadline:     string;

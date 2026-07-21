@@ -139,8 +139,11 @@ def _check_challenge(ch: dict | None) -> list[dict]:
     eq = ch.get("equity")
     if _bad_num(eq) or (isinstance(eq, (int, float)) and eq <= 0):
         out.append(_issue("数据问题", f"挑战账户 equity 异常({eq!r})"))
-    floor = ch.get("floor_line") or ch.get("floor") or 4250
-    if isinstance(eq, (int, float)) and eq < floor and ch.get("status") not in ("halted", "stopped"):
+    # floor_line 可显式为 None(2026-07-21 用户拍板取消地板,跑到期)—— 此时不设下限,
+    # 不能落回硬编码 4250 default,否则会对着"本就没有地板"的正常状态误报破线。
+    floor = ch.get("floor_line") if "floor_line" in ch else ch.get("floor")
+    if (floor is not None and isinstance(eq, (int, float)) and eq < floor
+            and ch.get("status") not in ("halted", "stopped")):
         out.append(_issue("数据问题", f"equity ${eq:.0f} 已破 floor ${floor} 但状态未停手"))
     curve = ch.get("equity_curve") or []
     if curve:
