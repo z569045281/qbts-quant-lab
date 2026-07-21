@@ -128,8 +128,15 @@ def _action_hint(where: str, val: float, vah: float,
     """
     up_targets   = [p for p in naked_above if mag_up   and p > mag_up][:2]
     down_targets = [p for p in naked_below if mag_down and p < mag_down][:2]
-    up_t = " → ".join(f"${p}" for p in up_targets)   or f"${vah}(VAH)"
-    dn_t = " → ".join(f"${p}" for p in down_targets) or f"${val}(VAL)"
+    # VAH/VAL 只在"确实在磁吸位更远那一侧"时才配当 fallback 目标 —— 否则(如价格已
+    # 深跌到 VAL 之下、下方又没有更远的 naked POC)会把已经在磁吸位反方向的 VAL
+    # 说成"跌破X下看VAL",出现"跌破$16.38下看$20.51(VAL)"这种方向倒挂的假话
+    # (2026-07-21 AI 自检抓到)。没有更远参照就如实说"无更多参照",不能硬凑。
+    up_no_ref, dn_no_ref = "暂无更多参照", "暂无更多参照"
+    up_t = (" → ".join(f"${p}" for p in up_targets)
+           or (f"${vah}(VAH)" if (not mag_up or vah > mag_up) else up_no_ref))
+    dn_t = (" → ".join(f"${p}" for p in down_targets)
+           or (f"${val}(VAL)" if (not mag_down or val < mag_down) else dn_no_ref))
 
     parts: list[str] = []
     if mag_up:

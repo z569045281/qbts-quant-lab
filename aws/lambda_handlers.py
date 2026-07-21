@@ -166,6 +166,12 @@ def _publish_decision_only() -> dict:
             sync_short_volume(sb)
         except Exception as e:
             print(f"! FINRA short sync skipped: {e}")
+        # 财报日历同款持久化(2026-07-21:Lambda /tmp 冷启动清空导致云端"数据源失败")
+        try:
+            from data.altdata import sync_earnings_dates
+            sync_earnings_dates(sb)
+        except Exception as e:
+            print(f"! earnings sync skipped: {e}")
 
         snap = loop.run_until_complete(dashboard_snapshot(force_refresh=True))
 

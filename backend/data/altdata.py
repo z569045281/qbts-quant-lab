@@ -184,6 +184,54 @@ def fetch_earnings_dates(force_refresh: bool = False) -> list[datetime]:
         return []
 
 
+# ── Supabase persistence (Lambda /tmp wiped on cold start = same finra_short bug) ─
+# 2026-07-21 AI 自检:云端"财报日历数据源失败"——本地磁盘缓存兜底在 Lambda 上没用
+# (/tmp 每次冷启动清空),live yfinance 抓取一失败就整段财报日历消失。镜像
+# finra_short 的 Supabase 持久化套路:发布前从表里还原缓存,抓完再推回去。
+
+def earnings_cache_records() -> list[dict]:
+    """把财报日期缓存转成 JSON-safe 记录,供 Supabase 存取。"""
+    if not _EARNINGS_CACHE.exists():
+        return []
+    try:
+        df = pd.read_parquet(_EARNINGS_CACHE)
+        return [{"date": d.strftime("%Y-%m-%d")} for d in pd.to_datetime(df["date"])]
+    except Exception:
+        return []
+
+
+def seed_earnings_cache(records: list[dict]) -> None:
+    """用 Supabase 记录还原本地缓存文件(仅当本地没有时——新的 Lambda /tmp)。"""
+    if not records or _EARNINGS_CACHE.exists():
+        return
+    try:
+        dates = sorted(pd.to_datetime(r["date"]) for r in records)
+        _EARNINGS_CACHE.parent.mkdir(parents=True, exist_ok=True)
+        pd.DataFrame({"date": dates}).to_parquet(_EARNINGS_CACHE)
+    except Exception as e:
+        logger.warning(f"seed_earnings_cache failed: {e}")
+
+
+def sync_earnings_dates(sb) -> list[datetime]:
+    """云端安全财报刷新:先从 Supabase 还原缓存 → 强制刷新一次(拿到就顺带更新
+    缓存文件)→ 把结果推回去。`sb` 为 Supabase client(调用方传入,模块保持零依赖)。"""
+    table = "earnings_calendar"
+    try:
+        rows = sb.table(table).select("data").eq("id", "current").execute().data
+        if rows and rows[0].get("data"):
+            seed_earnings_cache(rows[0]["data"])
+    except Exception as e:
+        logger.warning(f"earnings restore from supabase failed: {e}")
+    dates = fetch_earnings_dates(force_refresh=True)
+    records = earnings_cache_records()
+    if records:                          # live 抓取失败但种子缓存还在时,别拿空覆盖已存的
+        try:
+            sb.table(table).upsert({"id": "current", "data": records}).execute()
+        except Exception as e:
+            logger.warning(f"earnings push to supabase failed: {e}")
+    return dates
+
+
 def add_earnings_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Adds:

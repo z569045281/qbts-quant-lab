@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-21 · [fable] selfcheck-0721 · AI自检07-21两修:①volume_profile.py `_action_hint` VAL/VAH fallback 未判方向,价格深跌到VAL下方时会把"跌破X下看"指向一个更高的VAL(方向倒挂假话)——加"是否真在磁吸位更远侧"判断,不成立就说"暂无更多参照"②财报日历云端数据源失败=Lambda/tmp冷启动清空本地parquet缓存(与finra_short同病)→ 镜像 sync_short_volume 套路新增 sync_earnings_dates,接入 publish.py + lambda_handlers.py,新表 sql/earnings_calendar_migration.sql(待用户跑)。元模型19%命中率转inverse-weight影子跟踪的建议留给用户拍板,未动手实现。files: backend/dashboard/volume_profile.py, backend/data/altdata.py, publish.py, aws/lambda_handlers.py, sql/earnings_calendar_migration.sql(new)
+
 - [active] 2026-07-21 · [fable] challenge2-resume · 千元挑战二期三连亏(LABU/WEBL/LABU 全负,两次触地板)复盘+恢复运行(用户拍板):①诊断=扫描器对大盘环境全盲,三笔都买在动量榜首却撞 risk_off 回撤②修复=复用 scan.py `_market_context` risk_off 闸门③用户选择取消地板跑到8/15(非重设)④顺带修 _finish() halt路径 pnl 从不重算的陈旧显示bug。floor_line 改 nullable 贯穿 backend+frontend。files: backend/dashboard/challenge2.py, backend/dashboard/selfcheck.py, frontend/app/_lib/data.ts, frontend/app/challenge/page.tsx, frontend/public/version.json
 
 - [done] 2026-07-20 · [opus] intrabar-profile · 新增 Intrabar Profile 辅助卡(用户点单,仿 Kioseff TradingView editor's pick):用日内 1h 子bar 重构最近日线bar 内部的成交量画像+签名delta(吸收/投降/派发读数),回答"价格到需求区时买盘在吸收还是继续投降"。地图非信号——不进 edge/机械打分,只展示+喂决策prompt作确认腿参考(同 POC/NW 待遇)。files: backend/dashboard/intrabar_profile.py(new), backend/api.py, backend/dashboard/decision.py, frontend/app/_lib/data.ts, frontend/app/page.tsx, frontend/public/version.json

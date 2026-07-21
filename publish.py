@@ -94,6 +94,13 @@ def main() -> None:
             sync_short_volume(sb)
         except Exception as e:
             print(f"  ! FINRA short sync skipped: {e}")
+        # 财报日历同款持久化(2026-07-21:Lambda /tmp 冷启动清空导致云端"数据源失败")
+        try:
+            from data.altdata import sync_earnings_dates
+            print("→ syncing earnings calendar…")
+            sync_earnings_dates(sb)
+        except Exception as e:
+            print(f"  ! earnings sync skipped: {e}")
 
         # 1. Dashboard snapshot (force a fresh compute) ----------------------
         print("→ computing dashboard snapshot…")
