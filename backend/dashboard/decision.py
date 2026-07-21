@@ -985,6 +985,29 @@ def generate_decision(snapshot: dict, extras: dict | None = None) -> dict:
     return decision
 
 
+def _invert_v1_shadow(snapshot: dict) -> dict | None:
+    """反向影子(2026-07-21,用户拍板 · 承 AI 自检建议):把原始 v1 元模型
+    (2026-07-17 前上线版,22 条已判 21% 命中、Wilson95% 上界 38%<50%,显著劣于
+    随机)的表态整个倒过来,当零决策权的测量对照——若 v1 稳定地"错",反过来押
+    可能有正 edge;但这只是假设,n 太小(21~24)不能排除只是小样本噪声,不能
+    默认成立。纯机械(edge.compute_edge_v1,不调任何 LLM,$0),从不进真决策
+    或 edge.py 的 compute_edge(v2)。8/15 与 Fable/DeepSeek 同框判分。"""
+    v1 = snapshot.get("edge_v1_shadow")
+    if not v1 or v1.get("error") or v1.get("p_up") is None:
+        return None
+    p_up_v1 = float(v1["p_up"])
+    v1_call = "up" if p_up_v1 > 0.5 else "down"        # v1 的原始(未反向)表态
+    inv_call = "down" if v1_call == "up" else "up"      # 本影子实际下注的方向
+    return {
+        "source_model": "v1(原始未改元模型,已判21%命中·劣于随机)",
+        "v1_p_up": round(p_up_v1, 4),
+        "v1_call": v1_call,
+        "bold_call_5d": inv_call,      # 与 bold_call_5d/ds_bold_call 同名同口径,journal 复用同一套 fwd5 评分
+        "p_up_5d": round(1 - p_up_v1, 4),
+        "note": "v1 表态整体反向,零决策权测量;8/15 判是真反向alpha还是巧合",
+    }
+
+
 _DS_MODEL = "deepseek-v4-pro"
 _DS_URL = "https://api.deepseek.com/chat/completions"
 
@@ -1064,6 +1087,12 @@ def get_or_generate_decision(
     ds = generate_shadow_decision(snapshot, extras)
     if ds:
         decision["shadow_ds"] = ds
+
+    # v1 反向影子(2026-07-21 用户拍板,承 AI 自检建议):零成本(纯机械,不调模型),
+    # 零决策权,只记账供 8/15 判是否是真反向alpha还是小样本噪声
+    v1inv = _invert_v1_shadow(snapshot)
+    if v1inv:
+        decision["shadow_v1_inverse"] = v1inv
 
     # NOTE: the intraday consistency guard (flip-flop detection) lives in
     # journal.record() — it reads/writes Supabase, so a phone tap on the deployed

@@ -161,6 +161,10 @@ def record(decision: dict, price_at_decision: float, as_of: str) -> None:
         "ds_entry":  ((decision.get("shadow_ds") or {}).get("trade_plan") or {}).get("qbts_entry"),
         "ds_stop":   ((decision.get("shadow_ds") or {}).get("trade_plan") or {}).get("qbts_stop"),
         "ds_target": ((decision.get("shadow_ds") or {}).get("trade_plan") or {}).get("qbts_target"),
+        # v1 反向影子(2026-07-21,用户拍板):原始 21% 命中元模型的表态整体倒过来,
+        # 零决策权,同一套 fwd5 口径评分,8/15 与 Fable/DeepSeek 同框判分
+        "v1inv_bold_call": (decision.get("shadow_v1_inverse") or {}).get("bold_call_5d"),
+        "v1inv_p_up":       (decision.get("shadow_v1_inverse") or {}).get("p_up_5d"),
         "price":      round(float(price_at_decision), 2),
         "entry":      tp.get("qbts_entry"),
         "stop":       tp.get("qbts_stop"),
@@ -266,6 +270,11 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
             dsc = r.get("ds_bold_call")
             if dsc in ("up", "down"):
                 ds_correct = (dsc == "up") == (fwd5 > 0)
+        v1inv_correct = None
+        if fwd5 is not None:
+            vic = r.get("v1inv_bold_call")
+            if vic in ("up", "down"):
+                v1inv_correct = (vic == "up") == (fwd5 > 0)
 
         r["status"] = "graded"
         r["result"] = {
@@ -280,6 +289,7 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
             "fwd5_ret":       round(fwd5, 4) if fwd5 is not None else None,
             "bold_correct":    bold_correct,
             "ds_bold_correct": ds_correct,
+            "v1inv_bold_correct": v1inv_correct,
         }
         newly_graded.append(r)
 

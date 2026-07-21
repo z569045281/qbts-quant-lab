@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-21 · [fable] v1-inverse-shadow · v1反向影子(用户拍板,承AI自检建议):edge.py 重构出 `_build_contributions` 共用+新 `compute_edge_v1`(逐字节复现原始v1:无上限裸加+无regime+EV±1%阈值,compute_edge/v2行为不变,已用合成快照验证 v1/v2 分歧符合mining.md记录的病征)→ decision.py `_invert_v1_shadow` 把v1表态整体倒过来当零决策权影子(纯机械$0)→ journal.py record/grade_pending 加 v1inv_bold_call 同一套fwd5评分 → audit.py ②🥊 三行同框。CLAUDE.md 已归档。files: backend/dashboard/edge.py, backend/api.py, backend/dashboard/decision.py, backend/dashboard/journal.py, backend/dashboard/audit.py, CLAUDE.md
+
 - [done] 2026-07-21 · [fable] selfcheck-0721 · AI自检07-21两修:①volume_profile.py `_action_hint` VAL/VAH fallback 未判方向,价格深跌到VAL下方时会把"跌破X下看"指向一个更高的VAL(方向倒挂假话)——加"是否真在磁吸位更远侧"判断,不成立就说"暂无更多参照"②财报日历云端数据源失败=Lambda/tmp冷启动清空本地parquet缓存(与finra_short同病)→ 镜像 sync_short_volume 套路新增 sync_earnings_dates,接入 publish.py + lambda_handlers.py,新表 sql/earnings_calendar_migration.sql(待用户跑)。元模型19%命中率转inverse-weight影子跟踪的建议留给用户拍板,未动手实现。files: backend/dashboard/volume_profile.py, backend/data/altdata.py, publish.py, aws/lambda_handlers.py, sql/earnings_calendar_migration.sql(new)
 
 - [active] 2026-07-21 · [fable] challenge2-resume · 千元挑战二期三连亏(LABU/WEBL/LABU 全负,两次触地板)复盘+恢复运行(用户拍板):①诊断=扫描器对大盘环境全盲,三笔都买在动量榜首却撞 risk_off 回撤②修复=复用 scan.py `_market_context` risk_off 闸门③用户选择取消地板跑到8/15(非重设)④顺带修 _finish() halt路径 pnl 从不重算的陈旧显示bug。floor_line 改 nullable 贯穿 backend+frontend。files: backend/dashboard/challenge2.py, backend/dashboard/selfcheck.py, frontend/app/_lib/data.ts, frontend/app/challenge/page.tsx, frontend/public/version.json

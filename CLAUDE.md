@@ -121,6 +121,15 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   同一套 fwd5 口径评分(`audit.py` ② 🥊 表态vs5日两行同框)→ **8/15 影子考场宣判,
   赢了才谈换岗**。Blank key = 影子全关,主决策零影响。方向单 <5 bar 提前触发评分的
   日子 fwd5 无数据,该日两模型表态不计分(方向单稀有,可忽略)。
+- **v1 反向影子**(`dashboard/edge.py::compute_edge_v1` + `decision.py::_invert_v1_shadow`,
+  2026-07-21,承 AI 自检建议、用户拍板)—— 原始 v1 元模型(2026-07-17 前上线版,22 条
+  已判 **21% 命中,Wilson95% 上界 38%<50%,显著劣于随机**)从 `edge.py` 里**逐字节复现**
+  (`_build_contributions` 抽成 v1/v2 共用,v1 走原始无上限裸加 + 无 regime 项 +
+  EV±1% 阈值,`compute_edge`(v2)行为完全不变)。表态**整体反向**当零决策权影子:
+  不进 edge/真决策,纯机械($0,不调任何模型),`snapshot['edge_v1_shadow']` →
+  `decision['shadow_v1_inverse']` → journal `v1inv_bold_call` 同一套 fwd5 口径评分
+  → `audit.py` ② 🥊 三行同框(Fable/DeepSeek/v1反向)。**假设未证实**:21%可能是稳定的
+  反向 alpha,也可能只是 n=21~24 的小样本噪声——8/15 一起宣判,不预设结论。
 - **🚀 SpaceX (SPCX) 第二仪表盘** (`backend/dashboard/spacex.py`, 2026-07-13 用户要求):
   **决策只由 DeepSeek 生成、绝不回退 Fable**(与影子决策共用 `DEEPSEEK_API_KEY`,但这是
   一台**独立**的机器,不是影子)。SPCX 是普通个股 → 自包含:自抓 yfinance 技术读数 +

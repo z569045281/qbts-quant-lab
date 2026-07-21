@@ -57,21 +57,17 @@ _REL_STRENGTH_WEIGHT     = 0.20    # leading/lagging the peer basket — a dynam
 _SENTIMENT_WEIGHT        = 0.12    # retail Reddit sentiment (Adanos) — weak/laggy, small tilt only
 
 
-def compute_edge(
+def _build_contributions(
     snapshot: dict,
-    today_signals: dict | None = None,
-    options_signal: dict | None = None,
-    intraday_signal: dict | None = None,
-    holdings_signal: dict | None = None,
-) -> dict:
-    """
-    Pure function. No I/O. Takes the dashboard snapshot + optional signal
-    payloads and returns the meta-model verdict.
-
-    Self-learning: applies per-source weight multipliers learned from
-    historical prediction-vs-outcome calibration (Tier 3).
-    """
-    log_odds = 0.0
+    today_signals: dict | None,
+    options_signal: dict | None,
+    intraday_signal: dict | None,
+    holdings_signal: dict | None,
+) -> list[Contribution]:
+    """Per-source contribution list — IDENTICAL between v1 and v2, the two
+    model generations only differ in how they're AGGREGATED (see compute_edge_v1
+    vs compute_edge below). Extracted 2026-07-21 so the original v1 aggregation
+    can be reconstructed exactly for the inverse-weight shadow track."""
     contributions: list[Contribution] = []
 
     # Load learned weight multipliers (Tier 3 self-learning).
@@ -94,7 +90,6 @@ def compute_edge(
             base_w = sharpe * _MINED_WEIGHT_PER_SHARPE
             w  = base_w * _learn_mult(src)
             lo = sig * w
-            log_odds += lo
             mult = _learn_mult(src)
             extra = f" · 学习权重 ×{mult:.2f}" if mult != 1.0 else ""
             contributions.append(Contribution(
@@ -113,7 +108,6 @@ def compute_edge(
         base_w = _CLASSIC_WEIGHT_BASE.get(conf, 0.05)
         w  = base_w * _learn_mult(src)
         lo = sig * w
-        log_odds += lo
         mult = _learn_mult(src)
         extra = f" · 学习权重 ×{mult:.2f}" if mult != 1.0 else ""
         contributions.append(Contribution(
@@ -132,7 +126,6 @@ def compute_edge(
         base_w = _NEWS_WEIGHT * (0.4 + 0.6 * intensity)
         w  = base_w * _learn_mult("新闻聚合情绪")
         lo = news_sig * w
-        log_odds += lo
         contributions.append(Contribution(
             source="新闻聚合情绪", kind="news",
             signal=news_sig, weight=w, log_odds=lo,
@@ -147,7 +140,6 @@ def compute_edge(
         base_w = float(options_signal.get("log_odds_magnitude", 0.0))
         w  = base_w * _learn_mult("期权流")
         lo = sig * w
-        log_odds += lo
         contributions.append(Contribution(
             source="期权流", kind="classic",
             signal=sig, weight=w, log_odds=lo,
@@ -160,7 +152,6 @@ def compute_edge(
         base_w = float(intraday_signal.get("log_odds_magnitude", 0.0))
         w  = base_w * _learn_mult("盘中量能")
         lo = sig * w
-        log_odds += lo
         contributions.append(Contribution(
             source="盘中量能", kind="classic",
             signal=sig, weight=w, log_odds=lo,
@@ -175,7 +166,6 @@ def compute_edge(
     if st_sig != 0:
         w  = _SENTIMENT_WEIGHT * _learn_mult("散户情绪")
         lo = st_sig * w
-        log_odds += lo
         contributions.append(Contribution(
             source="散户情绪", kind="news",
             signal=st_sig, weight=w, log_odds=lo,
@@ -188,7 +178,6 @@ def compute_edge(
         base_w = float(holdings_signal.get("log_odds_magnitude", 0.0))
         w  = base_w * _learn_mult("机构持仓 (13F)")
         lo = sig * w
-        log_odds += lo
         contributions.append(Contribution(
             source="机构持仓 (13F)", kind="classic",
             signal=sig, weight=w, log_odds=lo,
@@ -204,13 +193,92 @@ def compute_edge(
     if rs_sig != 0:
         w  = _REL_STRENGTH_WEIGHT * _learn_mult("相对强度")
         lo = rs_sig * w
-        log_odds += lo
         lead = {"leader": "领先", "laggard": "落后"}.get(rs.get("leadership", ""), rs.get("leadership", ""))
         contributions.append(Contribution(
             source="相对强度", kind="classic",
             signal=rs_sig, weight=w, log_odds=lo,
             detail=f"{lead}量子篮子 · {rs.get('rationale', '')[:60]}",
         ))
+
+    return contributions
+
+
+def _p_up_ev_kelly(log_odds: float, snapshot: dict) -> tuple[float, float, float]:
+    """Shared sigmoid → EV → Kelly math, identical in v1 and v2 (only the
+    log_odds fed in differs)."""
+    p_up = 1.0 / (1.0 + math.exp(-log_odds))
+    atr_abs = float(snapshot.get("chart", {}).get("atr_14", 0.0) or 0.0)
+    price   = float(snapshot.get("price", 0.0) or 0.0)
+    atr_pct = (atr_abs / price) if price > 0 else 0.05
+    horizon_factor = 1.6    # ~5-bar forward, sqrt(5/2) ≈ 1.58
+    expected_return = math.tanh(log_odds * 0.7) * atr_pct * horizon_factor
+    var = (atr_pct * horizon_factor) ** 2
+    raw_kelly = expected_return / var if var > 1e-9 else 0.0
+    kelly = max(-0.5, min(0.5, 0.5 * raw_kelly))
+    return p_up, expected_return, kelly
+
+
+def compute_edge_v1(
+    snapshot: dict,
+    today_signals: dict | None = None,
+    options_signal: dict | None = None,
+    intraday_signal: dict | None = None,
+    holdings_signal: dict | None = None,
+) -> dict:
+    """The ORIGINAL (pre-2026-07-17) meta-model, byte-for-byte reconstructed:
+    raw uncapped log-odds sum, no regime term, EV±1% label threshold. This is
+    the model that ran live for a month and graded 21%/24 hit rate (Wilson95%
+    upper bound 38% < 50% — significantly worse than random).
+
+    Exists ONLY to power the 2026-07-21 inverse-weight shadow track (user's
+    idea, following the AI self-check's suggestion): if a model is reliably
+    wrong, its exact opposite is a candidate edge — but that hypothesis is
+    UNTESTED prospectively (the 19-21% could be small-sample noise, not a
+    stable anti-correlation), so it is measured here as a zero-authority
+    shadow call (mirrors shadow_ds/DeepSeek), never fed into the real decision
+    or edge.py's compute_edge (v2, unchanged). Graded the same fwd5 way,
+    judged 8/15 alongside everything else."""
+    contributions = _build_contributions(
+        snapshot, today_signals, options_signal, intraday_signal, holdings_signal)
+    log_odds = sum(c.log_odds for c in contributions)   # no per-source cap, no soft cap
+    p_up, expected_return, kelly = _p_up_ev_kelly(log_odds, snapshot)
+
+    # v1 用 EV±1% 判(不是 v2 的 p_up 死区)—— 这正是 v1 的病根之一:54% 就敢喊 BUY
+    if expected_return >= 0.01:
+        label, signal = "BUY", 1
+    elif expected_return <= -0.01:
+        label, signal = "SELL", -1
+    else:
+        label, signal = "HOLD", 0
+
+    contributions.sort(key=lambda c: abs(c.log_odds), reverse=True)
+    return {
+        "signal":               signal,
+        "label":                label,
+        "model":                "v1",      # 原始版,2026-07-17 起停用,仅供反向影子复现
+        "p_up":                 round(p_up, 4),
+        "expected_return_pct":  round(expected_return, 4),
+        "kelly_fraction":       round(kelly, 4),
+        "log_odds":             round(log_odds, 4),
+        "n_signals":            len(contributions),
+        "contributions":        [c.to_dict() for c in contributions[:10]],
+    }
+
+
+def compute_edge(
+    snapshot: dict,
+    today_signals: dict | None = None,
+    options_signal: dict | None = None,
+    intraday_signal: dict | None = None,
+    holdings_signal: dict | None = None,
+) -> dict:
+    """
+    Pure function. No I/O. Takes the dashboard snapshot + optional signal
+    payloads and returns the meta-model verdict (v2 — see module docstring
+    and mining.md 第二十四轮 for why the aggregation looks like this).
+    """
+    contributions = _build_contributions(
+        snapshot, today_signals, options_signal, intraday_signal, holdings_signal)
 
     # ══ v2 聚合(2026-07-17 重设计;出身:v1 上线一个月 22 条 21% 命中的审判)══
     # v1 两个病根,都是结构性的:
@@ -246,20 +314,7 @@ def compute_edge(
                    f"实测 P(5d up)={'52.5%' if qqq_vs > 0 else '41.9%'}"))
 
     log_odds = soft + regime_lo
-
-    # Probability and expected return
-    p_up = 1.0 / (1.0 + math.exp(-log_odds))
-
-    atr_abs = float(snapshot.get("chart", {}).get("atr_14", 0.0) or 0.0)
-    price   = float(snapshot.get("price", 0.0) or 0.0)
-    atr_pct = (atr_abs / price) if price > 0 else 0.05
-    horizon_factor = 1.6    # ~5-bar forward, sqrt(5/2) ≈ 1.58
-    expected_return = math.tanh(log_odds * 0.7) * atr_pct * horizon_factor
-
-    # Kelly (half-Kelly capped at ±50%)
-    var = (atr_pct * horizon_factor) ** 2
-    raw_kelly = expected_return / var if var > 1e-9 else 0.0
-    kelly = max(-0.5, min(0.5, 0.5 * raw_kelly))
+    p_up, expected_return, kelly = _p_up_ev_kelly(log_odds, snapshot)
 
     # v2 死区:p_up 出 [42%, 58%] 才给方向(v1 用 EV±1% 判,54% 就敢喊 BUY —— 22 条
     # 21% 命中里一多半是这种弱信号;方向弱就承认没方向)
