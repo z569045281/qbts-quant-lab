@@ -688,6 +688,30 @@ export default function Dashboard() {
                   </div>
                 );
               })()}
+
+              {/* 🔬 v1 反向影子(2026-07-21,纯机械$0测量,零决策权,不可切换查看) */}
+              {snap.decision?.shadow_v1_inverse && (() => {
+                const v1i = snap.decision!.shadow_v1_inverse!;
+                return (
+                  <div className="mt-3 rounded-lg border px-3 py-2 bg-gray-50/60 border-gray-200">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <span className="text-[11px] font-bold text-gray-600">🔬 v1 反向影子(测量用)</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-500">
+                        零决策权
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-gray-600">
+                      原始 v1 表态{v1i.v1_call === "up" ? "看涨" : "看跌"}(P(up) {(v1i.v1_p_up * 100).toFixed(0)}%)
+                      <span className="text-gray-400"> → </span>
+                      本影子反着押{v1i.bold_call_5d === "up" ? "涨 ▲" : "跌 ▼"}
+                    </div>
+                    <div className="mt-1 text-[9px] text-gray-400 leading-snug">
+                      v1(2026-07-17 前上线版)22 条已判 21% 命中 · 劣于随机;反向是否有真 edge 未证实,
+                      8/15 与 Fable/DeepSeek 同框宣判
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 关键驱动 + 风险 */}

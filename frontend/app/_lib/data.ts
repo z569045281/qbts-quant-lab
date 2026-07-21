@@ -467,6 +467,14 @@ export interface Decision {
   position_advice?:   PositionAdvice[];  // 💼 用户实盘持仓的逐笔操作建议
   shadow?:            boolean;   // true = 影子决策(零决策权,仅对照)
   shadow_ds?:         Decision;  // DeepSeek V4 Pro 影子决策(卡上可切换;8/15 同框宣判)
+  shadow_v1_inverse?: {          // 2026-07-21:原始21%命中元模型整体反向的零决策权影子(纯机械,不可切换查看,只做每日徽章)
+    source_model: string;
+    v1_p_up:      number;
+    v1_call:      "up" | "down";
+    bold_call_5d: "up" | "down";
+    p_up_5d:      number;
+    note:         string;
+  } | null;
 }
 
 /* ── 🔬 全站 AI 系统自检(publish §4.8 · 规则层+Haiku 六页体检) ──────────── */
