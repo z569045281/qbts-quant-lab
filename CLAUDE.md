@@ -413,6 +413,15 @@ Frontend tabs (`frontend/app/`): **🎯 决策仪表盘** (`/`) · **🔭 自选
   gate warns until ≥30 graded calls. Standing guidance given to the user: **don't size up
   real money until the track record shows an edge.** Treat the whole thing as a measurement
   tool for now; the next optimization should be driven by the accumulated results.
+- **HOLD 判读入台账(2026-07-22 用户拍板"大波动日观望=错的,就是亏钱")**:
+  `journal.grade_pending` 给 HOLD 记录也打 `correct` —— 决策覆盖日 |QBTS| ≥3% →
+  `correct=False` 漏判 ✗(带 `day0_ret_pct`,漏判也生成 Haiku 反思)。口径**完全复用**
+  audit.py 2026-07-13 预注册规则(用户要求的 >5% 被更严的 3% 覆盖,不设第二套标准)。
+  **与方向单分开统计**(预注册明文):`load_recent` 出 `hold_accuracy`(n_hold_*),
+  方向单 accuracy 按 action 显式分池;`_lean`(journal+retrospective 两处)按 action
+  分流,防止"漏判判读分"冒充方向命中。已回填 23 条历史 HOLD:12✓/11✗(48% 漏判率)。
+  决策 prompt 历史行对漏判显示「当日±X%(≥3%,漏判——观望不是免费的)」;前端
+  「观望判读」chip + ✗漏判 行(v2.23.0)。
 - **⏰ REMINDER — re-derive the edge weights once calibration has samples.** Every weight in
   `edge.py` is a **hardcoded prior, not derived from data**: `_MINED_WEIGHT_PER_SHARPE=0.8`,
   `_CLASSIC_WEIGHT_BASE={high:0.40,medium:0.20,low:0.08}`, `_NEWS_WEIGHT=0.15`,

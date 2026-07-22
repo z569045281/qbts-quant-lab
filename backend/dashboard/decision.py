@@ -549,7 +549,15 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
         rows = []
         for r in journal["records"][:8]:
             res = r.get("result")
-            if res and res.get("correct") is not None:
+            if res and res.get("correct") is not None and r.get("action") == "HOLD":
+                # HOLD 判读(07-22 起):决策日 |QBTS|≥3% = 漏判(双向工具在架)。
+                # 展示当日波动而非 5 日漂移 —— ✗ 判的是"错过了当天的行情"。
+                mark = "✓" if res["correct"] else "✗"
+                d0 = res.get("day0_ret_pct")
+                d0_s = f"当日{d0*100:+.1f}%" if d0 is not None else "当日?"
+                rows.append(f"  {mark} {r['date']} HOLD(信心{r['conviction']}) "
+                            f"→ {d0_s}{'' if res['correct'] else '(≥3%,漏判——观望不是免费的)'}")
+            elif res and res.get("correct") is not None:
                 mark = "✓" if res["correct"] else "✗"
                 rows.append(f"  {mark} {r['date']} {r['action']}(信心{r['conviction']}) "
                             f"→ {res['outcome']} {res['ret_pct']*100:+.1f}%")

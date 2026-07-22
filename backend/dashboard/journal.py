@@ -35,6 +35,7 @@ _JOURNAL = Path(__file__).parent.parent / "data" / "cache" / "decision_journal.j
 _JOURNAL.parent.mkdir(parents=True, exist_ok=True)
 
 _GRADE_AFTER_BARS = 5     # final grade horizon (trading days)
+_HOLD_MISS_PCT    = 0.03  # HOLD 判读:决策日 |QBTS| ≥3% = 漏判(audit.py 07-13 预注册同一口径)
 
 # Storage: a Supabase `decision_journal` table when credentials are present
 # (so the journal persists across stateless cloud runs — Lambda's /tmp is wiped
@@ -203,6 +204,7 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
         stop, target = r.get("stop"), r.get("target")
 
         outcome, correct, ret_pct, exit_day = None, None, None, None
+        day0_ret = None    # HOLD 判读用:决策覆盖日的当日涨跌
         # Path-dependent: did stop or target get touched first?
         for n_day, day in enumerate(after[:_GRADE_AFTER_BARS], 1):
             hi, lo = float(highs.loc[day]), float(lows.loc[day])
@@ -238,8 +240,22 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
             elif action == "SHORT_QBTZ":
                 outcome, correct = "drift", ret < 0
                 ret_pct = -ret    # P&L perspective for a short
-            else:  # HOLD — informational
+            else:
+                # HOLD 也是决策(2026-07-22 用户拍板"大波动日观望=错的,就是亏钱"):
+                # 决策覆盖日 |QBTS| ≥3% → 漏判 ✗。口径完全复用 audit.py 2026-07-13
+                # 预注册规则(双向工具在架,错过任一方向≥3%行情=漏判;用户要求的
+                # >5% 自动被更严的 3% 覆盖,不另设第二套标准)。day0 = 首个 ≥记录日
+                # 的交易 bar(决策 09:00 ET 盘前发布,覆盖当天)。
                 outcome, correct = "hold", None
+                day0_idx = dates[dates >= d0]
+                if len(day0_idx) > 0:
+                    pos = dates.get_loc(day0_idx[0])
+                    if isinstance(pos, slice):   # duplicate index guard
+                        pos = pos.start
+                    if pos > 0:
+                        day0_ret = (float(closes.iloc[pos]) - float(closes.iloc[pos - 1])) \
+                                   / float(closes.iloc[pos - 1])
+                        correct = abs(day0_ret) < _HOLD_MISS_PCT
 
         # Shadow grade for HOLD: even when we sat out, was the model's lean
         # directionally right? 2026-07-13 起优先用 bold_call_5d(强制二选一表态,
@@ -281,6 +297,7 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
             "graded_at": datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
             "outcome":   outcome,
             "correct":   correct,
+            "day0_ret_pct": round(day0_ret, 4) if day0_ret is not None else None,
             "ret_pct":   round(ret_pct, 4) if ret_pct is not None else None,
             "exit_day":  exit_day,
             "reflection": None,
@@ -311,10 +328,17 @@ def _reflect(r: dict) -> str | None:
         load_dotenv()
         client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
         res = r["result"]
-        msg = (f"{r['date']} 系统决策 {r['action']}（信心{r['conviction']}/10，价格${r['price']}），"
-               f"理由：{r['summary']}\n"
-               f"结果：{res['outcome']}，第{res['exit_day']}天，收益 {res['ret_pct']*100:+.1f}%（判断错误）。\n"
-               f"用一句话（≤60字）总结这次错在哪、下次同类情形该注意什么。只输出这句话。")
+        if r.get("action") == "HOLD":
+            msg = (f"{r['date']} 系统决策观望（信心{r['conviction']}/10，价格${r['price']}），"
+                   f"理由：{r['summary']}\n"
+                   f"结果：当天 QBTS 走出 {(res.get('day0_ret_pct') or 0)*100:+.1f}% 的大波动"
+                   f"（≥3% 即判漏判——货架上有 QBTX/QBTZ 双向工具，两个方向都可参与）。\n"
+                   f"用一句话（≤60字）总结这次漏判错在哪、下次同类盘面该注意什么。只输出这句话。")
+        else:
+            msg = (f"{r['date']} 系统决策 {r['action']}（信心{r['conviction']}/10，价格${r['price']}），"
+                   f"理由：{r['summary']}\n"
+                   f"结果：{res['outcome']}，第{res['exit_day']}天，收益 {res['ret_pct']*100:+.1f}%（判断错误）。\n"
+                   f"用一句话（≤60字）总结这次错在哪、下次同类情形该注意什么。只输出这句话。")
         resp = client.messages.create(
             model="claude-haiku-4-5-20251001", max_tokens=150,
             messages=[{"role": "user", "content": msg}],
@@ -333,16 +357,27 @@ def load_recent(n: int = 12) -> dict:
     """Journal payload for dashboard + decision prompt."""
     allr = sorted(_load(), key=lambda r: r["date"], reverse=True)
     records = allr[:n]
+    # 方向单命中(纯方向盘,不含 HOLD):2026-07-22 起 HOLD 也带 correct(漏判判读),
+    # 但预注册规则明说"与方向单分开统计" —— 这里显式按 action 分池,不靠 correct 非空。
     graded = [r for r in records if r.get("status") == "graded"
+              and r.get("action") in ("LONG_QBTX", "SHORT_QBTZ")
               and r["result"] and r["result"]["correct"] is not None]
     n_correct = sum(1 for r in graded if r["result"]["correct"])
+
+    # 观望判读(HOLD 池):决策日 |QBTS| <3% = 观望合理 ✓,≥3% = 漏判 ✗。
+    hold_graded = [r for r in records if r.get("status") == "graded"
+                   and r.get("action") == "HOLD"
+                   and r.get("result") and r["result"].get("correct") is not None]
+    n_hold_correct = sum(1 for r in hold_graded if r["result"]["correct"])
 
     # Shadow accuracy = directional lean correct across BOTH real trades and
     # HOLDs (uses correct for trades, shadow_correct for HOLDs). A falsifiable
     # signal of edge even when the system mostly sits out.
+    # (HOLD 的 correct 是"漏判判读"不是方向表态 —— lean 必须按 action 分流,
+    #  不能像旧版那样"correct 非空就当方向分"。)
     def _lean(r: dict):
         res = r.get("result") or {}
-        if res.get("correct") is not None:
+        if r.get("action") in ("LONG_QBTX", "SHORT_QBTZ") and res.get("correct") is not None:
             return res["correct"]
         return res.get("shadow_correct")
     shadow = [r for r in records if r.get("status") == "graded" and _lean(r) is not None]
@@ -380,6 +415,9 @@ def load_recent(n: int = 12) -> dict:
         "n_shadow":         len(shadow),
         "n_shadow_correct": n_shadow_correct,
         "shadow_accuracy":  round(n_shadow_correct / len(shadow), 3) if shadow else None,
+        "n_hold_graded":  len(hold_graded),
+        "n_hold_correct": n_hold_correct,
+        "hold_accuracy":  round(n_hold_correct / len(hold_graded), 3) if hold_graded else None,
         "lessons":   [r["result"]["reflection"] for r in records
                       if r.get("result") and r["result"].get("reflection")][:5],
     }

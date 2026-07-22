@@ -380,6 +380,7 @@ export interface JournalRecord {
     reflection: string | null;
     shadow_dir?:     -1 | 1 | null;   // HOLD: lean implied by p_up_5d
     shadow_correct?: boolean | null;  // HOLD: was that lean directionally right
+    day0_ret_pct?:   number | null;   // HOLD 判读:决策日当日涨跌(≥3% → correct=false 漏判)
   } | null;
 }
 export interface JournalPaper {
@@ -405,6 +406,9 @@ export interface DecisionJournal {
   n_shadow?:         number;          // graded calls incl. HOLD shadow leans
   n_shadow_correct?: number;
   shadow_accuracy?:  number | null;   // directional accuracy incl. observed HOLDs
+  n_hold_graded?:  number;            // 观望判读(07-22 起):|决策日|<3% ✓ / ≥3% ✗漏判
+  n_hold_correct?: number;
+  hold_accuracy?:  number | null;
   lessons:   string[];
 }
 

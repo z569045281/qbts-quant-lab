@@ -1118,6 +1118,12 @@ export default function Dashboard() {
                   ({snap.journal.n_shadow_correct}/{snap.journal.n_shadow})
                 </span>
               )}
+              {snap.journal?.hold_accuracy != null && (
+                <span className="text-[10px] text-gray-400 font-mono" title="观望判读:决策日 |QBTS| ≥3% 却观望 = 漏判(双向工具在架,错过任一方向都算)— 观望不是免费的">
+                  观望判读 {(snap.journal.hold_accuracy * 100).toFixed(0)}%
+                  ({snap.journal.n_hold_correct}/{snap.journal.n_hold_graded})
+                </span>
+              )}
             </div>
           </div>
           {jPaper && (
@@ -1174,6 +1180,13 @@ export default function Dashboard() {
                       <span className="ml-auto">
                         {r.status === "pending" ? (
                           <span className="text-[10px] text-gray-400">⏳ 待评判</span>
+                        ) : r.action === "HOLD" && res?.correct === false ? (
+                          // 观望漏判(07-22 起):✗ 判的是"决策日 ≥3% 却观望",展示当日波动
+                          <span className="text-xs font-bold text-[#F03A3E]" title="决策日 |QBTS| ≥3% 却观望 = 漏判">
+                            ✗ 漏判 {res.day0_ret_pct != null ? `当日${(res.day0_ret_pct*100).toFixed(1)}%` : ""}
+                          </span>
+                        ) : r.action === "HOLD" && res?.correct === true ? (
+                          <span className="text-[10px] text-gray-400" title="决策日波动 <3%,观望合理">— 观望✓</span>
                         ) : res?.correct === true ? (
                           <span className="text-xs font-bold text-emerald-600">✓ {res.ret_pct != null ? `${(res.ret_pct*100).toFixed(1)}%` : ""}</span>
                         ) : res?.correct === false ? (

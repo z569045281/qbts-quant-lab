@@ -68,9 +68,13 @@ def _gather(df_daily: pd.DataFrame) -> dict:
     dir_win = sum(1 for r in dir_graded if r["result"]["ret_pct"] > 0)
 
     # Shadow lean: directional correctness across BOTH trades and HOLDs.
+    # (07-22 起 HOLD 的 correct 是"漏判判读"非方向表态 —— 按 action 分流,
+    #  与 journal.load_recent._lean 同修,防止判读分数冒充方向命中。)
     def _lean(r: dict):
         res = r.get("result") or {}
-        return res["correct"] if res.get("correct") is not None else res.get("shadow_correct")
+        if r.get("action") in ("LONG_QBTX", "SHORT_QBTZ") and res.get("correct") is not None:
+            return res["correct"]
+        return res.get("shadow_correct")
     shadow = [r for r in graded if _lean(r) is not None]
     shadow_correct = sum(1 for r in shadow if _lean(r))
 
