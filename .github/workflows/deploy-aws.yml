@@ -62,11 +62,6 @@ jobs:
           if [ -n "${{ secrets.ALPACA_API_KEY }}" ]; then
             ALPACA_PARAMS="AlpacaApiKey=${{ secrets.ALPACA_API_KEY }} AlpacaSecretKey=${{ secrets.ALPACA_SECRET_KEY }}"
           fi
-          # 🎯 游击战 webhook secret. Same empty-value rule (blank = module off).
-          ER_PARAM=""
-          if [ -n "${{ secrets.ER_HOOK_SECRET }}" ]; then
-            ER_PARAM="ErHookSecret=${{ secrets.ER_HOOK_SECRET }}"
-          fi
           sam deploy \
             --stack-name qbts-jobs \
             --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
@@ -81,7 +76,7 @@ jobs:
               AdanosApiKey='${{ secrets.ADANOS_API_KEY }}' \
               DeepSeekApiKey='${{ secrets.DEEPSEEK_API_KEY }}' \
               AllowOrigin='${{ vars.PUBLISH_ALLOW_ORIGIN || '*' }}' \
-              $NTFY_PARAM $ALPACA_PARAMS $ER_PARAM
+              $NTFY_PARAM $ALPACA_PARAMS
 
       - name: Show Publish Function URL
         run: |

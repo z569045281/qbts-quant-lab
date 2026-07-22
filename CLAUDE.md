@@ -414,19 +414,18 @@ Frontend tabs (`frontend/app/`): **🎯 决策仪表盘** (`/`) · **🔭 自选
   real money until the track record shows an edge.** Treat the whole thing as a measurement
   tool for now; the next optimization should be driven by the accumulated results.
 - **🎯 极度超卖游击战 (Extreme Reversion,2026-07-22 用户点单)**:
-  `backend/dashboard/guerrilla.py` — TradingView Pine webhook 驱动的**高危观察模块**
-  (Bear Lock 下逆宏观、顺微观订单流的多头游击:VMC<-70 + 连续两根K线 Intrabar POC
-  重合≤$0.05 + RR≥2.5,信号完全在用户的 TV Pine 脚本里算,本端只收 webhook)。
-  **零决策权**:不进 edge/决策 prompt,$1000/枪纸面记账,/factors 页直读
-  `guerrilla_state` 表渲染(**待用户跑 sql/guerrilla_migration.sql**,表含 anon 读策略)。
-  Webhook 路由:Lambda `publish_handler` 靠 body `module=="extreme_reversion"` 识别
-  (TV 发不了自定义 header → secret 走 URL `?key=`,`ER_HOOK_SECRET` 空=拒一切=模块关;
-  机器信号不进点击审计);本地测试走 api.py `POST /hooks/extreme_reversion?key=`。
-  出场:QuoteFunction `minute%5==4`(错开 SMC/挑战/地缘分钟)`check_exits` —— 只在有
-  open 仓位时才拉 1m 行情,触 stop/target 按触发价结算 → 写 ledger → **武装 24h 冷却**
-  (冷却由平仓武装,不是进场;epoch 为真理存 Supabase,fail-CLOSED:状态读不到=拒信号)。
-  `ER_HOOK_SECRET` 需加 GitHub Actions secret + root `.env`;TV 告警 webhook 指向
-  Publish Function URL + `?key=<secret>`,消息体就是 Pine `alert()` 的 JSON。
+  `backend/dashboard/guerrilla.py` — **服务端收盘自算 + ntfy** 的高危观察模块
+  (用户原提 TradingView webhook,后改口"webhook和TV都不需要,触发发ntfy就行" →
+  三条件全在服务端用现有数据自算,**无 webhook/无 TV/无 secret**)。Bear Lock 下逆宏观、
+  顺微观订单流的多头游击:**A** 日线 WaveTrend wt1<-70(VMC/Cipher-B 核心线,实测 4.4%
+  天数达标) · **B** 连续两日 Intrabar POC(15m 子bar volume-at-price 重构,~26根/日)
+  重合≤$0.05(停机坪) · **C** RR≥2.5(stop=POC底座-0.05,target=上方最近历史POC墙/无则
+  50日高)。`maybe_guerrilla_signal(now_et)` 在 QuoteFunction 里跑:**收盘后 16:05–20:00 ET
+  每日算一次**(meta.last_compute_date 去重),命中→ntfy+开 $1000 纸面仓。出场 `check_exits`
+  (`minute%5==4`,只在有 open 仓时拉 1m 行情)触 stop/target→ledger→**武装 24h 冷却**
+  (冷却由平仓武装,epoch 存 Supabase,fail-CLOSED)。**零决策权**,/factors 直读
+  `guerrilla_state`(**待用户跑 sql/guerrilla_migration.sql**,anon 读策略)。ntfy 复用
+  `NTFY_TOPIC`。15m 重构比 Pine 的 5m 粗,$0.05 停机坪偏严可能长期静默——UNPROVEN,8/15 同审。
 - **⏳「今天在等什么」卡(2026-07-22 用户:"天天观望,我都不知道在等什么")**:
   `backend/dashboard/waiting_for.py::build_waiting_card` — 六个一级扳机(特调抄底/
   RSI2超卖/同行落后追赶/周末BTC/相对估值z40/crypto顺风辅助腿)的当前读数+距触发

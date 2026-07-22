@@ -98,17 +98,17 @@ function GuerrillaCard({ g }: { g: GuerrillaState }) {
       <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
         <span className="text-sm font-bold text-[#1C1C1E]">🎯 极度超卖游击战 · Extreme Reversion</span>
         <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-600">
-          高危观察 · webhook 驱动
+          高危观察 · 收盘自算
         </span>
       </div>
       <p className="text-[12px] text-gray-400 leading-relaxed mb-3">
-        Bear Lock 下的逆宏观顺订单流游击线程:VMC&lt;−70 + 连续两根K线 Intrabar POC 重合≤$0.05(停机坪)
-        + RR≥2.5,TradingView 端触发 webhook 进场,$1000/枪纸面;止盈/止损即平仓并进入 <b>24h 强制冷却</b>。
-        零决策权、UNPROVEN,8/15 与观察组同审。
+        Bear Lock 下的逆宏观顺订单流游击线程:VMC&lt;−70 + 连续两根日线 Intrabar POC 重合≤$0.05(停机坪)
+        + RR≥2.5,<b>服务端收盘后自算</b>,命中即 ntfy 推送 + $1000/枪纸面;止盈/止损即平仓并进入
+        <b>24h 强制冷却</b>。零决策权、UNPROVEN,8/15 与观察组同审。
       </p>
       {!hasAny && (
         <div className="text-[12px] text-gray-400 bg-[#F6F6F8] rounded-xl px-3 py-3 text-center">
-          待第一枪 —— TradingView 告警尚未触发过(条件极端,常态是长期静默)
+          待第一枪 —— 三条件极端合取,尚未触发过(常态是长期静默)
         </div>
       )}
       {g.cooldowns.map(c => (

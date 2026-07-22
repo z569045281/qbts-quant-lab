@@ -69,13 +69,6 @@ Parameters:
     NoEcho: true
     Default: ""
     Description: Alpaca PAPER API secret (pair of AlpacaApiKey).
-  ErHookSecret:
-    Type: String
-    NoEcho: true
-    Default: ""
-    Description: >
-      🎯 极度超卖游击战 TradingView webhook secret (URL ?key=). Blank = the
-      webhook rejects everything (module off); exits/ledger display unaffected.
 
 Globals:
   Function:
@@ -91,7 +84,6 @@ Globals:
         NTFY_URL: !Ref NtfyUrl
         ALPACA_API_KEY: !Ref AlpacaApiKey
         ALPACA_SECRET_KEY: !Ref AlpacaSecretKey
-        ER_HOOK_SECRET: !Ref ErHookSecret
 
 Resources:
   # ── Decision publish: button (Function URL) + daily auto-run ──────────────

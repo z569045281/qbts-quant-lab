@@ -1270,19 +1270,6 @@ def control_status():
     return {"publish": pub, "pusher": pusher}
 
 
-@app.post("/hooks/extreme_reversion")
-async def extreme_reversion_hook(req: Request, key: str = ""):
-    """🎯 极度超卖游击战 TradingView webhook(本地测试通道;生产走 Lambda Function
-    URL 同逻辑)。TV 不能自定义 header → secret 走 ?key= query;ER_HOOK_SECRET
-    未配置 = 拒一切(blank=off 约定)。"""
-    secret = os.getenv("ER_HOOK_SECRET", "")
-    if not secret or key != secret:
-        raise HTTPException(status_code=401, detail="bad key")
-    from dashboard.guerrilla import on_signal
-    body = await req.json()
-    return await asyncio.to_thread(on_signal, body)
-
-
 @app.post("/scan/watch")
 async def scan_watch(req: Request):
     """Local-mode watchlist edit (cloud mode POSTs to the Lambda Function URL).
