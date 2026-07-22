@@ -413,6 +413,20 @@ Frontend tabs (`frontend/app/`): **🎯 决策仪表盘** (`/`) · **🔭 自选
   gate warns until ≥30 graded calls. Standing guidance given to the user: **don't size up
   real money until the track record shows an edge.** Treat the whole thing as a measurement
   tool for now; the next optimization should be driven by the accumulated results.
+- **🎯 极度超卖游击战 (Extreme Reversion,2026-07-22 用户点单)**:
+  `backend/dashboard/guerrilla.py` — TradingView Pine webhook 驱动的**高危观察模块**
+  (Bear Lock 下逆宏观、顺微观订单流的多头游击:VMC<-70 + 连续两根K线 Intrabar POC
+  重合≤$0.05 + RR≥2.5,信号完全在用户的 TV Pine 脚本里算,本端只收 webhook)。
+  **零决策权**:不进 edge/决策 prompt,$1000/枪纸面记账,/factors 页直读
+  `guerrilla_state` 表渲染(**待用户跑 sql/guerrilla_migration.sql**,表含 anon 读策略)。
+  Webhook 路由:Lambda `publish_handler` 靠 body `module=="extreme_reversion"` 识别
+  (TV 发不了自定义 header → secret 走 URL `?key=`,`ER_HOOK_SECRET` 空=拒一切=模块关;
+  机器信号不进点击审计);本地测试走 api.py `POST /hooks/extreme_reversion?key=`。
+  出场:QuoteFunction `minute%5==4`(错开 SMC/挑战/地缘分钟)`check_exits` —— 只在有
+  open 仓位时才拉 1m 行情,触 stop/target 按触发价结算 → 写 ledger → **武装 24h 冷却**
+  (冷却由平仓武装,不是进场;epoch 为真理存 Supabase,fail-CLOSED:状态读不到=拒信号)。
+  `ER_HOOK_SECRET` 需加 GitHub Actions secret + root `.env`;TV 告警 webhook 指向
+  Publish Function URL + `?key=<secret>`,消息体就是 Pine `alert()` 的 JSON。
 - **⏳「今天在等什么」卡(2026-07-22 用户:"天天观望,我都不知道在等什么")**:
   `backend/dashboard/waiting_for.py::build_waiting_card` — 六个一级扳机(特调抄底/
   RSI2超卖/同行落后追赶/周末BTC/相对估值z40/crypto顺风辅助腿)的当前读数+距触发

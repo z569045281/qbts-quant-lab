@@ -105,6 +105,16 @@ def quote_handler(event, context):
         challenge_summary = maybe_challenge_tick(now_et)
     except Exception as e:
         print(f"! challenge2 skipped: {type(e).__name__}: {e}")
+
+    # 🎯 游击战出场盯守:minute%5==4(错开 %5==0 SMC / %15==2 挑战 / %30==8 地缘);
+    # 模块内部只在有 open 仓位时才拉行情,平时零成本秒退。
+    try:
+        from dashboard.guerrilla import check_exits
+        ger = check_exits(now_et)
+        if ger:
+            print(f"guerrilla exits: {ger}")
+    except Exception as e:
+        print(f"! guerrilla skipped: {type(e).__name__}: {e}")
     recompute = payload.get("session") in ("pre", "regular", "post") and now_et.minute % 5 == 0
     if recompute:
         try:
@@ -304,6 +314,23 @@ def publish_handler(event, context):
     Returns API-Gateway-v2 response shape."""
     body = _parse_body(event)
     action = body.get("action")
+
+    # 🎯 极度超卖游击战 webhook(TradingView 直发,body 无 action 字段,靠 module
+    # 识别)。TV 不能自定义 header → secret 走 URL query (?key=...);ER_HOOK_SECRET
+    # 未配置 = 模块整体关闭(空key拒一切,与 Alpaca/DeepSeek blank=off 同约定)。
+    # 放在 _audit_click 之前:机器 webhook 不是真人点击,不进点击审计。
+    if body.get("module") == "extreme_reversion":
+        secret = os.environ.get("ER_HOOK_SECRET", "")
+        qs = (event.get("rawQueryString") or "") if isinstance(event, dict) else ""
+        given = ""
+        for part in qs.split("&"):
+            if part.startswith("key="):
+                given = part[4:]
+        if not secret or given != secret:
+            return {"statusCode": 401, "body": json.dumps({"ok": False, "error": "bad key"})}
+        from dashboard import guerrilla
+        return {"statusCode": 200, "body": json.dumps(guerrilla.on_signal(body))}
+
     _audit_click(event, body)      # 👀 记录点击者(IP/UA/设备提示;cron 不记)
     try:
         if action in ("watch_add", "watch_remove"):

@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-22 · [fable] guerrilla-module · 🎯 极度超卖游击战(用户点单"弄吧,放到策略战绩里"):TV Pine webhook 驱动的高危观察模块,零决策权$1000/枪纸面。新 backend/dashboard/guerrilla.py(on_signal:secret→bar_ts幂等去重→24h冷却锁fail-CLOSED→开仓;check_exits:minute%5==4只在有仓时拉1m行情,触stop/target按触发价结算→ledger→平仓武装冷却;epoch为真理全存Supabase防/tmp清空)。路由:Lambda publish_handler 按 body module 识别(TV无自定义header→secret走?key=,空=模块关,不进点击审计)+api.py本地端点。template.yaml ErHookSecret+deploy-aws.yml ER_PARAM。前端/factors新GuerrillaCard(冷却❄️/在场/流水,表缺=不渲染)v2.25.0。假SB全生命周期8项测试过(dedup/冷却拒信/几何校验/结算数学$85.39✓)。⚠️待用户:跑sql/guerrilla_migration.sql + 设ER_HOOK_SECRET(GitHub secret+.env) + TV告警指向Function URL?key=。files: backend/dashboard/guerrilla.py(new), backend/api.py, aws/lambda_handlers.py, aws/template.yaml, .github/workflows/deploy-aws.yml, sql/guerrilla_migration.sql(new,gitignored), frontend/app/_lib/data.ts, frontend/app/factors/page.tsx, frontend/public/version.json, CLAUDE.md
+
 - [done] 2026-07-22 · [fable] mining-r27-streaks · 第二十七轮(用户点单):"连涨几天必大跌/跌一周下周涨"猜想审判——连涨/连跌N天(3/4/5)fwd + 连涨后5日内大跌概率 + 周维度反转(上周负→本周) 预注册;判活须 |t|≥2 且 n≥15 且中位过基线 且对在册 RSI2/特调/5日新低 有增量;做空腿即使显著也只作观察(判死家族不复活) · files: mining.md
 
 - [done] 2026-07-22 · [fable] mining-r26-intrabar · 第二十六轮(用户点单,冻结豁免):Intrabar 画像回测——净delta≥+40%/突破接受判读/绿日+高delta 三个预注册变体的 fwd1/3/5,判活须 |t|≥2 且胜均过基线;过判活也只进观察组不直接当买信号 · files: mining.md

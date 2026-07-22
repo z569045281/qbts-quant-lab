@@ -1059,6 +1059,49 @@ export interface SectorRotation {
   note: string;
 }
 
+/* ── 🎯 极度超卖游击战(TradingView webhook 观察模块,零决策权) ─────────── */
+export interface GuerrillaTrade {
+  ticker: string; entry: number; stop: number; target: number; rr: number;
+  shares?: number; opened_at: string;
+  exit?: number; exit_why?: "stop" | "target"; ret_pct?: number; pnl?: number;
+  closed_at?: string; status: "open" | "closed";
+}
+export interface GuerrillaState {
+  open: GuerrillaTrade[];                                   // 在场仓位(open:* 行)
+  ledger: { trades: GuerrillaTrade[]; n_trades?: number;
+            n_win?: number; realized?: number } | null;     // 已结算流水
+  cooldowns: { ticker: string; until_iso: string; until_epoch: number;
+               reason?: string }[];                          // 冷却中的标的
+}
+
+/** 游击战状态 — 直读 guerrilla_state 表(webhook 驱动,不随每日快照)。
+ *  表不存在/未建 → null(页面不渲染该卡,优雅缺席)。 */
+export async function getGuerrillaState(): Promise<GuerrillaState | null> {
+  try {
+    const { data, error } = await supabase.from("guerrilla_state").select("id,data");
+    if (error || !data) return null;
+    const open: GuerrillaTrade[] = [];
+    const cooldowns: GuerrillaState["cooldowns"] = [];
+    let ledger: GuerrillaState["ledger"] = null;
+    const now = Date.now() / 1000;
+    for (const row of data) {
+      const d = row.data as Record<string, unknown>;
+      if (row.id.startsWith("open:")) open.push(d as unknown as GuerrillaTrade);
+      else if (row.id === "ledger") ledger = d as GuerrillaState["ledger"];
+      else if (row.id.startsWith("cooldown:")) {
+        const until = Number(d.cooldown_until_epoch ?? 0);
+        if (until > now)
+          cooldowns.push({ ticker: row.id.slice(9), until_epoch: until,
+                           until_iso: String(d.cooldown_until_iso ?? ""),
+                           reason: d.armed_reason as string | undefined });
+      }
+    }
+    return { open, ledger, cooldowns };
+  } catch {
+    return null;
+  }
+}
+
 /** Latest challenge state (single 'current' row; null until the bot first pushes). */
 export async function getCryptoChallenge(): Promise<CryptoChallenge | null> {
   const { data, error } = await supabase
