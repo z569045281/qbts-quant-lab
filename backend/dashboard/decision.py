@@ -564,7 +564,44 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
         lessons = journal.get("lessons") or []
         lessons_s = ("\n  ⚠️ 近期错误的教训（认真吸取，避免重蹈覆辙）:\n"
                      + "\n".join(f"    - {x}" for x in lessons)) if lessons else ""
-        parts.append(f"## 你自己的历史决策战绩\n  {acc_s}\n" + "\n".join(rows) + lessons_s)
+
+        # 错过成本对冲(2026-07-22):台账只给模型看✗亏损,却从不展示连续观望期间
+        # 市场走掉的行情——06-15→07-17 21天20次HOLD 眼看 QBTS −37% 的单边段,唯一
+        # 教训条目还是那笔止损过紧的✗空单,负反馈只教"动=亏、不动=安全"。这里把
+        # 连续观望的机会成本和"表态vs行动长期背离"摆到模型眼前,让不作为不再隐形。
+        recs_new = journal["records"]  # newest first
+        inact_s = ""
+        hold_run = []
+        for r in recs_new:
+            if r.get("action") == "HOLD":
+                hold_run.append(r)
+            else:
+                break
+        if len(hold_run) >= 3:
+            p_new, p_old = _num(hold_run[0].get("price")), _num(hold_run[-1].get("price"))
+            if p_new and p_old and p_old > 0:
+                moved = (p_new / p_old - 1) * 100
+                if abs(moved) >= 8:
+                    inact_s += (f"\n  ⚠️ 连续观望成本:你已连续 {len(hold_run)} 个决策日 HOLD,"
+                                f"期间 QBTS 从 ${p_old:.2f} 走到 ${p_new:.2f}"
+                                f"（{moved:+.1f}%）。观望在优势不明时合法,但连续观望期间"
+                                f"市场走出单边行情=你的门槛可能设错了。这不是催你交易——"
+                                f"是要求你今天在 summary 里正面回答:这段行情为什么不值得参与?")
+        bc_run = []
+        for r in recs_new:
+            bc = r.get("bold_call_5d")
+            if bc and bc == (recs_new[0].get("bold_call_5d") or None) and r.get("action") == "HOLD":
+                bc_run.append(bc)
+            else:
+                break
+        if len(bc_run) >= 3:
+            dir_cn = "跌" if bc_run[0] == "down" else "涨"
+            inact_s += (f"\n  ⚠️ 表态与行动背离:你已连续 {len(bc_run)} 天押注「{dir_cn}」"
+                        f"却全部 HOLD。若方向证据真实存在且持续,解释为什么它够你表态"
+                        f"却不够你下一张小仓位战术单(规则9的5-6档就是为这种场景设的);"
+                        f"若证据其实不足,就把 p_up_5d 老实拉回 0.50 附近。长期骑墙="
+                        f"系统只敢看不敢做,台账正在记录这个背离。")
+        parts.append(f"## 你自己的历史决策战绩\n  {acc_s}\n" + "\n".join(rows) + lessons_s + inact_s)
 
     # ── 宏观日历（CPI/PPI/FOMC 等）──────────────────────────
     macro = snapshot.get("macro")
