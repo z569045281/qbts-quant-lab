@@ -816,13 +816,32 @@ def _sanitize_decision(decision: dict, snapshot: dict, extras: dict | None) -> d
         valid = (stop < entry < target) if action == "LONG_QBTX" else (target < entry < stop)
     decision["plan_valid"] = bool(valid)
 
+    # Regime-floor the stop distance — 2026-06-25 SHORT_QBTZ post-mortem: regime
+    # said "expansion, 87th pctl, stops need ≥1.5×ATR" in the SAME day's prompt,
+    # but the model's numeric stop came in at only ~1.03×ATR and got whipsawed out
+    # 2 days later (-10.4%) right before the thesis played out to target. Prose
+    # guidance in the prompt is not self-enforcing — widen the stop in code so a
+    # regime-violating stop can't silently ride through.
+    qbts_now, qbtx_now, qbtz_now = _anchor_prices(snapshot, extras)
+    if valid:
+        reg = snapshot.get("regime") or {}
+        atr_pct = _num(reg.get("atr_pct"))
+        if atr_pct and qbts_now:
+            min_mult = 1.5 if reg.get("regime") == "expansion" else 1.0
+            floor_dist = min_mult * atr_pct * qbts_now
+            cur_dist = abs(entry - stop)
+            if cur_dist < floor_dist:
+                widened = round(entry - floor_dist, 2) if action == "LONG_QBTX" else round(entry + floor_dist, 2)
+                logger.info(
+                    f"stop widened to regime floor: {stop} -> {widened} "
+                    f"(regime={reg.get('regime')}, {min_mult}x ATR14={atr_pct*qbts_now:.2f})")
+                stop = widened
+                tp["qbts_stop"] = stop
+
     # R:R from the levels (2× leverage cancels, so QBTS R:R == ETF R:R)
     if valid:
         risk, reward = abs(entry - stop), abs(target - entry)
         tp["rr_ratio"] = round(reward / risk, 2) if risk > 1e-9 else None
-
-    # Deterministic ETF prices from the REAL current ETF quote.
-    qbts_now, qbtx_now, qbtz_now = _anchor_prices(snapshot, extras)
     if action == "LONG_QBTX":
         tp["etf_ticker"], etf_now, sign = "QBTX", qbtx_now, +1
     else:

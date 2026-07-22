@@ -270,6 +270,27 @@ Mistakes worth not repeating — when you learn one, add a dated bullet here.
   but an easy misread as "this old level is a current reference." Fixed by
   prefixing the sweep's own event date in the note string.
 
+- **2026-07-22 · Prose risk guidance in an LLM prompt is not self-enforcing —
+  a numeric rule needs a code-level guardrail, not just a sentence.** User
+  challenged why the decision journal was 20/21 days HOLD while QBTZ ran
+  $3.54→$6.81 (+92%, 06-15→07-17). Traced the one real attempt (06-25
+  SHORT_QBTZ, conviction 6): `regime.py` had already classified that exact day
+  as `expansion` (87th ATR percentile) and its `stop_hint` text — sitting right
+  in that day's prompt — said stops need "≥1.5×ATR". The model's actual numeric
+  stop came in at only ~1.03×ATR ($2.65 vs ATR14=$2.58), got whipsawed out 2
+  days later (−10.45%) on a bounce that only reached $24.26, then QBTS fell all
+  the way to the $18.66 target anyway — a 1.5×ATR stop ($25.42) would have
+  survived the whipsaw and turned a losing trade into a winner. Fixed in
+  `decision.py::_sanitize_decision`: after the model returns entry/stop/target,
+  compute the regime-implied floor (`1.5×ATR14` if `regime=="expansion"` else
+  `1.0×ATR14`, using that day's real `atr_pct`×price) and widen the stop in code
+  if the model's number is tighter than the floor — verified against the exact
+  06-25 numbers plus synthetic already-wide/normal-regime-too-tight cases.
+  **Corollary: any time a prompt tells the model "your number must satisfy rule
+  X," check whether X is actually enforced afterward — if it's just descriptive
+  text, the model can and will ignore it under pressure (a fat R:R, a confident
+  thesis), and the fix belongs in code, not in stronger wording.**
+
 - **2026-06-24 · Verify market facts live, never from training memory.** I claimed
   "SpaceX is private / can't be bought"; it had IPO'd as **NASDAQ: SPCX** after my
   knowledge cutoff. For ANY current market fact (is X listed? its ticker / price /
