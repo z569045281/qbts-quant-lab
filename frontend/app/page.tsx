@@ -12,10 +12,11 @@ import { fmtLocalDateTime, parseUtc, etMelbSuffix, epochMelbTime, macroSurprise 
 import versionData from "../public/version.json";
 
 const SESSION_BADGE: Record<LiveQuote["session"], { label: string; cls: string }> = {
-  pre:     { label: "盘前", cls: "bg-amber-100 text-amber-700"   },
-  regular: { label: "盘中", cls: "bg-emerald-100 text-emerald-700" },
-  post:    { label: "盘后", cls: "bg-violet-100 text-violet-700" },
-  closed:  { label: "已收盘", cls: "bg-gray-100 text-gray-500"   },
+  pre:       { label: "盘前", cls: "bg-amber-100 text-amber-700"   },
+  regular:   { label: "盘中", cls: "bg-emerald-100 text-emerald-700" },
+  post:      { label: "盘后", cls: "bg-violet-100 text-violet-700" },
+  overnight: { label: "🌙 夜盘", cls: "bg-indigo-100 text-indigo-700" },
+  closed:    { label: "已收盘", cls: "bg-gray-100 text-gray-500"   },
 };
 
 /* ─────────────────────────────────────────────────────────────────────────

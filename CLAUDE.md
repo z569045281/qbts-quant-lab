@@ -77,6 +77,20 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
   `end=today+1d` so the current (live partial) or just-closed session is included; with a
   bare `end=today` an AEST user (ahead of US) sees `as_of` a session stale until UTC
   midnight. During a live US session `as_of` is the current date with a *partial* daily bar.
+- **🌙 夜盘(Blue Ocean overnight)行情**(`quote_pusher.py::fetch_overnight`, 2026-07-22):
+  yfinance 的 `prepost` 只覆盖到盘后 20:00 ET,**夜盘(20:00–04:00 ET)yfinance 全盲**——
+  用户在 moomoo 夜盘下单时仪表盘曾整段变黑。补法用的是**已部署的 `ALPACA_*` key**、
+  Alpaca 数据 API 的 **`feed=overnight`**(免费档即可拿实时 Blue Ocean 成交/盘口;`feed=sip`/
+  `feed=boats` 都 403 需订阅,不用它俩)。`build_payload` 仅在 `us_session()==closed` 且
+  `_overnight_window()`(Sun–Thu 20:00+ / Mon–Fri 00:00–03:59)时才打 Alpaca,以 QBTS 最新
+  mark ≤20min 判定夜盘活跃(否则假日夜/周六退回昨收)→ `session="overnight"`。**价格取
+  bid/ask 中点、不是最后成交**:夜盘薄,成交稀疏,QBTZ 实测印过 19h 前的 $6.49 陈价而其
+  live 盘口中点 $5.83 才对(=2× 反推的 implied 也是 5.84)。QuoteFunction 的调度**原来只有
+  04:00–19:59 MON-FRI + 周日晚 BTC**,夜盘窗根本不跑 → `template.yaml` 新增 `OvernightEvening`
+  (`cron(* 20-23 ? * MON-THU *)`)+ `OvernightMorning`(`cron(* 0-3 ? * MON-FRI *)`)补满整个
+  夜盘窗。夜盘价**只做展示,不驱动信号**(薄流动性 UNPROVEN);`challenge2` 已自门控在
+  09:30–16:00,夜盘不会误交易。前端 `SESSION_BADGE.overnight`「🌙 夜盘」徽章 + `LiveQuoteEntry`
+  加 `ov_age_s/ov_bid/ov_ask/ov_trade`。
 - **Secrets**: `ANTHROPIC_API_KEY` / `SUPABASE_SECRET_KEY` / `ALPACA_*` live in root `.env`
   (gitignored). Supabase **secret** key (`sb_secret_…`) is write-capable — local/CI only;
   the **publishable** key is safe-public read-only. Repo is public. **Both `.env` AND

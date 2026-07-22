@@ -23,9 +23,10 @@ import os
 import sys
 import time
 import warnings
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
+import requests
 from dotenv import load_dotenv
 
 warnings.filterwarnings("ignore")
@@ -33,6 +34,14 @@ load_dotenv()
 
 ET = ZoneInfo("America/New_York")
 TICKERS = ["QBTS", "QBTX", "QBTZ"]
+
+# 🌙 Blue Ocean 夜盘:yfinance 的 prepost 只到盘后 20:00 ET,夜盘(20:00–04:00 ET)
+# 全盲——这正是用户在 moomoo 夜盘下单时仪表盘变黑的盲区。Alpaca 的 `overnight`
+# feed(免费档即可,key 已部署)吐 Blue Ocean 实时成交/盘口。以 QBTS 最新成交的
+# 新鲜度判定"夜盘此刻是否真的在交易"——≤此秒数内有成交才算活跃,否则(假日夜/
+# 周六)退回昨收显示,不硬套时钟窗。
+_ALPACA_DATA = "https://data.alpaca.markets/v2/stocks"
+_OVERNIGHT_FRESH_S = 20 * 60
 
 
 def us_session(now_et: datetime) -> str:
@@ -47,6 +56,66 @@ def us_session(now_et: datetime) -> str:
     if 16 * 60 <= hm < 20 * 60:
         return "post"
     return "closed"
+
+
+def _overnight_window(now_et: datetime) -> bool:
+    """Cheap clock gate for the Blue Ocean overnight session, so we only hit
+    Alpaca when it's plausibly trading (never Sat / mid-day). Evening leg =
+    Sun–Thu 20:00–23:59; morning leg = Mon–Fri 00:00–03:59 (tail of Sun–Thu
+    nights). The freshness check is the real authority — this just avoids waste."""
+    wd, h = now_et.weekday(), now_et.hour   # Mon=0 … Sun=6
+    if h >= 20 and wd in (6, 0, 1, 2, 3):   # evening leg (Sun–Thu nights)
+        return True
+    if h < 4 and wd in (0, 1, 2, 3, 4):     # morning leg (Mon–Fri)
+        return True
+    return False
+
+
+def _alpaca_headers() -> "dict | None":
+    k, s = os.getenv("ALPACA_API_KEY"), os.getenv("ALPACA_SECRET_KEY")
+    return {"APCA-API-KEY-ID": k, "APCA-API-SECRET-KEY": s} if k and s else None
+
+
+def _age_s(iso_ts: str) -> float:
+    try:
+        tt = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
+        return (datetime.now(timezone.utc) - tt).total_seconds()
+    except Exception:
+        return 1e9
+
+
+def fetch_overnight(symbol: str, headers: dict) -> "dict | None":
+    """Blue Ocean overnight mark via Alpaca `overnight` feed. Returns
+    {price, bar_time, ov_bid?, ov_ask?, ov_trade?} or None.
+
+    Price = bid/ask MIDPOINT when a two-sided quote exists, else the last trade.
+    Overnight is thin: quotes refresh continuously but trades are sparse, so the
+    last *trade* can be many hours stale (QBTZ printed 19h-old $6.49 while its
+    live quote midpoint was $5.83). The NBBO midpoint is the honest current mark;
+    `bar_time` tracks whichever source set the price so freshness stays truthful."""
+    try:
+        q = (requests.get(f"{_ALPACA_DATA}/{symbol}/quotes/latest", headers=headers,
+                          params={"feed": "overnight"}, timeout=10).json().get("quote") or {})
+        bid, ask, q_ts = q.get("bp"), q.get("ap"), q.get("t")
+        tr = (requests.get(f"{_ALPACA_DATA}/{symbol}/trades/latest", headers=headers,
+                           params={"feed": "overnight"}, timeout=10).json().get("trade") or {})
+        tp, t_ts = tr.get("p"), tr.get("t")
+
+        out: dict = {}
+        if bid and ask and q_ts:
+            out["ov_bid"], out["ov_ask"] = round(float(bid), 4), round(float(ask), 4)
+            out["price"] = round((float(bid) + float(ask)) / 2, 4)
+            out["bar_time"] = q_ts
+            if tp is not None:
+                out["ov_trade"] = round(float(tp), 4)
+        elif tp is not None and t_ts:
+            out["price"] = round(float(tp), 4)
+            out["bar_time"] = t_ts
+        else:
+            return None
+        return out
+    except Exception:
+        return None
 
 
 def fetch_quote(symbol: str) -> dict | None:
@@ -83,11 +152,36 @@ def fetch_quote(symbol: str) -> dict | None:
 
 def build_payload() -> dict:
     now_et = datetime.now(ET)
+    session = us_session(now_et)
     quotes = {}
     for sym in TICKERS:
         q = fetch_quote(sym)
         if q:
             quotes[sym.lower()] = q
+
+    # 🌙 夜盘覆盖:常规/盘前后 yfinance(prepost)已够;仅当 yfinance 收工(closed)
+    # 且时钟在夜盘窗内,才用 Alpaca overnight feed 覆盖实时价。以 QBTS 最新成交
+    # ≤_OVERNIGHT_FRESH_S 判定夜盘活跃;prev_close 仍取 yfinance(上一常规收盘),
+    # 夜盘涨跌据此重算。QBTX/QBTZ 成交稀疏,拿到就覆盖、拿不到保留昨收(各带 ov_age_s)。
+    if session == "closed" and _overnight_window(now_et):
+        headers = _alpaca_headers()
+        qbts_ov = fetch_overnight("QBTS", headers) if headers else None
+        if qbts_ov and _age_s(qbts_ov["bar_time"]) <= _OVERNIGHT_FRESH_S:
+            session = "overnight"
+            for sym in TICKERS:
+                ov = qbts_ov if sym == "QBTS" else fetch_overnight(sym, headers)
+                q = quotes.get(sym.lower())
+                if not ov or not q:
+                    continue
+                q["price"] = ov["price"]
+                q["bar_time"] = ov["bar_time"]
+                q["ov_age_s"] = int(_age_s(ov["bar_time"]))
+                for k in ("ov_bid", "ov_ask"):
+                    if k in ov:
+                        q[k] = ov[k]
+                pc = q.get("prev_close")
+                q["change_pct"] = round(q["price"] / pc - 1, 6) if pc else None
+
     # 杠杆腿隐含公允价:QBTZ/QBTX 薄流动性,最后成交价常偏离 2× 换算(实测
     # 07-09 收盘差 0.66pp,是真实贴价偏离而非 prev_close 口径问题)。给下游一个
     # 干净基准:implied_px = 自身上一收盘 × (1 + 杠杆 × QBTS涨跌),premium_pct
@@ -102,7 +196,7 @@ def build_payload() -> dict:
                 if q.get("price") and fair:
                     q["premium_pct"] = round(q["price"] / fair - 1, 6)
     return {
-        "session":    us_session(now_et),
+        "session":    session,
         "asof_et":    now_et.strftime("%Y-%m-%d %H:%M:%S"),
         "asof_epoch": int(time.time()),
         "quotes":     quotes,
@@ -152,8 +246,9 @@ def main() -> None:
 
         if once:
             break
-        session = us_session(datetime.now(ET))
-        time.sleep(60 if session != "closed" else 600)
+        # overnight counts as "live" → 60s; only truly closed (Sat/holiday) idles at 600s
+        sess = p.get("session", "closed")
+        time.sleep(60 if sess != "closed" else 600)
 
 
 if __name__ == "__main__":

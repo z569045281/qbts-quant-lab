@@ -141,10 +141,27 @@ Resources:
           Properties:
             # 周日 20:00 ET = 美股夜盘开门 = BTC 周日 UTC 线定案 → 周末BTC信号
             # 最早可推时刻(墨尔本周一上午 ~10 点)。分钟取 1/10 避开 %5==0
-            # 的 SMC 重算分支。
+            # 的 SMC 重算分支。(周日夜盘报价也顺带每 10 分钟刷新一次。)
             ScheduleExpression: "cron(1/10 20-23 ? * SUN *)"
             ScheduleExpressionTimezone: America/New_York
             Description: Weekend-BTC signal at US overnight-session open (Sun 20:00 ET).
+        OvernightEvening:
+          Type: ScheduleV2
+          Properties:
+            # 🌙 Blue Ocean 夜盘(晚场):Mon-Thu 20:00-23:59 ET,每分钟推夜盘实时价
+            # (Alpaca overnight feed)。补上用户在 moomoo 夜盘下单时仪表盘变黑的盲区。
+            # 周日晚由 SundayNightBtc(每10分钟)覆盖,故此处只列 MON-THU 不重叠。
+            ScheduleExpression: "cron(* 20-23 ? * MON-THU *)"
+            ScheduleExpressionTimezone: America/New_York
+            Description: Overnight (Blue Ocean) live quotes — evening leg (Mon-Thu 20:00 ET).
+        OvernightMorning:
+          Type: ScheduleV2
+          Properties:
+            # 🌙 Blue Ocean 夜盘(晨场尾):Mon-Fri 00:00-03:59 ET —— Sun-Thu 各夜的延续,
+            # 接在 04:00 起的 MarketHoursEveryMinute(盘前)之前,填满整个夜盘窗。
+            ScheduleExpression: "cron(* 0-3 ? * MON-FRI *)"
+            ScheduleExpressionTimezone: America/New_York
+            Description: Overnight (Blue Ocean) live quotes — early-morning leg (Mon-Fri 00:00-03:59 ET).
 
 Outputs:
   PublishUrl:

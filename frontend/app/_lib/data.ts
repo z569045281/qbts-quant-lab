@@ -654,9 +654,15 @@ export interface LiveQuoteEntry {
   prev_close: number | null;
   change_pct: number | null;
   bar_time:   string | null;
+  // 🌙 夜盘(Blue Ocean via Alpaca overnight feed):mark = 盘口中点(薄市里比稀疏
+  // 的最后成交诚实),ov_age_s = 该 mark 的新鲜度秒数,ov_trade = 最后成交(仅参考)
+  ov_age_s?:  number;
+  ov_bid?:    number;
+  ov_ask?:    number;
+  ov_trade?:  number;
 }
 export interface LiveQuote {
-  session:    "closed" | "pre" | "regular" | "post";
+  session:    "closed" | "pre" | "regular" | "post" | "overnight";
   asof_et:    string;
   asof_epoch: number;
   quotes:     Partial<Record<"qbts" | "qbtx" | "qbtz", LiveQuoteEntry>>;
