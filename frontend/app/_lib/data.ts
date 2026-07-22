@@ -139,6 +139,7 @@ export interface Snapshot {
     note:            string;
   } | null;
   journal?: DecisionJournal | null;
+  waiting_for?: WaitingFor | null;   // 「今天在等什么」六扳机卡
 }
 
 /* ── SMC (smart money concepts) structural read ─────────────────────────── */
@@ -410,6 +411,23 @@ export interface DecisionJournal {
   n_hold_correct?: number;
   hold_accuracy?:  number | null;
   lessons:   string[];
+}
+
+// 「今天在等什么」:六个一级扳机的距触发读数(纯展示,不进决策权重)
+export interface WaitingTrigger {
+  key:     string;
+  name:    string;
+  record:  string;           // 回测战绩标签
+  fired:   boolean | null;   // null = 今天不适用(如周末BTC非周一)
+  reading: string;
+  hint:    string;
+  aux?:    boolean;          // 辅助腿:只加信心不独立开枪
+}
+export interface WaitingFor {
+  gate: { regime: string | null; note: string | null };
+  triggers: WaitingTrigger[];
+  n_fired: number;
+  summary: string;
 }
 
 export interface MacroEvent {

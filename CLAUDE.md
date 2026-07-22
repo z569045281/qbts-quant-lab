@@ -413,6 +413,13 @@ Frontend tabs (`frontend/app/`): **🎯 决策仪表盘** (`/`) · **🔭 自选
   gate warns until ≥30 graded calls. Standing guidance given to the user: **don't size up
   real money until the track record shows an edge.** Treat the whole thing as a measurement
   tool for now; the next optimization should be driven by the accumulated results.
+- **⏳「今天在等什么」卡(2026-07-22 用户:"天天观望,我都不知道在等什么")**:
+  `backend/dashboard/waiting_for.py::build_waiting_card` — 六个一级扳机(特调抄底/
+  RSI2超卖/同行落后追赶/周末BTC/相对估值z40/crypto顺风辅助腿)的当前读数+距触发
+  距离,纯展示复用 snapshot 现成读数(champs.today/relative_strength/btc_weekend/
+  market_light),零新拉取、不进决策权重。api.py `payload["waiting_for"]` → 决策页
+  历史战绩卡上方。HOLD 的真实含义 = 这六个扳机没扣,卡片让等待可见(如"特调蹲守:
+  收盘≥$18.16 即触发")。阈值与 decision.py B级清单一一对应,改扳机记得两处同步。
 - **HOLD 判读入台账(2026-07-22 用户拍板"大波动日观望=错的,就是亏钱")**:
   `journal.grade_pending` 给 HOLD 记录也打 `correct` —— 决策覆盖日 |QBTS| ≥3% →
   `correct=False` 漏判 ✗(带 `day0_ret_pct`,漏判也生成 Haiku 反思)。口径**完全复用**

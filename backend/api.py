@@ -1086,6 +1086,14 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["journal"]        = journal
     payload["user_positions"] = user_positions
     payload["strategy_replay"] = strategy_replay
+    # 「今天在等什么」卡:六个一级扳机的距触发读数(纯展示,复用上面已算好的
+    # champs/rel_strength/btc_weekend/market_light,零新拉取,不进决策权重)
+    try:
+        from dashboard.waiting_for import build_waiting_card
+        payload["waiting_for"] = build_waiting_card(df_d, payload)
+    except Exception as e:
+        logger.warning(f"waiting_for failed: {e}")
+        payload["waiting_for"] = None
 
     # ── Source status map: tells the UI which signals are active/inactive/error
     # so the user knows when something needs setup (e.g. Reddit OAuth missing). ─

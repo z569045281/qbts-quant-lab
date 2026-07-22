@@ -1095,6 +1095,44 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* ⏳ 今天在等什么 — 六个一级扳机的距触发读数(HOLD 不再是黑箱) */}
+        {snap.waiting_for && (
+          <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+                ⏳ 今天在等什么
+              </span>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                snap.waiting_for.n_fired > 0 ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                {snap.waiting_for.n_fired > 0 ? `🟢 ${snap.waiting_for.n_fired} 个扳机已触发` : "全部待触发"}
+              </span>
+            </div>
+            <p className="text-[11px] text-gray-400 mb-3">{snap.waiting_for.summary}
+              {snap.waiting_for.gate?.regime === "risk_off" && (
+                <span className="text-[#F03A3E] font-medium"> · ⚠️ 大盘 risk-off:即使扳机触发也降档</span>
+              )}
+            </p>
+            <div className="space-y-2">
+              {snap.waiting_for.triggers.map(t => (
+                <div key={t.key} className={`rounded-lg px-3 py-2 border ${
+                  t.fired ? "border-emerald-200 bg-emerald-50/60"
+                  : t.fired === null ? "border-[#F0F0F2] bg-[#FAFAFB] opacity-60" : "border-[#F0F0F2]"}`}>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span>{t.fired ? "🟢" : t.fired === null ? "⏸" : "⚪"}</span>
+                    <span className="font-semibold text-gray-800">{t.name}</span>
+                    <span className="text-[10px] text-gray-400">{t.record}</span>
+                    <span className="ml-auto font-mono text-[11px] text-[#525461]">{t.reading}</span>
+                  </div>
+                  <div className={`mt-1 text-[11px] leading-snug ${
+                    t.fired ? "text-emerald-700 font-medium" : "text-gray-500"}`}>
+                    {t.hint}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 历史战绩 */}
         <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
           <div className="flex items-center justify-between mb-3">
