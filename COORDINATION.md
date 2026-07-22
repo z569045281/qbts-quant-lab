@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-22 · [fable] mining-r27-streaks · 第二十七轮(用户点单):"连涨几天必大跌/跌一周下周涨"猜想审判——连涨/连跌N天(3/4/5)fwd + 连涨后5日内大跌概率 + 周维度反转(上周负→本周) 预注册;判活须 |t|≥2 且 n≥15 且中位过基线 且对在册 RSI2/特调/5日新低 有增量;做空腿即使显著也只作观察(判死家族不复活) · files: mining.md
+
 - [done] 2026-07-22 · [fable] mining-r26-intrabar · 第二十六轮(用户点单,冻结豁免):Intrabar 画像回测——净delta≥+40%/突破接受判读/绿日+高delta 三个预注册变体的 fwd1/3/5,判活须 |t|≥2 且胜均过基线;过判活也只进观察组不直接当买信号 · files: mining.md
 
 - [done] 2026-07-22 · [fable] selfcheck-0722b · AI自检07-22第二批四查:①期权"数据缺失"=Yahoo把全链OI置0(OCC断供,volume正常,实测3到期日vol全有OI全0)→options.py 加降级口径:OI断供时退回纯PCR_vol读数(权重压0.10/confidence low/口径诚实标注"仅当日量能"),不再整体拉黑②财报日期未获取=预期中的时序(用户昨晚才跑迁移,晚于周二publish)→本地跑sync_earnings_dates验证+预播种成功(下次财报2026-08-06,15天后),今日09:00 ET publish自愈③挑战"equity+pnl≠sleeve_start差271.26"=Haiku自创错误恒等式且算术都错(真恒等式pnl=equity−sleeve_start分毫不差)→确定性代数下沉规则层(_check_challenge加|pnl−(equity−start)|>1检查,同07-16跨页价格教训),digest加pos_value直给持仓市值,prompt明文禁止自创公式④13F滞后113天建议缩短间隔=拒绝:13F按SEC法规季度申报,数据不存在没法更频繁拉;衰减到零正是07-13修复在正常工作(拦住18%命中的假日频看多信号),Q2申报窗8/14截止后自然更新。files: backend/dashboard/options.py, backend/dashboard/selfcheck.py
