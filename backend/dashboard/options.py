@@ -85,12 +85,32 @@ def _fetch_options_summary(ticker: str = "QBTS") -> dict:
 
 def _signal_from_summary(s: dict) -> dict:
     """Convert raw OI/vol numbers into BUY/SELL/HOLD + rationale + log-odds magnitude."""
-    if not s or (s.get("call_oi", 0) + s.get("put_oi", 0)) == 0:
+    if not s or (s.get("call_vol", 0) + s.get("put_vol", 0)
+                 + s.get("call_oi", 0) + s.get("put_oi", 0)) == 0:
         return {
             "signal": 0, "label": "HOLD", "confidence": "low",
             "log_odds_magnitude": 0.0,
             "rationale": "期权链数据缺失",
             "snapshot": s,
+        }
+
+    if (s.get("call_oi", 0) + s.get("put_oi", 0)) == 0:
+        # Yahoo 间歇性把全链 openInterest 置 0(OI 来自 OCC 每日更新,Yahoo 时常断供)
+        # 而 volume 正常 —— 2026-07-22 实测 3 个到期日 call_vol 7388/put_vol 3331 全有、
+        # OI 全 0。全拉黑会让自检天天报"期权数据缺失",实际当日量能口径仍有信息:
+        # 退回纯 PCR_vol 读数,权重压到 0.10、confidence=low,口径诚实标注。
+        pcr_vol = s["put_vol"] / max(s["call_vol"], 1)
+        signal, mag, note = 0, 0.0, "中性"
+        if pcr_vol > 1.5:
+            signal, mag, note = 1, 0.10, "put 流极端,反向偏多"
+        elif pcr_vol < 0.35:
+            signal, mag, note = -1, 0.10, "call 追逐极端,反向偏空"
+        return {
+            "signal": signal, "label": {1: "BUY", -1: "SELL", 0: "HOLD"}[signal],
+            "confidence": "low", "log_odds_magnitude": mag,
+            "rationale": (f"OI 断供(Yahoo)·仅当日量能口径:PCR_vol={pcr_vol:.2f}（{note}）"
+                          f"— churn/持仓类读数不可用"),
+            "snapshot": {**s, "pcr_vol": round(pcr_vol, 3), "oi_missing": True},
         }
 
     call_oi  = max(s["call_oi"], 1)

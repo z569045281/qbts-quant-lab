@@ -145,6 +145,15 @@ def _check_challenge(ch: dict | None) -> list[dict]:
     if (floor is not None and isinstance(eq, (int, float)) and eq < floor
             and ch.get("status") not in ("halted", "stopped")):
         out.append(_issue("数据问题", f"equity ${eq:.0f} 已破 floor ${floor} 但状态未停手"))
+    # 账本真恒等式(规则层,2026-07-22):pnl == equity − sleeve_start(始终成立,
+    # 无论持仓与否)。07-22 Haiku 自创了 equity+pnl==sleeve_start 的错公式并误报
+    # "未入账手续费"——确定性代数下沉规则层(同 07-16 跨页价格教训),LLM 不再管这条。
+    pnl, start = ch.get("pnl"), ch.get("sleeve_start")
+    if all(isinstance(v, (int, float)) for v in (eq, pnl, start)):
+        if abs(pnl - (eq - start)) > 1.0:
+            out.append(_issue("数据问题",
+                              f"pnl({pnl:.2f}) ≠ equity({eq:.2f}) − sleeve_start({start:.0f})"
+                              f",差 {abs(pnl - (eq - start)):.2f} —— 台账恒等式被破坏"))
     curve = ch.get("equity_curve") or []
     if curve:
         last = curve[-1]
@@ -204,8 +213,10 @@ _AI_PROMPT = """你是量化交易仪表盘的数据质检员。下面是六个�
   generated_at 晚于/跨日于 as_of 完全正常。
 - catalyst_asof = 事件日历上次人工复核的日期,静态字段,30 天内都正常(有独立守卫)。
 - 不同数据源的同一价格允许 ±0.1% 的舍入/时点差,不算矛盾。
-- challenge: in_position=false(空仓)时 equity==sleeve_cash 是恒等式,pnl<0 只是已实现
-  亏损(equity−sleeve_start),不是"持仓价值未计入"。
+- challenge 的恒等式只有两条,不许自创别的公式(07-22 曾自创 equity+pnl==sleeve_start
+  误报"未入账手续费"):① pnl == equity − sleeve_start(永远成立,规则层已自动检查,
+  你不用管)② 空仓时 equity == sleeve_cash;持仓时 equity == sleeve_cash + pos_value
+  (pos_value 是持仓市值,digest 已直接给出)。pnl<0 只是浮亏/已实现亏损,不是数据矛盾。
 
 只报你能说出【具体伤害】的矛盾。该报的例子:同一 ticker 在两个页面价格相差 >2%;
 交易记录买入日期晚于卖出日期;负价格/胜率>100%/权重合计明显≠100;标记在场但敞口为 0;
@@ -255,6 +266,12 @@ def _digest(snap: dict, scan, dca, ch, sx, known: dict) -> str:
                              # 空仓事实必须显式给出:缺它时 equity==cash+pnl<0 被误判
                              # "持仓未计入"(07-20 误报——空仓+已实现亏损本是正常状态)
                              "in_position": bool(ch.get("position")),
+                             # 持仓市值直接给出,免得 LLM 拿 equity/cash 自创代数
+                             "pos_value": (_f(ch["equity"] - ch["sleeve_cash"])
+                                           if ch.get("position") and
+                                           all(isinstance(ch.get(k), (int, float))
+                                               for k in ("equity", "sleeve_cash"))
+                                           else None),
                              "sleeve_start": _f(ch.get("sleeve_start")),
                              "cooldown_date": ch.get("cooldown_date"),
                              "status": ch.get("status"),
