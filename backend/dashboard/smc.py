@@ -167,17 +167,21 @@ def find_sweeps(df: pd.DataFrame, swing_highs: list[dict], swing_lows: list[dict
     n = len(df)
     h, l, c = df["high"].values, df["low"].values, df["close"].values
     for i in range(max(0, n - window), n):
+        ev_date = df.index[i].strftime("%m-%d")
         for s in swing_lows:
             if s["i"] < i - 1 and l[i] < s["price"] and c[i] > s["price"]:
+                # note 里显式带上"扫单当天"日期(ev_date),不能只写被扫旧低/高点的日期
+                # (s['date'] 可能是几个月前)——2026-07-22 AI 自检把旧低/高点误读成
+                # "近期事件"就是栽在这句只字面写着旧日期上,补一句消歧义。
                 out.append({"dir": "bullish", "level": round(s["price"], 2),
-                            "date": df.index[i].strftime("%m-%d"),
-                            "note": f"扫过 {s['date']} 低点 ${s['price']:.2f} 后收回 — 空头流动性被收割"})
+                            "date": ev_date,
+                            "note": f"{ev_date} 扫过 {s['date']} 低点 ${s['price']:.2f} 后收回 — 空头流动性被收割"})
                 break
         for s in swing_highs:
             if s["i"] < i - 1 and h[i] > s["price"] and c[i] < s["price"]:
                 out.append({"dir": "bearish", "level": round(s["price"], 2),
-                            "date": df.index[i].strftime("%m-%d"),
-                            "note": f"扫过 {s['date']} 高点 ${s['price']:.2f} 后回落 — 多头流动性被收割"})
+                            "date": ev_date,
+                            "note": f"{ev_date} 扫过 {s['date']} 高点 ${s['price']:.2f} 后回落 — 多头流动性被收割"})
                 break
     # 价格在同一被扫价位附近连续多日反复插针时,每根 bar 都会重报同一事件
     # (实例:24.04 三天报三次)。同 (方向,价位) 只保留最新一次。

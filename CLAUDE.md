@@ -250,6 +250,26 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
 
 Mistakes worth not repeating — when you learn one, add a dated bullet here.
 
+- **2026-07-22 · A "分代记账" tag written at log time is worthless until something
+  actually reads it at grading time.** `calibration.py::log_prediction` started
+  tagging `model:"v2"` on 2026-07-17 with the comment "校准/审判按代际分开" — but
+  `grade_predictions()` never once checked that field; it graded all 27 logged
+  predictions (24 dead v1 + 3 live v2) as one blended pool. The AI self-check cited
+  "25条23%命中率" as if it were v2's live track record and suggested flipping the
+  model to inverse-weighted NOW instead of waiting for 8/15 — that number was
+  **100% v1's already-known 21% zombie data**; the true v2 sample was 1 gradable
+  prediction (partial horizon), nowhere near a real track record. Fixed by making
+  `grade_predictions(model="v2")` the default (filters `r.get("model","v1")`),
+  with the v1 legacy stat kept visible in `audit.py`'s report for context, not
+  blended into the live judgment. **Corollary: whenever you add a generation/version
+  tag to stop old data from contaminating a metric, grep every reader of that data
+  store in the same change — a tag nobody filters on is decoration, not a fix.**
+  Also caught same session: `smc.py::find_sweeps`'s note text embedded only the
+  OLD swept swing-level's date ("扫过 03-25 高点…"), never the recent date the
+  sweep itself occurred on — technically correct (the event date field was right)
+  but an easy misread as "this old level is a current reference." Fixed by
+  prefixing the sweep's own event date in the note string.
+
 - **2026-06-24 · Verify market facts live, never from training memory.** I claimed
   "SpaceX is private / can't be bought"; it had IPO'd as **NASDAQ: SPCX** after my
   knowledge cutoff. For ANY current market fact (is X listed? its ticker / price /

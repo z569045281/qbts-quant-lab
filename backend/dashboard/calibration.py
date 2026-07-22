@@ -150,21 +150,25 @@ def _load_predictions() -> list[dict]:
     return out
 
 
-def grade_predictions(price_df: pd.DataFrame, horizon: int = _HORIZON_DAYS) -> dict:
+def grade_predictions(price_df: pd.DataFrame, horizon: int = _HORIZON_DAYS,
+                      model: "str | None" = "v2") -> dict:
     """
     Grade all logged predictions against realized N-bar forward returns.
     price_df: DataFrame with DatetimeIndex and 'close' column.
 
-    Returns:
-        {
-          "n_total": total predictions logged,
-          "n_graded": predictions with N-bar data available,
-          "overall_hit_rate": fraction directionally correct,
-          "calibration":   list of (predicted_p_up_bucket, realized_hit_rate),
-          "by_source":    {source: {n: int, hits: int, hit_rate: float, weight_mult: float}},
-        }
+    model: only grade predictions logged under this generation tag (default
+    "v2"). log_prediction() has tagged records by generation since 07-17
+    ("v2 起分代记账,审判按代际分开"见其注释) but this function never actually
+    read the tag — every call silently blended pre-07-17 v1 predictions in
+    with v2's, so any "overall_hit_rate" reported was really v1's already-known
+    21% zombie score, not v2's (2026-07-22 AI 自检抓到:引用的"25条23%命中"
+    实测 24/27 条 model 字段缺失即 v1,仅 3 条真 v2 且全部因 07-17 起才打标、未满
+    5 交易日无法评判——v2 真实 n_graded 目前是 0,不是 25)。Pass model=None to get
+    the old unfiltered/blended view (debugging only).
     """
     preds = _load_predictions()
+    if model is not None:
+        preds = [r for r in preds if r.get("model", "v1") == model]
     if not preds:
         return {"n_total": 0, "n_graded": 0, "overall_hit_rate": 0.5,
                 "calibration": [], "by_source": {}}

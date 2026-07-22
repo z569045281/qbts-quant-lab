@@ -82,7 +82,13 @@ def run_audit() -> dict:
                     "n_min": _N_MIN, "sections": {}}
 
     # ── ① edge 逐源校准(核心审判对象:edge.py 的权重先验)────────────────
-    cal = grade_predictions(df_d)
+    # 2026-07-22 AI 自检抓到:grade_predictions 从不读 model 标签,v1(已于
+    # 07-17 停用)的陈年记录混进"当前"校准,把 v1 的 21% 拖成"25条23%"顶替
+    # v2 汇报——v2 才 3 条记录、仅 1 条够格评分(部分窗口),远不到能下结论的
+    # 量。现在默认只算 v2(见 calibration.py），v1 的历史成绩单独留档对照,
+    # 不再混进当前判决。
+    cal = grade_predictions(df_d)                    # v2-only(新默认)
+    cal_v1_legacy = grade_predictions(df_d, model="v1")
     sources = {}
     for src, d in (cal.get("by_source") or {}).items():
         sources[src] = _verdict(d.get("hits", 0), d.get("n", 0))
@@ -91,6 +97,10 @@ def run_audit() -> dict:
         "n_graded_days": cal.get("n_graded"),
         "overall_hit_rate": cal.get("overall_hit_rate"),
         "sources": sources,
+        "v1_legacy_frozen": {                          # 仅供对照,不参与判决
+            "n_graded": cal_v1_legacy.get("n_graded"),
+            "overall_hit_rate": cal_v1_legacy.get("overall_hit_rate"),
+        },
     }
 
     # ── ② AI 决策台账(决策本身当一个"源"审)────────────────────────────
@@ -210,8 +220,13 @@ def format_report(report: dict) -> str:
     L = ["⚖️ 审判报告 " + report["as_of"][:16].replace("T", " ") + " UTC",
          f"(判决门槛 n≥{report['n_min']};规则预注册于 audit.py,不得临场更改)", ""]
     es = report["sections"].get("edge_sources", {})
-    L.append(f"① edge 逐源校准 — 已评判 {es.get('n_graded_days')} 天,整体方向命中 "
-             f"{(es.get('overall_hit_rate') or 0)*100:.0f}%")
+    L.append(f"① edge 逐源校准(v2,2026-07-17起)— 已评判 {es.get('n_graded_days')} 天,"
+             f"整体方向命中 {(es.get('overall_hit_rate') or 0)*100:.0f}%"
+             f"{' ⚠️n太小,远不到能下结论的量' if (es.get('n_graded_days') or 0) < _N_MIN else ''}")
+    v1l = es.get("v1_legacy_frozen") or {}
+    if v1l.get("n_graded"):
+        L.append(f"   （v1 历史存档,已停用,不参与本次判决:n={v1l['n_graded']} "
+                 f"命中{(v1l.get('overall_hit_rate') or 0)*100:.0f}%）")
     rows = sorted((es.get("sources") or {}).items(), key=lambda x: -x[1]["n"])
     for src, d in rows:
         mult = f" → 建议mult {d['recommended_mult']}" if d["recommended_mult"] is not None else ""

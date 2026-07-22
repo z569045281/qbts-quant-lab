@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-22 · [fable] selfcheck-0722 · AI自检07-22三查:①财报日历云端持久化(07-21已修)确认待用户跑 sql/earnings_calendar_migration.sql,非新bug②SMC find_sweeps note 只写被扫旧swing的日期、没写扫单当天日期,易误读成"旧位当前参照"→ 补扫单日期前缀③重大发现:calibration.py grade_predictions 从不读 model 标签,v1(07-17停用)陈年数据混进"25条23%命中"顶替v2汇报,实测v2真实n_graded=1(部分窗口)——grade_predictions 加 model="v2" 默认过滤,audit.py 报告分离展示v1历史存档(不参与判决)。CLAUDE.md 教训归档。files: backend/dashboard/calibration.py, backend/dashboard/smc.py, backend/dashboard/audit.py, CLAUDE.md
+
 - [done] 2026-07-21 · [fable] v1-inverse-shadow · v1反向影子(用户拍板,承AI自检建议):edge.py 重构出 `_build_contributions` 共用+新 `compute_edge_v1`(逐字节复现原始v1:无上限裸加+无regime+EV±1%阈值,compute_edge/v2行为不变,已用合成快照验证 v1/v2 分歧符合mining.md记录的病征)→ decision.py `_invert_v1_shadow` 把v1表态整体倒过来当零决策权影子(纯机械$0)→ journal.py record/grade_pending 加 v1inv_bold_call 同一套fwd5评分 → audit.py ②🥊 三行同框。CLAUDE.md 已归档。files: backend/dashboard/edge.py, backend/api.py, backend/dashboard/decision.py, backend/dashboard/journal.py, backend/dashboard/audit.py, CLAUDE.md
 
 - [done] 2026-07-21 · [fable] selfcheck-0721 · AI自检07-21两修:①volume_profile.py `_action_hint` VAL/VAH fallback 未判方向,价格深跌到VAL下方时会把"跌破X下看"指向一个更高的VAL(方向倒挂假话)——加"是否真在磁吸位更远侧"判断,不成立就说"暂无更多参照"②财报日历云端数据源失败=Lambda/tmp冷启动清空本地parquet缓存(与finra_short同病)→ 镜像 sync_short_volume 套路新增 sync_earnings_dates,接入 publish.py + lambda_handlers.py,新表 sql/earnings_calendar_migration.sql(待用户跑)。元模型19%命中率转inverse-weight影子跟踪的建议留给用户拍板,未动手实现。files: backend/dashboard/volume_profile.py, backend/data/altdata.py, publish.py, aws/lambda_handlers.py, sql/earnings_calendar_migration.sql(new)
