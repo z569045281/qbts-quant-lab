@@ -489,6 +489,7 @@ def altdata_health_check(refresh: bool = False) -> dict:
 # 免费接口,但 SEC 要求带 User-Agent;任何失败都安静返回 None,绝不影响扫描。
 import json as _json
 import os as _os
+import re as _re
 
 # SEC 要求 UA 带"邮箱形式"的联系方式,否则 403(不会校验邮箱真伪)。沿用 FINRA 的伪域名。
 _SEC_USER_AGENT  = _os.getenv("SEC_USER_AGENT", "qbts-quant-lab research@qbts-quant-lab.local")
@@ -646,7 +647,7 @@ _8K_ITEMS: dict[str, tuple[str, str]] = {
     "2.02": ("业绩/经营结果公布", "info"),
     "2.05": ("裁员/重组费用", "warn"),
     "2.06": ("重大减值", "warn"),
-    "3.01": ("退市/转板通知(item不分自愿换所与被迫退市,须查原文判性质)", "warn"),
+    "3.01": ("退市/转板通知(性质待判)", "warn"),
     "3.02": ("非公开发行股票(稀释)", "high"),
     "3.03": ("股东权利重大修改", "warn"),
     "4.01": ("更换审计师", "warn"),
@@ -658,6 +659,129 @@ _8K_ITEMS: dict[str, tuple[str, str]] = {
     "7.01": ("Reg FD 自愿披露", "info"),
     "8.01": ("其他重大事件", "info"),
 }
+
+
+def _classify_301(cik: int, acc: str, doc: str) -> "tuple[str, str] | None":
+    """Item 3.01 定性:自愿换所 vs 被迫退市 —— 抓原文正文判,别把标签模糊丢给读者。
+
+    出身(2026-07-22 AI 自检):07-14 QBTS 那份被挂了 8 天的 "warn/退市通知",原文
+    其实是**主动**通知 NYSE 撤牌转 Nasdaq(代码不变、已获批准),完全中性事件。
+    item 3.01 一个代码同时覆盖"自愿转板"和"不满足持续上市standard被摘牌",
+    严重度天差地别 → 按正文关键词定性,判不出才退回原 warn。
+    """
+    a = (acc or "").replace("-", "")
+    if not a or not doc:
+        return None
+    raw = _sec_get(f"https://www.sec.gov/Archives/edgar/data/{cik}/{a}/{doc}", timeout=10)
+    if not raw:
+        return None
+    try:
+        txt = _re.sub(r"<[^>]+>", " ", raw.decode("utf-8", "ignore"))
+        txt = _re.sub(r"&nbsp;?|&#160;", " ", txt)
+        txt = _re.sub(r"\s+", " ", txt).lower()
+    except Exception:
+        return None
+    m = _re.search(r"item\s*3\.01(.{0,2500})", txt)
+    body = m.group(1) if m else txt[:2500]
+    # ⚠️ 必须先剥掉 SEC 的标准条目抬头再做关键词匹配 —— 那行模板文字本身就含
+    # "failure to satisfy"(所有 3.01 filing 通用),不剥会把自愿转板误判成退市风险
+    # (2026-07-22 首版实测就栽在这:QBTS 自愿转 Nasdaq 被判成 high/退市风险)。
+    body = _re.sub(r"notice of delisting or failure to satisfy a continued listing "
+                   r"rule or standard;?\s*transfer of listing\.?", " ", body)
+
+    bad = ("failure to satisfy", "not in compliance", "non-compliance", "noncompliance",
+           "deficiency", "minimum bid price", "delisting determination",
+           "subject to delisting", "notice of noncompliance", "cure period")
+    good = ("voluntarily withdraw", "voluntary withdrawal", "transfer the listing",
+            "transfer its listing", "approved for listing", "intention to voluntarily")
+    if any(k in body for k in bad):
+        return ("退市风险:未满足持续上市标准(原文含合规缺陷措辞)", "high")
+    if any(k in body for k in good):
+        # 顺带抓交易所与生效日,让标签自带事实
+        ex = "Nasdaq" if "nasdaq" in body else ("NYSE" if "new york stock exchange" in body else "")
+        return (f"自愿转板{('→ ' + ex) if ex else ''}(非被迫退市,代码通常不变)", "info")
+    return None
+
+
+def fetch_insider_form4(ticker: str, days: int = 60, max_filings: int = 30) -> "dict | None":
+    """本票**自己**的内部人公开市场卖出(Form 4,非衍生 transactionCode='S')。
+
+    出身(2026-07-22 AI 自检):新闻流出现"QBTS/IONQ/RGTI 内部人合计抛售 $988M"被打
+    bearish/medium —— 三票合计的数字对单票没有可用信息量,无法判断这个标签名不名副
+    其实。答案不该向新闻要,EDGAR 有一手数据:实测 QBTS 自 06-01 起真实卖出仅
+    **$26.2M**(占流通盘 0.42%),与 $988M 的观感天差地别。
+
+    返回 {window_days, total_usd, pct_float, by_owner:[...], n_filings};
+    任何失败/无记录 → None(安静降级,与本模块其它 EDGAR 函数一致)。
+    """
+    cik = _sec_cik(ticker)
+    if cik is None:
+        return None
+    raw = _sec_get(_SEC_SUBMISSIONS.format(cik=cik))
+    if not raw:
+        return None
+    try:
+        recent = _json.loads(raw)["filings"]["recent"]
+        forms = recent.get("form", [])
+        dates = recent.get("filingDate", [])
+        accs = recent.get("accessionNumber") or [""] * len(forms)
+    except Exception:
+        return None
+    cut = (datetime.now().date() - timedelta(days=days)).isoformat()
+    picks = [(d, a) for f, d, a in zip(forms, dates, accs)
+             if (f or "").strip() == "4" and d >= cut][:max_filings]
+    if not picks:
+        return None
+
+    total = 0.0
+    by_owner: dict[str, float] = {}
+    n_ok = 0
+    for d, acc in picks:
+        a = (acc or "").replace("-", "")
+        doc = _sec_get(f"https://www.sec.gov/Archives/edgar/data/{cik}/{a}/{acc}.txt", timeout=10)
+        if not doc:
+            continue
+        t = doc.decode("utf-8", "ignore")
+        n_ok += 1
+        owner_m = _re.search(r"<rptOwnerName>([^<]+)</rptOwnerName>", t)
+        owner = (owner_m.group(1).strip() if owner_m else "?")
+        for m in _re.finditer(r"<nonDerivativeTransaction>(.*?)</nonDerivativeTransaction>", t, _re.S):
+            blk = m.group(1)
+            code = _re.search(r"<transactionCode>([^<]+)</transactionCode>", blk)
+            sh = _re.search(r"<transactionShares>\s*<value>([\d.]+)</value>", blk)
+            px = _re.search(r"<transactionPricePerShare>\s*<value>([\d.]+)</value>", blk)
+            # 只算 'S' = 公开市场卖出;'M'(期权行权)/'A'(授予)不是抛售,别混进来
+            if code and code.group(1).strip() == "S" and sh and px:
+                try:
+                    v = float(sh.group(1)) * float(px.group(1))
+                except ValueError:
+                    continue
+                total += v
+                by_owner[owner] = by_owner.get(owner, 0.0) + v
+    if total <= 0:
+        return None
+
+    pct_float = None
+    try:
+        import yfinance as yf
+        info = yf.Ticker(ticker).info
+        fl, px_now = info.get("floatShares"), info.get("regularMarketPrice") or info.get("currentPrice")
+        if fl and px_now:
+            pct_float = round(total / (fl * px_now) * 100, 3)
+    except Exception:
+        pass
+
+    top = sorted(by_owner.items(), key=lambda kv: -kv[1])[:5]
+    return {
+        "window_days": days,
+        "total_usd": round(total, 2),
+        "pct_float": pct_float,
+        "n_filings": n_ok,
+        "by_owner": [{"name": n, "usd": round(v, 2)} for n, v in top],
+        "note": (f"{ticker} 自身 Form 4 公开市场卖出 ${total/1e6:.1f}M"
+                 + (f"(占流通市值 {pct_float:.2f}%)" if pct_float is not None else "")
+                 + f",近{days}天 · 一手 EDGAR 数据,不是多票合计的新闻口径"),
+    }
 
 
 def fetch_sec_events(ticker: str, days: int = 14) -> "dict | None":
@@ -679,11 +803,13 @@ def fetch_sec_events(ticker: str, days: int = 14) -> "dict | None":
         dates = recent.get("filingDate", [])
         # items 键缺失时 zip 会静默吞掉全部 8-K(zip 按最短截断)→ 补空串占位
         items_l = recent.get("items") or [""] * len(forms)
+        accs_l = recent.get("accessionNumber") or [""] * len(forms)
+        docs_l = recent.get("primaryDocument") or [""] * len(forms)
     except Exception:
         return None
     cut = datetime.now().date() - timedelta(days=days)
     evs: list[dict] = []
-    for f, ds, its in zip(forms, dates, items_l):
+    for f, ds, its, acc, doc in zip(forms, dates, items_l, accs_l, docs_l):
         if not (f or "").upper().startswith("8-K"):
             continue
         try:
@@ -697,6 +823,10 @@ def fetch_sec_events(ticker: str, days: int = 14) -> "dict | None":
             if not c or c == "9.01":
                 continue
             label, sev = _8K_ITEMS.get(c, (f"item {c}", "info"))
+            if c == "3.01":     # 只对这一个 item 多打一次原文(3.01 稀有,成本可忽略)
+                ruling = _classify_301(cik, acc, doc)
+                if ruling:
+                    label, sev = ruling
             decoded.append({"code": c, "label": label, "sev": sev})
             if sev == "high" or (sev == "warn" and top == "info"):
                 top = sev

@@ -1342,6 +1342,13 @@ async def refresh_decision():
     except Exception:
         pass
     try:
+        # 内部人卖出(Form 4,本票自己的一手数据):新闻常给"QBTS/IONQ/RGTI 合计$988M"
+        # 这类多票聚合口径,对单票没有信息量(实测 QBTS 自身仅 $35M/占流通 0.57%)
+        from data.altdata import fetch_insider_form4
+        extras["insider_form4"] = await asyncio.to_thread(fetch_insider_form4, "QBTS")
+    except Exception:
+        pass
+    try:
         today = await today_signals(top_n=5)
         extras["mined_factors"] = today.get("factors", [])
     except Exception:

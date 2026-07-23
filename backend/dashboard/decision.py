@@ -684,6 +684,20 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                      + "\n  纪律：🔴(稀释/控制权/财报问题)按供给冲击或信任冲击对待;🟠(换所/高管/合同)"
                        "先判性质再定权重——如换所不换 ticker 属行政中性,别脑补方向;·(业绩公告/FD)通常已被新闻覆盖。")
 
+    # ── 内部人卖出(Form 4 一手数据,专治新闻的多票聚合口径)──────
+    ins = extras.get("insider_form4")
+    if ins and ins.get("total_usd"):
+        owners = "、".join(f"{o['name']} ${o['usd']/1e6:.1f}M" for o in (ins.get("by_owner") or [])[:3])
+        pf = ins.get("pct_float")
+        parts.append(
+            f"## 👤 内部人卖出（Form 4,近{ins['window_days']}天,QBTS 本票一手数据）\n"
+            f"  合计 ${ins['total_usd']/1e6:.1f}M"
+            + (f"（占流通市值 {pf:.2f}%）" if pf is not None else "")
+            + f" · {ins['n_filings']} 份申报 · 主要卖方: {owners}\n"
+            f"  纪律：若新闻里出现「QBTS/IONQ/RGTI 合计抛售 $X 亿」这类**多票聚合**数字,"
+            f"一律以上面这个本票口径为准——聚合数字对单票没有信息量,别按它定方向。"
+            f"高管常有 10b5-1 预设计划,占流通 <1% 属常规减持,不等于看空信号。")
+
     # ── 量化元模型（机械加权参考值）──────────────────────────
     edge = snapshot.get("edge")
     if edge and not edge.get("error"):
