@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-07-24 · [opus] decision-parallel · 出决策慢诊断+修:主决策(Fable adaptive思考+16k)与 DeepSeek 影子决策(推理模型,实测小prompt都12.9s→全量30-60s)原本串行,墙钟=两者相加。影子零决策权却让用户干等。修:get_or_generate_decision 里把 generate_shadow_decision 丢进 ThreadPoolExecutor 与 generate_decision 并发,墙钟从 sum 变 max。决策内容/影子记账/缓存/journal 零变化,纯延迟优化。files: backend/dashboard/decision.py
+
 - [done] 2026-07-24 · [fable] audit-breakeven · 审判器保本线修正(用户拍板"按修正版落地"):audit.py 判决线从一刀切 0.5 改为各池自己代码承诺的保本胜率 p*=1/(1+RR_design)(扫描v2 1.5R→0.40 / 游击战 2.5R→0.286 / 方向单按各单 rr_ratio),方向表态类(edge逐源/daily_call/影子/HOLD)保持 0.5;期望R只做展示列不做判决;预注册修订注记(2026-07-24,依据=设计常数矛盾非结果不满意),报告新旧两线并排。scan_paper 按 epoch 分池(CLAUDE.md 承诺过的"审判按 epoch 分开统计"此前没落地)。纯 audit 层只读改动。files: backend/dashboard/audit.py, CLAUDE.md
 
 - [done] 2026-07-23 · [opus] selfcheck-0723 · AI自检07-23四条,两查证两修:①初请失业金"已发布未回填"×2(决策模型+全站体检各报一次)=**非bug,结构性时序**:08:30 ET 发布 vs 09:00 ET publish,FRED 要几小时才更新;实测 5h 后 FRED 已出 187K 且 enrich_actuals 正确回填,下次 publish 自愈,decision.py 07-14 起已显式标注"严禁拿前值当今日值"→ 风险已处置。修:selfcheck prompt 加"actual空+hours_until≥−6h=正常时序,别每周四报一次"。②"连续10日HOLD错过15%跌幅,建议放宽特调到盘中预警"—— 事实前提对(实测 $20.09→$17.10 = −14.9%,12条全HOLD),但**药方有逻辑硬伤**:特调抄底是多头进场腿,放宽它抓不到下跌;且反事实实测——这11天特调一直在蹲守区却从未收盘确认,若按"蹲守即进"会在 07-09 $21.16 买入→今日 $17.10 = **−19.2%**,正是收盘确认过滤器的价值(与第二十五轮互证)。做空腿四轮判死不复活。漏判已由昨日 HOLD 判读台账记录(07-10/12/13/15 均 ✗),8/15 凭累积数据重定阈值,不中途凭 n=1 松绑已验证扳机。③全站体检把一条自己写着"计算相符…恒等式验证通过,无矛盾"的项填进 findings = 纯噪声 → prompt 明令"自证无矛盾一律不输出"+**代码层兜底** `_is_nonfinding` 过滤(昨日教训:确定性判断不能只靠LLM合规),4用例验证真矛盾保留/伪发现丢弃。files: backend/dashboard/selfcheck.py

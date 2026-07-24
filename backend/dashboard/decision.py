@@ -30,6 +30,7 @@ import logging
 import math
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -1155,14 +1156,27 @@ def get_or_generate_decision(
         except Exception:
             pass
 
+    # 主决策(Fable adaptive 思考)与 DeepSeek 影子(推理模型,30-60s)用同一份
+    # prompt、互相独立 —— 并发跑,墙钟从「两者相加」降到「取大」。影子零决策权,
+    # 只是随决策带过去记账;串行等它纯属浪费用户时间(2026-07-24 延迟优化)。
+    # 用显式 executor(不用 `with`):`with` 退出会 shutdown(wait=True),主决策失败
+    # 的错误路径上会白白再等影子跑完;这里让错误路径立即返回、影子线程弃置后台。
+    _pool = ThreadPoolExecutor(max_workers=1)
+    _ds_future = _pool.submit(generate_shadow_decision, snapshot, extras)
     try:
         decision = generate_decision(snapshot, extras)
     except Exception as e:
         logger.warning(f"Decision generation failed: {e}")
+        _pool.shutdown(wait=False, cancel_futures=True)   # 主决策没了,影子弃置
         return None, None, False
-
-    # DeepSeek 影子决策挂在主决策上随缓存/payload/前端一路带过去;失败=没有,零影响
-    ds = generate_shadow_decision(snapshot, extras)
+    # 主决策成了才取影子(此时它多半已跑完,几乎不再额外等待);失败=没有,零影响
+    try:
+        ds = _ds_future.result()
+    except Exception as e:
+        logger.warning(f"deepseek shadow future failed: {e}")
+        ds = None
+    finally:
+        _pool.shutdown(wait=False)
     if ds:
         decision["shadow_ds"] = ds
 
