@@ -217,11 +217,18 @@ _AI_PROMPT = """你是量化交易仪表盘的数据质检员。下面是六个�
   误报"未入账手续费"):① pnl == equity − sleeve_start(永远成立,规则层已自动检查,
   你不用管)② 空仓时 equity == sleeve_cash;持仓时 equity == sleeve_cash + pos_value
   (pos_value 是持仓市值,digest 已直接给出)。pnl<0 只是浮亏/已实现亏损,不是数据矛盾。
+- **宏观事件 actual 为空 + hours_until 是小负数(≥ −6h)= 正常时序,不是数据问题**:
+  每日 publish 跑在 09:00 ET,而 08:30 ET 发布的数据(CPI/PPI/初请失业金等)其 actual
+  要等 FRED 更新几小时才有 → 当天必然空,下次 publish 自动回填(2026-07-23 实测:
+  初请当天空,5 小时后 FRED 出 187K 并成功回填)。decision.py 已对这种事件显式标注
+  "实际值尚未回填·严禁拿前值当今日值",风险已被处置。**不要每周四都报一次这条。**
 
 只报你能说出【具体伤害】的矛盾。该报的例子:同一 ticker 在两个页面价格相差 >2%;
 交易记录买入日期晚于卖出日期;负价格/胜率>100%/权重合计明显≠100;标记在场但敞口为 0;
 equity 与 cash+持仓明显对不上。
 宁缺勿滥:凡是能用口径/舍入/时区/缓存节奏解释的都不要报;拿不准就不报。
+**你自己验算后确认"相符/无矛盾/验证通过"的项,一律不要输出** —— 那是体检通过,不是
+发现(07-23 曾把一条自己写着"恒等式验证通过,无矛盾"的项填进 findings,纯噪声)。
 不要评论策略好坏,不要复述已在 known_issues 里的问题。
 输出 JSON 数组(无 markdown 围栏),最多 4 条,没有就输出 []:
 [{"page": "home|watch|dca|factors|challenge|spacex", "kind": "数据问题|改进建议", "note": "<中文一句话,引用具体数字>"}]"""
@@ -288,6 +295,17 @@ def _digest(snap: dict, scan, dca, ch, sx, known: dict) -> str:
     return json.dumps(d, ensure_ascii=False, default=str)
 
 
+# 自证无矛盾的"发现"= 体检通过,不是发现。prompt 已明令,但 07-22 的教训是确定性
+# 判断不能只靠 LLM 合规 —— 代码层再拦一道(07-23 实测:Haiku 填了一条自己写着
+# "计算相符…恒等式验证通过,无矛盾"的 finding)。
+_NONFINDING_PAT = ("无矛盾", "验证通过", "计算相符", "并无矛盾", "没有矛盾",
+                   "一致,无", "无异常", "符合预期,无", "校验通过")
+
+
+def _is_nonfinding(note: str) -> bool:
+    return any(p in note for p in _NONFINDING_PAT)
+
+
 def _ai_layer(digest: str) -> list[dict]:
     key = os.getenv("ANTHROPIC_API_KEY")
     if not key:
@@ -310,8 +328,12 @@ def _ai_layer(digest: str) -> list[dict]:
         for it in items[:6]:
             page = it.get("page")
             if page in _PAGES and it.get("note"):
+                note = str(it["note"])
+                if _is_nonfinding(note):
+                    logger.info(f"selfcheck: 丢弃自证无矛盾的伪发现 — {note[:60]}")
+                    continue
                 kind = it.get("kind") if it.get("kind") in ("数据问题", "改进建议") else "数据问题"
-                out.append((page, _issue(kind, str(it["note"]), src="ai")))
+                out.append((page, _issue(kind, note, src="ai")))
         return out
     except Exception as e:
         logger.warning(f"selfcheck AI layer skipped: {e}")
