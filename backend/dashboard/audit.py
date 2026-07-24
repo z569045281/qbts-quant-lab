@@ -10,6 +10,21 @@ CLAUDE.md 的常设提醒:edge.py 的所有权重都是硬编码先验,等各源
   n ≥ 30 且 Wilson95%上界<0.5 → 剔除(建议 mult=0,信号静音)
   其余                        → 中性·维持自学习 mult
 
+**预注册修订 2026-07-24(用户拍板"按修正版落地")— 判决线 p* 分池:**
+原规则一刀切 p*=0.5,与各交易池自己代码里写死的开仓 RR 闸门自相矛盾
+(45%胜率×1.5R 每笔期望 +0.125R 是赚钱的,却会被"胜率须>50%"枪毙)。
+修订:判决线改为各池**自己代码承诺的保本胜率 p* = 1/(1+RR_design)** ——
+该数由设计常数推出,任何人重算同值,无看结果调参空间:
+  · 方向表态类(edge逐源/daily_call/三影子/HOLD判读):无止损/目标,p*=0.5 不变
+  · 自选扫描 v2(scan.py 1.5R 门):p*=0.40;v1 老仓无 RR 门,p*=0.5
+  · 游击战(guerrilla.py _RR_MIN=2.5):p*=1/3.5≈0.286
+  · AI 方向单:按各单记录的 stop/target 现算平均计划 RR → p*=1/(1+RR̄)
+统计机器不变(仍 Wilson 二项,小样本功效最高);期望R(胜率×平均盈R/平均
+亏R)**只做展示列,不做判决依据**(肥尾下均值 CI 需 n≈60-170,8/15 前判不
+动,换成它=废掉剔除权)。凡 p*≠0.5 的池,报告**新旧两线并排**打出,判决
+分歧一目了然。修订依据=设计常数与判决标准矛盾,非对已见结果不满意;
+2026-07-24 写死,审判日仍不得看着数字改标准。
+
 只读不写:工具产出报告(stdout + cache/audit_report.json),权重改动仍走
 人工 code review(edge.py 常量),证据在手再动刀。
 
@@ -54,20 +69,50 @@ def _wilson(hits: int, n: int) -> tuple[float, float]:
     return (max(0.0, centre - half), min(1.0, centre + half))
 
 
-def _verdict(hits: int, n: int) -> dict:
-    lo, hi = _wilson(hits, n)
-    hit = hits / n if n else 0.5
+def _judge(lo: float, hi: float, n: int, breakeven: float) -> str:
+    """Wilson CI vs 判决线 p* → 判决文本(预注册修订 2026-07-24:p* 分池)。"""
     if n < _N_MIN:
-        v, mult = "样本不足·继续测量", None
-    elif lo > 0.5:
-        v, mult = "✅ 转正·按命中率定权", round(max(0.0, min(2.0, 0.5 + (hit - 0.5) * 2)), 2)
-    elif hi < 0.5:
-        v, mult = "❌ 剔除(静音)", 0.0
-    else:
-        v, mult = "中性·维持自学习", None
-    return {"n": n, "hits": hits, "hit_rate": round(hit, 3),
-            "ci95": [round(lo, 3), round(hi, 3)], "verdict": v,
-            "recommended_mult": mult}
+        return "样本不足·继续测量"
+    if lo > breakeven:
+        return "✅ 转正"
+    if hi < breakeven:
+        return "❌ 剔除(静音)"
+    return "中性·维持自学习"
+
+
+def _verdict(hits: int, n: int, breakeven: float = 0.5) -> dict:
+    """breakeven = 该池代码承诺的保本胜率 p*=1/(1+RR_design);方向表态类保持 0.5。
+    p*≠0.5 时输出 legacy_at_50(旧一刀切线的判决)并排留证。"""
+    lo, hi = _wilson(hits, n)
+    hit = hits / n if n else breakeven
+    v = _judge(lo, hi, n, breakeven)
+    mult = None
+    if v.startswith("✅"):
+        if breakeven == 0.5:
+            v = "✅ 转正·按命中率定权"
+            mult = round(max(0.0, min(2.0, 0.5 + (hit - 0.5) * 2)), 2)
+    elif v.startswith("❌"):
+        mult = 0.0
+    out = {"n": n, "hits": hits, "hit_rate": round(hit, 3),
+           "ci95": [round(lo, 3), round(hi, 3)], "verdict": v,
+           "recommended_mult": mult}
+    if breakeven != 0.5:
+        out["breakeven"] = round(breakeven, 3)
+        out["legacy_at_50"] = _judge(lo, hi, n, 0.5)
+    return out
+
+
+def _expectancy_r(rs: list[float]) -> dict | None:
+    """展示用期望 R(每笔风险倍数)。只报数,不参与判决(见模块 docstring)。"""
+    rs = [float(r) for r in rs if r is not None and math.isfinite(float(r))]
+    if not rs:
+        return None
+    wins = [r for r in rs if r > 0]
+    losses = [r for r in rs if r <= 0]
+    return {"n_r": len(rs),
+            "exp_r": round(sum(rs) / len(rs), 3),
+            "avg_win_r": round(sum(wins) / len(wins), 3) if wins else None,
+            "avg_loss_r": round(sum(losses) / len(losses), 3) if losses else None}
 
 
 def run_audit() -> dict:
@@ -110,8 +155,30 @@ def run_audit() -> dict:
         graded = [r for r in recs if (r.get("result") or {}).get("ret_pct") is not None
                   and r.get("action") in ("LONG_QBTX", "SHORT_QBTZ")]
         wins = sum(1 for r in graded if r["result"]["ret_pct"] > 0)
+        # 保本线(预注册修订 2026-07-24):按各单记录的 stop/target 现算计划 RR
+        # (基准价 = 评分口径同款 p0),p* = 1/(1+RR̄);无可算记录退回 0.5。
+        # 期望R = ret_pct / 单笔风险距,展示用。
+        rrs, r_mults = [], []
+        for r in graded:
+            try:
+                p0 = float(r.get("price") or 0)
+                stop = r.get("stop")
+                if not p0 or stop is None:
+                    continue
+                risk = abs(p0 - float(stop)) / p0
+                if risk <= 0:
+                    continue
+                tgt = r.get("target")
+                if tgt is not None:
+                    rrs.append(abs(float(tgt) - p0) / (p0 * risk))
+                r_mults.append(float(r["result"]["ret_pct"]) / risk)
+            except (TypeError, ValueError):
+                continue
+        be_dir = 1 / (1 + sum(rrs) / len(rrs)) if rrs else 0.5
         report["sections"]["decision_journal"] = {
-            **_verdict(wins, len(graded)),
+            **_verdict(wins, len(graded), breakeven=be_dir),
+            "planned_rr_mean": round(sum(rrs) / len(rrs), 2) if rrs else None,
+            "expectancy": _expectancy_r(r_mults),
             "paper": j.get("paper"),
         }
         # HOLD 判读(2026-07-13 预注册补充,见模块 docstring;展示用,不触发权重)。
@@ -198,27 +265,85 @@ def run_audit() -> dict:
     except Exception as e:
         report["sections"]["paper_horses"] = {"error": str(e)[:120]}
 
-    # ── ④ 自选扫描纸面账本 ─────────────────────────────────────────────
+    # ── ④ 自选扫描纸面账本(按 epoch 分池 — CLAUDE.md 07-13 承诺的"审判按
+    #     epoch 分开统计"此前从未落地,又一例"没人读的标签只是装饰")──────
+    #     v2 有 scan.py 1.5R 开仓门 → 保本线 p*=1/(1+1.5)=0.40(预注册修订
+    #     2026-07-24);v1 老仓无 RR 门 → 维持 0.5。期望R = pnl_pct/stop_pct
+    #     (stop_pct 2026-07-24 起才随平仓记录落账,老记录缺→不进R统计)。
     try:
         from dashboard.scan_store import _load_paper
         p = _load_paper() or {}
         closed = p.get("closed") or []
-        wins = sum(1 for t in closed if (t.get("pnl") or 0) > 0)
+        pools = {}
+        for epoch, be in (("v1", 0.5), ("v2", 1 / 2.5)):
+            trades = [t for t in closed if t.get("epoch", "v1") == epoch]
+            wins = sum(1 for t in trades if (t.get("pnl") or 0) > 0)
+            rs = [t["pnl_pct"] / t["stop_pct"] for t in trades
+                  if t.get("stop_pct") and t.get("pnl_pct") is not None]
+            pools[epoch] = {
+                **_verdict(wins, len(trades), breakeven=be),
+                "expectancy": _expectancy_r(rs),
+                "realized_usd": round(sum(t.get("pnl") or 0 for t in trades), 2),
+            }
         report["sections"]["scan_paper"] = {
-            **_verdict(wins, len(closed)),
+            "by_epoch": pools,
             "realized_usd": round(sum(t.get("pnl") or 0 for t in closed), 2),
+            "n_total": len(closed),
         }
     except Exception as e:
         report["sections"]["scan_paper"] = {"error": str(e)[:120]}
+
+    # ── ⑤ 游击战账本(2026-07-24 接入 — 此前根本不在审判范围)────────────
+    #     开仓门 _RR_MIN=2.5 → 保本线 p*=1/3.5≈0.286。表缺/无记录 → 静默跳过。
+    try:
+        from dashboard.guerrilla import _sb, _get, _RR_MIN
+        sb = _sb()
+        led = (_get(sb, "ledger") or {}) if sb else {}
+        trades = led.get("trades") or []
+        if trades:
+            wins = sum(1 for t in trades if (t.get("pnl") or 0) > 0)
+            rs = []
+            for t in trades:
+                try:
+                    entry, stop = float(t["entry"]), float(t["stop"])
+                    risk = (entry - stop) / entry
+                    if risk > 0 and t.get("ret_pct") is not None:
+                        rs.append(float(t["ret_pct"]) / risk)
+                except (KeyError, TypeError, ValueError, ZeroDivisionError):
+                    continue
+            report["sections"]["guerrilla"] = {
+                **_verdict(wins, len(trades), breakeven=1 / (1 + _RR_MIN)),
+                "expectancy": _expectancy_r(rs),
+                "realized_usd": led.get("realized"),
+            }
+    except Exception as e:
+        report["sections"]["guerrilla"] = {"error": str(e)[:120]}
 
     _OUT.parent.mkdir(parents=True, exist_ok=True)
     _OUT.write_text(json.dumps(report, ensure_ascii=False, indent=2))
     return report
 
 
+def _fmt_be(d: dict) -> str:
+    """判决行通用尾巴:p*≠0.5 时打出新旧两线并排 + 期望R展示列。"""
+    s = ""
+    if d.get("breakeven") is not None:
+        s += f" 判决线{d['breakeven']*100:.0f}%"
+        legacy = d.get("legacy_at_50")
+        if legacy and legacy != d["verdict"].replace("·按命中率定权", ""):
+            s += f"(旧线50%判:{legacy})"
+    e = d.get("expectancy")
+    if e:
+        w = f"{e['avg_win_r']:+.2f}" if e.get("avg_win_r") is not None else "—"
+        l = f"{e['avg_loss_r']:+.2f}" if e.get("avg_loss_r") is not None else "—"
+        s += f" · 期望{e['exp_r']:+.2f}R(盈{w}/亏{l},n_R={e['n_r']})"
+    return s
+
+
 def format_report(report: dict) -> str:
     L = ["⚖️ 审判报告 " + report["as_of"][:16].replace("T", " ") + " UTC",
-         f"(判决门槛 n≥{report['n_min']};规则预注册于 audit.py,不得临场更改)", ""]
+         f"(判决门槛 n≥{report['n_min']};规则预注册于 audit.py,不得临场更改;"
+         f"2026-07-24 修订:交易池判决线=各池保本胜率 1/(1+RR_design),期望R仅展示)", ""]
     es = report["sections"].get("edge_sources", {})
     L.append(f"① edge 逐源校准(v2,2026-07-17起)— 已评判 {es.get('n_graded_days')} 天,"
              f"整体方向命中 {(es.get('overall_hit_rate') or 0)*100:.0f}%"
@@ -236,8 +361,10 @@ def format_report(report: dict) -> str:
     dj = report["sections"].get("decision_journal", {})
     if "n" in dj:
         pp = dj.get("paper") or {}
+        rr = f"(计划RR均值 {dj['planned_rr_mean']})" if dj.get("planned_rr_mean") else ""
         L.append(f"\n② AI 决策台账 — 方向单 n={dj['n']} 命中{dj['hit_rate']*100:.0f}% "
                  f"CI[{dj['ci95'][0]*100:.0f},{dj['ci95'][1]*100:.0f}] {dj['verdict']}"
+                 f"{_fmt_be(dj)}{rr}"
                  f" · 模拟持仓已实现 ${pp.get('realized')}")
         hr = dj.get("hold_read")
         if hr and hr.get("n"):
@@ -274,9 +401,20 @@ def format_report(report: dict) -> str:
                 L.append(f"   {k:<14s} 净值${d['nav']:.0f} ({d['ret_pct']*100:+.1f}%)"
                          f"{extra} {d['verdict']}")
     sp = report["sections"].get("scan_paper", {})
-    if "n" in sp:
-        L.append(f"\n④ 自选扫描纸面 — n={sp['n']} 胜率{sp['hit_rate']*100:.0f}% "
-                 f"{sp['verdict']} 已实现 ${sp.get('realized_usd')}")
+    if sp.get("by_epoch"):
+        L.append(f"\n④ 自选扫描纸面(按 epoch 分池)— 合计 n={sp.get('n_total')} "
+                 f"已实现 ${sp.get('realized_usd')}")
+        for ep, d in sp["by_epoch"].items():
+            if not d.get("n"):
+                continue
+            L.append(f"   {ep:<4s} n={d['n']:<3d} 胜率{d['hit_rate']*100:3.0f}% "
+                     f"CI[{d['ci95'][0]*100:.0f},{d['ci95'][1]*100:.0f}] {d['verdict']}"
+                     f"{_fmt_be(d)} 已实现 ${d.get('realized_usd')}")
+    gu = report["sections"].get("guerrilla", {})
+    if "n" in gu:
+        L.append(f"\n⑤ 游击战纸面 — n={gu['n']} 胜率{gu['hit_rate']*100:.0f}% "
+                 f"CI[{gu['ci95'][0]*100:.0f},{gu['ci95'][1]*100:.0f}] {gu['verdict']}"
+                 f"{_fmt_be(gu)} 已实现 ${gu.get('realized_usd')}")
     L.append("\n结论应用:仅『✅ 转正』与『❌ 剔除』触发 edge.py 权重改动(人工 review);"
              "其余一律继续测量。")
     return "\n".join(L)

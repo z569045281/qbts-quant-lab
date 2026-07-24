@@ -347,6 +347,9 @@ def run_paper_trades(results: list[dict], market_regime: str | None = None,
                     "pnl": round(pnl, 2), "pnl_pct": round(pnl / pos["cost"], 4),
                     "reason": reason, "days": _bdays(pos["entry_date"], today),
                     "epoch": pos.get("epoch", "v1"),
+                    # 2026-07-24 审判器修订配套:落账单笔风险距,审判期望R用
+                    # (R = pnl_pct/stop_pct);老记录无此字段 → 不进R统计。
+                    "stop_pct": pos.get("stop_pct"),
                 })
         elif stance == "买入区" and not r.get("thin_data") and t not in pending:
             if market_regime == "risk_off":                  # tape filter: don't fight a selloff

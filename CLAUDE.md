@@ -453,8 +453,17 @@ Frontend tabs (`frontend/app/`): **🎯 决策仪表盘** (`/`) · **🔭 自选
   hit-rate table — don't keep trusting the hand-tuned priors.** Until then treat every edge
   p_up as an unvalidated guess. (User explicitly asked to be reminded of this.)
   **审判执行器已就位(2026-07-09): `python audit.py`** — 汇总校准逐源命中+决策台账+
-  纸面马+扫描账本,按预注册规则(n≥30 且 Wilson95% 下界>0.5 转正 / 上界<0.5 剔除)
+  纸面马+扫描账本+游击战,按预注册规则(n≥30 且 Wilson95% 下界>p* 转正 / 上界<p* 剔除)
   出判决报告(backend/dashboard/audit.py;只读,权重改动仍走人工 review)。8/15 直接跑它。
+  **预注册修订 2026-07-24(用户拍板)**:判决线 p* 从一刀切 0.5 改为各**交易池自己代码
+  承诺的保本胜率 `p*=1/(1+RR_design)`**(扫描 v2 1.5R门→0.40 / 游击战 2.5R→0.286 /
+  AI方向单按各单 stop/target 现算 RR̄;方向表态类 edge逐源/daily_call/影子/HOLD 无止损
+  目标,保持 0.5)——原 0.5 线与开仓 RR 闸门自相矛盾(45%胜率×1.5R 每笔+0.125R 赚钱
+  却会被枪毙)。统计机器不变(Wilson 二项,小样本功效最高);**期望R 只做展示列不做判决**
+  (肥尾均值 CI 需 n≈60-170,换它=废掉剔除权);p*≠0.5 的池报告新旧两线并排留证。
+  修订依据=设计常数矛盾非结果不满意。顺带落地:scan_paper 审判按 epoch 分池(07-13
+  就承诺过、audit 里一直没分——又一例"没人读的标签只是装饰"),closed 记录新增
+  `stop_pct`(期望R=pnl_pct/stop_pct,老记录缺字段不进 R 统计)。
 - **All Supabase migrations have been run** (decision_journal, calibration/predictions/
   source_weights, watchlist, scan_journal, finra_short, watchlist_scan, scan_paper,
   dca_state) — **except `sql/publish_audit_migration.sql`(2026-07-09 点击审计表,待用户跑)
