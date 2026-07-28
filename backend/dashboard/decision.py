@@ -162,20 +162,62 @@ HOLD 时 trade_plan 里 etf_ticker 用 null，但仍给出"若突破 $X 买 QBTX
 的双向触发写进 entry_condition，让用户知道盘中该盯什么位。"""
 
 
+_BASIS_WARN_PCT = 0.03      # 收盘 vs 实时背离超过这个数就明写"派生读数不可当现值"
+
+# 全部由 as_of 那根日线收盘价推导、拿不到实时价重算的读数(用于背离时点名)
+_CLOSE_DERIVED = "SMC 折价/溢价区与订单块 · POC/成交量画像 · NW 包络 · 特调快慢%R · regime · 经典策略"
+
+
+def _price_basis_note(snapshot: dict, extras: dict | None) -> str:
+    """把「日线收盘口径」和「实时价」的差异摊开说清楚(2026-07-28 AI 自检①④)。
+
+    快照里所有派生读数都是 as_of 那根日线收盘价算出来的,而实时报价是另一个时点。
+    平时差几毛无所谓;07-27 那种消息暴涨日差 18%,「折价区 3%」「快%R −97.9」就会
+    被当成现值误读 —— 自检④报的「价格段 −5.2% vs 量能段 +20.2% 不同步」也是同一
+    件事(两个不同基准,不是快照错位)。这里只披露口径,不改任何读数。
+    """
+    extras = extras or {}
+    close = _num(snapshot.get("price"))
+    as_of = str(snapshot.get("as_of", "?"))[:10]
+    live = _num((((extras.get("live_quote") or {}).get("quotes") or {}).get("qbts") or {}).get("price"))
+
+    if close is None or live is None or close <= 0:
+        return (f"## 📐 价格基准\n上方所有日线派生读数({_CLOSE_DERIVED})均基于 {as_of} 收盘价 "
+                f"${close if close is not None else '?'}。本次拿不到实时价,无法核对偏离。")
+
+    div = live / close - 1
+    head = (f"## 📐 价格基准（两个「今天」，别混用）\n"
+            f"- 日线收盘口径：${close:.2f}（{as_of}）— 上方及下方**所有**派生读数都由它算出："
+            f"{_CLOSE_DERIVED}\n"
+            f"- 实时价：${live:.2f}，较该收盘 {div*100:+.1f}%")
+    if abs(div) < _BASIS_WARN_PCT:
+        return head + "\n- 两者接近，派生读数可按现值采信。"
+    mis = ("典型误读:收盘价在区间底部→读数报「折价区/超卖」,而实时价其实已经冲到区间顶部。"
+           if div > 0 else
+           "典型误读:收盘价在区间顶部→读数报「溢价区/超买」,而实时价其实已经砸到区间底部。")
+    return (head + f"\n- ⚠️ **背离 {abs(div)*100:.1f}% ≥ {_BASIS_WARN_PCT*100:.0f}%，上述派生读数已失真，"
+            f"今日不得当现值直接采信**。它们描述的是 ${close:.2f} 那个价位的状态，不是 ${live:.2f} 的。"
+            f"{mis}"
+            f"下判断请以实时价 ${live:.2f} 为准,派生读数只作**结构参照**(支撑/阻力/订单块的位置本身仍有效),"
+            f"不要引用它们的「当前位置」类结论(折价区百分比/%R 数值/包络内位置)。")
+
+
 def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
     """Compact every data source into a structured Chinese briefing."""
     extras = extras or {}
     parts: list[str] = []
 
     # ── 价格与技术面 ──────────────────────────────────────────
+    # (_price_basis_note 见本文件末尾的口径披露助手)
     chart = snapshot.get("chart", {})
     price = snapshot.get("price", 0)
     parts.append(
-        f"## 价格\n"
-        f"QBTS 现价 ${price}，今日 {snapshot.get('today_change', 0)*100:+.2f}%，"
+        f"## 价格（日线收盘口径）\n"
+        f"QBTS 收盘 ${price}，该日线 bar 涨跌 {snapshot.get('today_change', 0)*100:+.2f}%，"
         f"数据截至 {snapshot.get('as_of', '?')[:10]}\n"
         f"ATR(14)≈${chart.get('atr_14', '?')}，52周高 ${chart.get('high_52w','?')} / 低 ${chart.get('low_52w','?')}"
     )
+    parts.append(_price_basis_note(snapshot, extras))
     etf = snapshot.get("etf_prices") or {}
     parts.append(f"QBTX(2×多) 现价 ${etf.get('qbtx','?')}    QBTZ(2×空) 现价 ${etf.get('qbtz','?')}")
 

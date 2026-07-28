@@ -67,13 +67,22 @@ def _check_home(snap: dict) -> list[dict]:
             out.append(_issue("数据问题",
                               f"宏观「{e.get('title')}」实际值({a})与前值完全相同且偏离预测"
                               f"({e.get('forecast')})——疑似期错位回填,需人工核实"))
-    # 同屏两个涨跌幅口径(07-15 量能段事故的残余守卫)
+    # 同屏两个涨跌幅口径(07-15 量能段事故的残余守卫)。
+    # ⚠️ 只在两者描述**同一个交易日**时才算矛盾(2026-07-28 修):today_change 是 as_of
+    # 那根日线 bar 的涨跌,day_ret 是盘中模块**当前这个 session** 较昨收的涨跌。日线
+    # 缓存还没收进今日 bar 时(盘中/收盘当晚),两者本就是两个不同的日子,差 20pp 是
+    # 正常时序而不是错位 —— 07-27 就因此误报(−5.2% 是 07-24 bar,+20.2% 是 07-27 实时)。
+    # 那种情况的正确处置是 decision.py::_price_basis_note 的口径披露,不是报 bug。
     tc = snap.get("today_change")
-    dr = ((snap.get("intraday") or {}).get("snapshot") or {}).get("day_ret")
-    if isinstance(tc, (int, float)) and isinstance(dr, (int, float)) and abs(tc - dr) > 0.02:
+    intr = (snap.get("intraday") or {}).get("snapshot") or {}
+    dr = intr.get("day_ret")
+    as_of_md = str(snap.get("as_of") or "")[5:10].replace("-", "-")   # 'MM-DD'
+    same_session = bool(intr.get("session")) and intr.get("session") == as_of_md
+    if (isinstance(tc, (int, float)) and isinstance(dr, (int, float))
+            and same_session and abs(tc - dr) > 0.02):
         out.append(_issue("数据问题",
                           f"价格段今日 {tc*100:+.1f}% 与量能段当日 {dr*100:+.1f}% 相差"
-                          f" >2pp——两处快照可能不同步"))
+                          f" >2pp（同为 {as_of_md} 交易日）——两处快照可能不同步"))
     return out
 
 

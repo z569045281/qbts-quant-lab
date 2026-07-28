@@ -264,6 +264,29 @@ with an executable trade plan (entry/stop/target/RR/size), key drivers, and cata
 
 Mistakes worth not repeating — when you learn one, add a dated bullet here.
 
+- **2026-07-28 · 一个读数的「名字」和「产出它的公式」必须对得上,否则它会理直气壮地
+  说反话;同理,一个没人填的入参等于没有这个功能。** AI 自检 07-28 报了四条,查下来
+  三条真、且其中两条是同一个病的两种形态:**①名不副实** —— `intraday.py` 的
+  `surge_ratio = 末60分钟量量 / 当日自身每分钟均速`,被显示成「量比 0.9×(正常区间)」。
+  它按当日自我归一化,**结构上不可能看见日级别放量**:07-27 QBTS 全天 2.62× 天量
+  (4716万 vs 20日均量 1801万),它照样输出 0.93 并盖章"正常"。修:显示口径改成
+  「末60分 X× 当日均速」,另加真·量比 `day_vol_ratio`(当日/前20日均量)。
+  **②入参没人填** —— `api.py` 里 `analyze_smc/volume_profile/intrabar` 都接受
+  `live_price`,注释写着"so zones are measured against reality, not yesterday's close",
+  但它的来源 `_LIVE_QUOTE_CACHE` **只有本地 `/quote/live` 端点会写**;云端 publish 从不
+  走那条路,且 `refresh_decision` 里 `dashboard_snapshot()` 本来就排在 `quote_live()`
+  **之前** → 线上 `_live_px` 恒为 None,这些模块一直吃的是收盘价。于是暴涨日出现两个
+  「今天」:派生读数说"折价区3%/快%R −97.9",实时价其实已 +18.5%。**③守卫自己误报** ——
+  `selfcheck.py` 那条"价格段 vs 量能段差>2pp=快照不同步"的确定性规则,比的是 as_of 日线
+  bar 的涨跌 vs **当前 session** 的涨跌,两者在日线缓存落后时本就是不同的两天,于是
+  07-27 稳定误报;已改成只在 `intraday.session == as_of 的 MM-DD` 时才判矛盾。
+  **口径披露 > 偷偷修正**:本次没有让 live_price 真的流进 SMC/POC(那会在 8/15 测量窗口内
+  改变被评判信号的输入,得用户拍板),而是在决策 prompt 里加 `_price_basis_note` 把两个
+  基准摊开写明、背离≥3% 时明令"派生读数不得当现值采信,只作结构参照"。
+  **推论:凡是给读数起中文名/显示名的地方,回头核一遍公式算的到底是不是那个东西;凡是
+  加了可选入参来"提升精度"的地方,grep 一遍生产路径上到底有没有人传它。** 与
+  2026-07-22「没人读的标签只是装饰」同宗。
+
 - **2026-07-22 · A "分代记账" tag written at log time is worthless until something
   actually reads it at grading time.** `calibration.py::log_prediction` started
   tagging `model:"v2"` on 2026-07-17 with the comment "校准/审判按代际分开" — but

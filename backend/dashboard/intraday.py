@@ -33,6 +33,31 @@ _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
 _CACHE_TTL  = 300       # 5 minutes
 
 
+def _day_volume_ratio(ticker: str = "QBTS") -> float | None:
+    """真·量比 = 当日总成交量 / 前 20 个交易日均量。
+
+    与 surge_ratio 是两回事:surge_ratio 按当日自身均速归一化(答「盘中什么时候
+    在放量」),这个答「今天整体比平常放量多少」。日级别的新闻暴涨只有这个看得见。
+    """
+    try:
+        d = yf.download(ticker, period="60d", interval="1d",
+                        progress=False, auto_adjust=True)
+        if d is None or d.empty:
+            return None
+        if isinstance(d.columns, pd.MultiIndex):
+            d.columns = [c[0] for c in d.columns]
+        vol = d["Volume"].astype(float)
+        if len(vol) < 22:
+            return None
+        base = float(vol.iloc[-21:-1].mean())      # 前 20 日,不含当日
+        if base <= 0:
+            return None
+        return round(float(vol.iloc[-1]) / base, 2)
+    except Exception as e:
+        logger.warning(f"day volume ratio failed: {e}")
+        return None
+
+
 def _fetch_intraday(ticker: str = "QBTS") -> dict:
     """Pull 1-day of 1-min bars and compute the surge metrics."""
     # 2d so we get the previous session's close — "当日" must mean 较昨收
@@ -69,7 +94,11 @@ def _fetch_intraday(ticker: str = "QBTS") -> dict:
     last_60 = vol.tail(60)
     last_60_vol = float(last_60.sum())
     expected_60 = avg_vol_per_min * 60
+    # ⚠️ 口径:这是「末 60 分钟 vs 当日自身均速」,**不是**量比。它按当日自我
+    # 归一化,所以整天均匀放量时它照样 ≈1.0 —— 结构上不可能看见日级别放量。
+    # (07-27 实测:全天 2.6× 天量,本比值 0.93 → 曾被错标成「量比 0.9×」)
     surge_ratio = last_60_vol / expected_60 if expected_60 > 1 else 1.0
+    day_vol_ratio = _day_volume_ratio(ticker)
 
     # Tick direction over last hour
     if len(close) >= 60:
@@ -97,6 +126,7 @@ def _fetch_intraday(ticker: str = "QBTS") -> dict:
         "avg_vol_per_min": int(avg_vol_per_min),
         "last_60_vol":     int(last_60_vol),
         "surge_ratio":     round(surge_ratio, 2),
+        "day_vol_ratio":   day_vol_ratio,
     }
 
 
@@ -113,6 +143,12 @@ def _signal_from_intraday(s: dict) -> dict:
     intraday = s["day_ret"] if s.get("day_ret") is not None else s["intraday_ret"]
     last_hour = s["last_hour_ret"]
     tag = f"({s['session']}盘)" if s.get("session") else ""
+    # 全日量比单独说 —— surge 按当日自我归一化,看不见日级别放量(见 _fetch_intraday 注释)
+    dvr = s.get("day_vol_ratio")
+    day_vol_bit = ""
+    if dvr:
+        lvl = "天量" if dvr >= 2.5 else ("放量" if dvr >= 1.5 else ("缩量" if dvr < 0.7 else "常量"))
+        day_vol_bit = f" · 全日量比 {dvr:.1f}×({lvl})"
 
     signal = 0
     confidence = "low"
@@ -123,29 +159,32 @@ def _signal_from_intraday(s: dict) -> dict:
         # Major volume surge — direction matters
         if last_hour > 0.01:
             signal, confidence, mag = 1, "high", 0.35
-            bits.append(f"最后 1 小时量能 {surge:.1f}× 均值 + 价格上行 {last_hour*100:+.1f}%（主力买入）")
+            bits.append(f"末 60 分钟 {surge:.1f}× 当日均速 + 价格上行 {last_hour*100:+.1f}%（主力买入）")
         elif last_hour < -0.01:
             # Could be panic. If down a lot intraday, contrarian buy
             if intraday < -0.05:
                 signal, confidence, mag = 1, "medium", 0.25
-                bits.append(f"放量下跌 {surge:.1f}× + 当日 {intraday*100:.1f}%（恐慌见底）")
+                bits.append(f"尾盘放量下跌 末60分 {surge:.1f}× 当日均速 + 当日 {intraday*100:.1f}%（恐慌见底）")
             else:
                 signal, confidence, mag = -1, "medium", 0.20
-                bits.append(f"放量下跌 {surge:.1f}× + 最后小时 {last_hour*100:.1f}%（持续抛压）")
+                bits.append(f"尾盘放量下跌 末60分 {surge:.1f}× 当日均速 + 最后小时 {last_hour*100:.1f}%（持续抛压）")
     elif surge > 1.5:
         signal = 1 if last_hour > 0 else -1
         confidence = "medium"
         mag = 0.15
-        bits.append(f"中等量能涌入 {surge:.1f}× · 最后小时 {last_hour*100:+.1f}%")
+        bits.append(f"尾盘中等量能涌入 末60分 {surge:.1f}× 当日均速 · 最后小时 {last_hour*100:+.1f}%")
     elif surge < 0.4 and abs(intraday) > 0.03:
         # Trend fading — momentum exhaustion
         signal = -1 if intraday > 0 else 1
         confidence = "medium"
         mag = 0.18
-        bits.append(f"量能枯竭 {surge:.1f}× + 当日已 {intraday*100:+.1f}%（动量衰竭）")
+        bits.append(f"尾盘量能枯竭 末60分 {surge:.1f}× 当日均速 + 当日已 {intraday*100:+.1f}%（动量衰竭）")
 
     if not bits:
-        bits.append(f"量比 {surge:.1f}× · 当日 {intraday*100:+.1f}%（正常区间）")
+        # 「正常区间」只描述尾盘节奏,不得暗示全日成交也正常 —— 07-27 天量日曾
+        # 因两者混为一谈而输出「量比 0.9×(正常区间)」,与 2.6× 的实际天量相反。
+        bits.append(f"尾盘节奏平稳 末60分 {surge:.1f}× 当日均速 · 当日 {intraday*100:+.1f}%")
+    bits[-1] += day_vol_bit
     if tag:
         bits[-1] += f" {tag}"
 

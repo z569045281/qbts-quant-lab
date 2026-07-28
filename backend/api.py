@@ -974,6 +974,10 @@ async def dashboard_snapshot(force_refresh: bool = False):
     try:
         # SMC structural read — pass the live price when fresh so zones are
         # measured against reality, not yesterday's close.
+        # ⚠️ 已知局限(2026-07-28):_LIVE_QUOTE_CACHE 只有本地 /quote/live 端点会填,
+        # 云端 publish Lambda 从不走那条路 → 线上 _live_px 恒为 None,SMC/POC/日内
+        # 画像实际上一直吃的是收盘价。修不修属于"要不要在测量期改信号输入"的取舍,
+        # 已交用户拍板;在那之前不偷偷改行为,只在 price_basis 里如实披露口径。
         _lq = _LIVE_QUOTE_CACHE.get("payload")
         _live_px = None
         if _lq and (now - _LIVE_QUOTE_CACHE.get("ts", 0) < 300):
