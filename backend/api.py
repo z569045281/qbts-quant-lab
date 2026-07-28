@@ -971,17 +971,15 @@ async def dashboard_snapshot(force_refresh: bool = False):
     except Exception as e:
         market_light = None
         logger.warning(f"market context failed: {e}")
+    # 实时价:2026-07-28 前这里只读进程内 _LIVE_QUOTE_CACHE,而那个缓存**只有本地
+    # /quote/live 端点会写** —— 云端 publish 从不走那条路,且 refresh_decision 里
+    # dashboard_snapshot() 本就排在 quote_live() 之前 → 线上恒为 None,SMC/POC/日内
+    # 画像一直吃的是收盘价(注释却写着 "measured against reality")。用户拍板接通:
+    # 进程内缓存拿不到就回读 Supabase live_quote(quote_pusher 每分钟在写)。
+    _live_px = await asyncio.to_thread(_live_price_for_snapshot, now)
     try:
         # SMC structural read — pass the live price when fresh so zones are
         # measured against reality, not yesterday's close.
-        # ⚠️ 已知局限(2026-07-28):_LIVE_QUOTE_CACHE 只有本地 /quote/live 端点会填,
-        # 云端 publish Lambda 从不走那条路 → 线上 _live_px 恒为 None,SMC/POC/日内
-        # 画像实际上一直吃的是收盘价。修不修属于"要不要在测量期改信号输入"的取舍,
-        # 已交用户拍板;在那之前不偷偷改行为,只在 price_basis 里如实披露口径。
-        _lq = _LIVE_QUOTE_CACHE.get("payload")
-        _live_px = None
-        if _lq and (now - _LIVE_QUOTE_CACHE.get("ts", 0) < 300):
-            _live_px = (_lq.get("quotes", {}).get("qbts") or {}).get("price")
         # 15m bars for the SMC playbook trigger (CHoCH + WaveTrend dot). Loaded
         # here (not via load_or_fetch) so the (1h,1d) contract stays untouched;
         # None on failure → the playbook degrades to "cannot confirm trigger".
@@ -1039,7 +1037,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
         sector_rot = None
         logger.warning(f"sector_rotation failed: {e}")
     try:
-        nw_env = await asyncio.to_thread(analyze_nw_envelope, df_d)
+        nw_env = await asyncio.to_thread(analyze_nw_envelope, df_d, _live_px)
     except Exception as e:
         nw_env = {"active": False, "signal": 0, "rationale": f"NW 包络失败: {str(e)[:80]}"}
     try:
@@ -1157,6 +1155,45 @@ async def dashboard_snapshot(force_refresh: bool = False):
 
 
 _LIVE_QUOTE_CACHE: dict = {"ts": 0.0, "payload": None}
+
+# 实时价最大可接受年龄(秒)。夜盘/盘后 quote_pusher 仍在跑,但假日或推送挂掉时
+# live_quote 会定格在几小时前 —— 那种陈价注进 SMC/POC 比用收盘价更糟(它会假装
+# 自己是"现在"),所以宁可退回 None 让各模块用收盘价。
+_LIVE_PX_MAX_AGE = 20 * 60
+
+
+def _live_price_for_snapshot(now: float) -> float | None:
+    """快照用的 QBTS 实时价:先进程内缓存,再回读 Supabase `live_quote`。
+
+    拿不到 / 太陈旧一律返回 None —— 下游(SMC/POC/NW/日内画像)各自退回收盘价,
+    与 2026-07-28 之前的行为一致,不会因为这条链路失败而崩。
+    """
+    lq = _LIVE_QUOTE_CACHE.get("payload")
+    if lq and (now - _LIVE_QUOTE_CACHE.get("ts", 0) < 300):
+        px = (lq.get("quotes", {}).get("qbts") or {}).get("price")
+        if px:
+            return float(px)
+    try:
+        from supabase import create_client
+        url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
+        key = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
+        if not url or not key:
+            return None
+        row = (create_client(url, key).table("live_quote")
+               .select("data").eq("id", 1).single().execute()).data
+        data = (row or {}).get("data") or {}
+        px = ((data.get("quotes") or {}).get("qbts") or {}).get("price")
+        if not px:
+            return None
+        age = data.get("asof_epoch")
+        if age and (now - float(age)) > _LIVE_PX_MAX_AGE:
+            logger.info("live price too stale (%.0f min) — falling back to close",
+                        (now - float(age)) / 60)
+            return None
+        return float(px)
+    except Exception as e:
+        logger.warning(f"live price fallback failed: {e}")
+        return None
 
 
 @app.get("/quote/live")

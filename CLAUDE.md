@@ -280,9 +280,14 @@ Mistakes worth not repeating — when you learn one, add a dated bullet here.
   `selfcheck.py` 那条"价格段 vs 量能段差>2pp=快照不同步"的确定性规则,比的是 as_of 日线
   bar 的涨跌 vs **当前 session** 的涨跌,两者在日线缓存落后时本就是不同的两天,于是
   07-27 稳定误报;已改成只在 `intraday.session == as_of 的 MM-DD` 时才判矛盾。
-  **口径披露 > 偷偷修正**:本次没有让 live_price 真的流进 SMC/POC(那会在 8/15 测量窗口内
-  改变被评判信号的输入,得用户拍板),而是在决策 prompt 里加 `_price_basis_note` 把两个
-  基准摊开写明、背离≥3% 时明令"派生读数不得当现值采信,只作结构参照"。
+  **处置(用户拍板接通)**:`_live_price_for_snapshot()` 在进程内缓存拿不到时回读 Supabase
+  `live_quote`(quote_pusher 每分钟在写),超过 20 分钟的陈价一律退回 None 用收盘价——
+  **陈价注进 SMC/POC 比收盘价更糟,因为它会假装自己是"现在"**。`analyze_nw_envelope`
+  加 `live_price` 参数,但**只替换位置判定,带子仍由收盘构建**:拿盘中价重跑核回归
+  会让包络在自己脚下移动(repainting),而这个移植版存在的意义就是不重绘。决策 prompt
+  的 `_price_basis_note` 相应把读数分成「已用实时价」和「仍是收盘口径」两类分别交代。
+  ⚠️ 这改变了 8/15 受审信号(SMC playbook 还驱动 ntfy TRIGGER)的输入,审判时样本横跨
+  两套口径,分代看。
   **推论:凡是给读数起中文名/显示名的地方,回头核一遍公式算的到底是不是那个东西;凡是
   加了可选入参来"提升精度"的地方,grep 一遍生产路径上到底有没有人传它。** 与
   2026-07-22「没人读的标签只是装饰」同宗。

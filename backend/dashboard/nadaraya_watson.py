@@ -75,12 +75,19 @@ def _causal_nw(close: np.ndarray, h: float, lookback: int) -> np.ndarray:
 
 def analyze_nw_envelope(
     df_d: pd.DataFrame,
+    live_price: float | None = None,
     h: float = _H,
     mult: float = _MULT,
     level: float = _LEVEL,
     lookback: int = _LOOKBACK,
 ) -> dict:
     """Compute the non-repainting NW envelope on daily closes → a signal dict.
+
+    `live_price` (2026-07-28) only replaces **当前价** when evaluating where price
+    sits relative to the bands. The bands themselves stay built from closes on
+    purpose — re-running the kernel on an intrabar price would make the envelope
+    move under its own feet (repainting), which is exactly what the non-repainting
+    port exists to avoid. So: 带子来自收盘,位置判定用实时价。
 
     Never raises on bad/short input — returns {'active': False, ...} instead, so
     callers can treat it like any other optional signal module.
@@ -105,7 +112,10 @@ def analyze_nw_envelope(
     if not np.isfinite(mae.iloc[-1]) or mae.iloc[-1] <= 0:
         return {"active": False, "signal": 0, "rationale": "NW 残差异常，跳过"}
 
-    price = float(close.iloc[-1])
+    # 位置判定用实时价(拿不到就退回收盘);prev 永远是上一根**收盘**,这样
+    # crossed_in/out 读作"自上一收盘以来是否穿进触发线",口径仍然是非重绘的。
+    close_px = float(close.iloc[-1])
+    price = float(live_price) if live_price else close_px
     prev = float(close.iloc[-2])
     mid = float(nw.iloc[-1])
     up, lo = float(upper.iloc[-1]), float(lower.iloc[-1])
@@ -154,6 +164,8 @@ def analyze_nw_envelope(
            else "现价已进入顶部卖出区。" if stance == "near_upper"
            else "现价在区间内，无极值信号。")
         + "（用因果单边端点核,信号当根收盘即定、不重绘——真实胜率低于 TradingView 重绘版回测,这是可交易的数。）"
+        + (f"【口径:位置用实时价 ${price:.2f} 判定(收盘 ${close_px:.2f}),带子仍由收盘价构建、不随盘中重绘。】"
+           if live_price and abs(price - close_px) > 0.005 else "")
     )
 
     # Per-bar band series (last N bars) for the decision-page chart overlay.
@@ -176,6 +188,8 @@ def analyze_nw_envelope(
         "active": True,
         "signal": signal,
         "stance": stance,
+        "price_basis": "live" if (live_price and abs(price - close_px) > 0.005) else "close",
+        "close_px": round(close_px, 2),
         "nw": round(mid, 2),
         "upper": round(up, 2),
         "lower": round(lo, 2),

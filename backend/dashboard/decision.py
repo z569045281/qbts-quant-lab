@@ -164,8 +164,11 @@ HOLD 时 trade_plan 里 etf_ticker 用 null，但仍给出"若突破 $X 买 QBTX
 
 _BASIS_WARN_PCT = 0.03      # 收盘 vs 实时背离超过这个数就明写"派生读数不可当现值"
 
-# 全部由 as_of 那根日线收盘价推导、拿不到实时价重算的读数(用于背离时点名)
-_CLOSE_DERIVED = "SMC 折价/溢价区与订单块 · POC/成交量画像 · NW 包络 · 特调快慢%R · regime · 经典策略"
+# 2026-07-28 用户拍板接通实时价后,读数分成两类:
+#   位置类模块拿得到实时价(SMC/POC/日内画像/NW 包络的「当前位置」判定)
+#   其余仍是纯收盘推导 —— 背离大时只有后者会失真,得分开说
+_LIVE_AWARE = "SMC 折价/溢价区 · POC/成交量画像 · 日内画像 · NW 包络位置"
+_CLOSE_DERIVED = "特调快慢%R · regime 波动率档 · 经典策略(RSI2/CLV/均线等) · 相对估值 z40"
 
 
 def _price_basis_note(snapshot: dict, extras: dict | None) -> str:
@@ -182,24 +185,23 @@ def _price_basis_note(snapshot: dict, extras: dict | None) -> str:
     live = _num((((extras.get("live_quote") or {}).get("quotes") or {}).get("qbts") or {}).get("price"))
 
     if close is None or live is None or close <= 0:
-        return (f"## 📐 价格基准\n上方所有日线派生读数({_CLOSE_DERIVED})均基于 {as_of} 收盘价 "
-                f"${close if close is not None else '?'}。本次拿不到实时价,无法核对偏离。")
+        px_s = f"${close:.2f}" if close is not None else "价格缺失"
+        return (f"## 📐 价格基准\n本次拿不到实时价,全部读数(含 {_LIVE_AWARE})均退回 {as_of} "
+                f"收盘价 {px_s} 计算,无法核对偏离。")
 
     div = live / close - 1
-    head = (f"## 📐 价格基准（两个「今天」，别混用）\n"
-            f"- 日线收盘口径：${close:.2f}（{as_of}）— 上方及下方**所有**派生读数都由它算出："
-            f"{_CLOSE_DERIVED}\n"
-            f"- 实时价：${live:.2f}，较该收盘 {div*100:+.1f}%")
+    head = (f"## 📐 价格基准（{as_of} 收盘 ${close:.2f} → 实时 ${live:.2f}，{div*100:+.1f}%）\n"
+            f"- **已用实时价**：{_LIVE_AWARE} —— 这些「当前位置」类读数反映的是 ${live:.2f}，可直接采信\n"
+            f"- **仍是收盘口径**：{_CLOSE_DERIVED}")
     if abs(div) < _BASIS_WARN_PCT:
-        return head + "\n- 两者接近，派生读数可按现值采信。"
-    mis = ("典型误读:收盘价在区间底部→读数报「折价区/超卖」,而实时价其实已经冲到区间顶部。"
+        return head + f"\n- 两者仅差 {abs(div)*100:.1f}%，收盘口径读数也可按现值采信。"
+    mis = ("(收盘价在区间底部时它们会报「超卖/折价」,而实时价其实已经冲上去了)"
            if div > 0 else
-           "典型误读:收盘价在区间顶部→读数报「溢价区/超买」,而实时价其实已经砸到区间底部。")
-    return (head + f"\n- ⚠️ **背离 {abs(div)*100:.1f}% ≥ {_BASIS_WARN_PCT*100:.0f}%，上述派生读数已失真，"
-            f"今日不得当现值直接采信**。它们描述的是 ${close:.2f} 那个价位的状态，不是 ${live:.2f} 的。"
-            f"{mis}"
-            f"下判断请以实时价 ${live:.2f} 为准,派生读数只作**结构参照**(支撑/阻力/订单块的位置本身仍有效),"
-            f"不要引用它们的「当前位置」类结论(折价区百分比/%R 数值/包络内位置)。")
+           "(收盘价在区间顶部时它们会报「超买/溢价」,而实时价其实已经砸下来了)")
+    return (head + f"\n- ⚠️ **背离 {abs(div)*100:.1f}% ≥ {_BASIS_WARN_PCT*100:.0f}%，上面这行收盘口径的读数今日不得"
+            f"当现值采信**{mis}。它们描述的是 ${close:.2f} 那个价位的状态。"
+            f"引用它们时必须写明是 {as_of} 收盘口径,或干脆别引用其「当前位置」类结论"
+            f"(%R 数值/超买超卖判定/估值 z 值)。")
 
 
 def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
