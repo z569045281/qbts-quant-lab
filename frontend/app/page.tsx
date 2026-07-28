@@ -257,6 +257,14 @@ export default function Dashboard() {
     .filter(g => g.relevance !== "low")
     .slice(0, 7);
 
+  // 📣 公司催化剂雷达:云端 ~10min 刷新的 live 版优先于每日快照
+  const cat = live?.catalyst ?? snap.catalyst ?? null;
+  const catLive = !!live?.catalyst;
+  // low 全部滤掉 —— 一条 PR 会有十几家转载,全是 low,列出来只会淹掉真催化剂
+  const catItems = (cat?.items ?? [])
+    .filter(c => c.impact !== "low")
+    .slice(0, 6);
+
   return (
     <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-4">
 
@@ -1678,6 +1686,79 @@ export default function Dashboard() {
           <div className="mt-3 text-[10px] text-gray-400">
             Google News 每~30分钟盘中自动扫描(伊朗谈判/停火/空袭 · 川普关税/行政令 · 量子国防/出口管制)
             · 出现新高影响条目或风险级别翻转 → ntfy 手机推送 · AI 分级仅供参考
+          </div>
+        </section>
+      )}
+
+      {/* ══ 4.5 公司催化剂雷达（D-Wave 自身消息 + 板块同行）══════════════ */}
+      {cat && (
+        <section className={`rounded-3xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] border ${
+          cat.impact_level === "breaking" ? "bg-red-50/70 border-red-200"
+            : cat.impact_level === "watch" ? "bg-amber-50/50 border-amber-200"
+            : "bg-white border-transparent"}`}>
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+              📣 公司催化剂雷达 · D-Wave 自身 / 板块同行
+            </span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+              cat.impact_level === "breaking" ? "bg-red-600 text-white"
+                : cat.impact_level === "watch" ? "bg-amber-400 text-amber-950"
+                : "bg-emerald-100 text-emerald-700"}`}>
+              {cat.impact_cn}
+            </span>
+            {catLive && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-semibold animate-pulse">
+                盘中实时
+              </span>
+            )}
+            <span className="ml-auto text-[10px] text-gray-400 font-mono">
+              {fmtLocalDateTime(cat.as_of) ?? ""}
+            </span>
+          </div>
+
+          <div className="text-[15px] font-bold text-gray-900 mb-1.5">{cat.headline_cn}</div>
+          {cat.summary_cn && (
+            <p className="text-sm leading-relaxed text-gray-700 mb-3">{cat.summary_cn}</p>
+          )}
+
+          {catItems.length > 0 && (
+            <div className="space-y-2 border-t border-black/5 pt-3">
+              {catItems.map(c => (
+                <a key={c.key} href={c.url || "#"} target="_blank" rel="noopener noreferrer"
+                   className="block group">
+                  <div className="flex items-start gap-2">
+                    <span className={`shrink-0 mt-1 w-1.5 h-1.5 rounded-full ${
+                      c.direction === "bullish" ? "bg-emerald-500"
+                        : c.direction === "bearish" ? "bg-[#F03A3E]" : "bg-gray-300"}`} />
+                    <div className="min-w-0">
+                      <div className="text-sm text-gray-900 group-hover:text-[#006FFF] transition-colors leading-snug">
+                        <span className={`mr-1.5 text-[10px] px-1.5 py-0.5 rounded font-semibold align-[1px] ${
+                          c.track === "company" ? "bg-sky-100 text-sky-700"
+                            : "bg-violet-100 text-violet-700"}`}>
+                          {c.track_cn}
+                        </span>
+                        {c.title}
+                        {c.impact === "high" && (
+                          <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-red-600 text-white font-bold">催化剂</span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-[#525461] mt-0.5">
+                        {c.note_cn} <span className="text-gray-400">
+                          · {c.source}
+                          {typeof c.age_h === "number" && ` · ${c.age_h}h前`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-3 text-[10px] text-gray-400">
+            Google News 每~10分钟盘中自动扫描(D-Wave 合同/订单/产品/融资/上市变更 · 量子板块同行)
+            · 出现新的高影响催化剂 → ntfy 手机推送(同一条 PR 的多家转载只推一次)
+            · 零决策权,只做事件背景 · AI 分级仅供参考
           </div>
         </section>
       )}

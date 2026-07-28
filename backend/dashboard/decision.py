@@ -162,6 +162,8 @@ HOLD 时 trade_plan 里 etf_ticker 用 null，但仍给出"若突破 $X 买 QBTX
 的双向触发写进 entry_condition，让用户知道盘中该盯什么位。"""
 
 
+_DIR_CN_D = {"bullish": "偏多", "bearish": "偏空", "neutral": "中性"}
+
 _BASIS_WARN_PCT = 0.03      # 收盘 vs 实时背离超过这个数就明写"派生读数不可当现值"
 
 # 2026-07-28 用户拍板接通实时价后,读数分成两类:
@@ -356,6 +358,31 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
             + "  （QBTS 与伊朗战局/川普政策强联动 — 07-07 暴跌即谈判破裂所致。alert 级别下"
               "技术面买点先让位:降信心/缩仓位,并把「局势再升级」写进失效条件。）"
             + cross
+        )
+
+    # ── 📣 公司催化剂雷达（D-Wave 自身消息 + 板块同行）────────────
+    # 07-27 教训:AT&T 签约驱动的 +20.4% 单日暴涨,机械信号全盲。这一段专门回答
+    # 「今天的价格里有没有一件**事**」,与上面的价格派生读数是两类证据。
+    cat = snapshot.get("catalyst")
+    if cat and cat.get("impact_level"):
+        hot = [it for it in (cat.get("items") or []) if it.get("impact") == "high"]
+        mid = [it for it in (cat.get("items") or []) if it.get("impact") == "medium"]
+        rows = [f"  ★ [{it.get('track_cn','?')}/{_DIR_CN_D.get(it.get('direction'),'?')}]"
+                + (f" {it['age_h']}h前" if it.get("age_h") is not None else "")
+                + f" {it.get('title','')[:80]}\n      → {it.get('note_cn','')}"
+                for it in hot[:4]]
+        rows += [f"  · [{it.get('track_cn','?')}] {it.get('title','')[:70]}"
+                 for it in mid[:3]]
+        parts.append(
+            f"## 📣 公司催化剂雷达 {cat.get('impact_cn','?')} — {cat.get('headline_cn','')}\n"
+            f"  {cat.get('summary_cn','')}\n"
+            + ("\n".join(rows) + "\n" if rows else "")
+            + ("  【breaking 级】今日价格可能由这条消息主导,而不是由技术位主导。"
+               "技术面读数(超买/超卖/折价区)在事件驱动日的解释力显著下降 —— "
+               "写计划时必须先说清这条消息把什么定价进去了、还剩多少没定价。\n"
+               if cat.get("impact_level") == "breaking" else "")
+            + "  （零决策权的事件背景,不进 edge 权重;消息面情绪已由「新闻聚合」"
+              "单独计入,别把同一条消息数两遍。）"
         )
 
     # ── 期权流 ────────────────────────────────────────────────

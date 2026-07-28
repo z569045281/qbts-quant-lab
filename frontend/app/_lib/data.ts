@@ -57,6 +57,31 @@ export interface GeoRadar {
   alerted?:    string[];          // live_quote 携带的已推送 key(去重用)
 }
 
+export interface CatalystItem {
+  key:        string;
+  track:      "company" | "sector";
+  track_cn:   string;
+  title:      string;
+  source:     string;
+  published:  string;
+  age_h?:     number | null;
+  url:        string;
+  impact:     "high" | "medium" | "low";
+  direction:  "bullish" | "bearish" | "neutral";
+  note_cn:    string;
+}
+
+/** 📣 公司催化剂雷达 — D-Wave 自身消息 + 板块同行(零决策权,只做事件背景) */
+export interface CatalystRadar {
+  as_of:        string;
+  impact_level: "breaking" | "watch" | "quiet";
+  impact_cn:    string;
+  headline_cn:  string;
+  summary_cn:   string;
+  items:        CatalystItem[];
+  alerted?:     string[];         // live_quote 携带的已推送 key(去重用)
+}
+
 export interface Snapshot {
   as_of:        string;
   price:        number;
@@ -117,6 +142,7 @@ export interface Snapshot {
     risk_note:   string;
   } | null;
   geopolitics?: GeoRadar | null;
+  catalyst?:    CatalystRadar | null;
   smc?: SmcAnalysis | null;
   volume_profile?:    VolumeProfile | null;
   intrabar_profile?:  IntrabarProfile | null;
@@ -699,6 +725,8 @@ export interface LiveQuote {
   } | null;
   // 🌍 地缘政治雷达(云端 ~30min 刷新,比每日快照新 → 页面优先读它)
   geo?: GeoRadar | null;
+  // 📣 公司催化剂雷达(云端 ~10min 刷新,同上优先读 live 版)
+  catalyst?: CatalystRadar | null;
 }
 
 /** Live quote — Supabase row in deployed mode, local backend in dev. Null on failure. */

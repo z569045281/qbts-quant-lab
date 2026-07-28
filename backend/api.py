@@ -963,6 +963,15 @@ async def dashboard_snapshot(force_refresh: bool = False):
         geo_sig = None
         logger.warning(f"geopolitics failed: {e}")
     try:
+        # 📣 公司催化剂雷达(D-Wave 自身消息 + 板块同行)。07-27 的 +20.4% 是
+        # AT&T 签约驱动的,而机械信号对公司事件全盲 —— 这里补上。零 edge 权重:
+        # news.py 已占 _NEWS_WEIGHT=0.15,同一个消息面不计两次。
+        from dashboard.catalyst_radar import get_catalyst_snapshot
+        catalyst_sig = await asyncio.to_thread(get_catalyst_snapshot, force_refresh)
+    except Exception as e:
+        catalyst_sig = None
+        logger.warning(f"catalyst radar failed: {e}")
+    try:
         # 🚦 大盘红绿灯(SPY/QQQ vs 50日线 + VIX)。决策纪律 B-1 把「QQQ<50日线」
         # 列为一级信号,但快照此前没有该字段 → AI 每天盲判(自检 2026-07-09 报出)。
         # 复用自选扫描的同一实现,口径一致。
@@ -1073,6 +1082,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["holdings"]       = holdings_sig
     payload["macro"]          = macro_cal
     payload["geopolitics"]    = geo_sig
+    payload["catalyst"]       = catalyst_sig
     payload["market_light"]   = market_light
     payload["smc"]            = smc
     payload["volume_profile"] = vol_profile

@@ -96,6 +96,20 @@ def quote_handler(event, context):
         if prev_data.get("geo"):
             payload["geo"] = prev_data["geo"]
 
+    # 📣 公司催化剂雷达(D-Wave 自身消息 + 板块同行):minute%10==3 刷新。
+    # 07-27 那波 +20.4% 是 AT&T 签约驱动的,机械信号全盲、news.py 一天只跑一次,
+    # 等决策看见时跳空已经走完 —— 这条就是补那段。RSS 免费,Haiku 只在头条真的
+    # 变了才跑;推送有故事级去重 + 45min 冷却,一条 PR 的多家转载只响一次。
+    try:
+        from dashboard.catalyst_radar import maybe_catalyst_refresh
+        cat = maybe_catalyst_refresh(prev_data.get("catalyst"), now_et)
+        if cat:
+            payload["catalyst"] = cat
+    except Exception as e:
+        print(f"! catalyst radar skipped: {type(e).__name__}: {e}")
+        if prev_data.get("catalyst"):
+            payload["catalyst"] = prev_data["catalyst"]
+
     # 千元挑战第二期($5000 云端全自动,Alpaca paper)。模块自己挑
     # minute%15==2 的盘中分钟干活(错开 %5 的 SMC 分钟防超时),其余分钟秒退;
     # 状态直接写 crypto_challenge 表,不走 live_quote。
