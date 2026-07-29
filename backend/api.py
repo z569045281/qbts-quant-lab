@@ -1076,6 +1076,15 @@ async def dashboard_snapshot(force_refresh: bool = False):
     except Exception as e:
         strategy_replay = None
         logger.warning(f"strategy replay failed: {e}")
+    try:
+        # ⚠️ 事件日熔断(第二十八轮):极端跳空 / breaking 催化剂 → 技术面结论失效。
+        # 只加披露,不改任何已有读数的数值(预注册条件)。
+        from dashboard.event_day import detect_event_day
+        event_day = await asyncio.to_thread(detect_event_day, df_d, _live_px, catalyst_sig)
+    except Exception as e:
+        event_day = None
+        logger.warning(f"event_day detect failed: {e}")
+    payload["event_day"]      = event_day
     payload["options"]        = opt_sig
     payload["intraday"]       = intr_sig
     payload["sentiment"]      = sentiment_sig

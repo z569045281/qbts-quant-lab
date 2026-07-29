@@ -38,6 +38,13 @@
   用户在 moomoo 夜盘下单时仪表盘全黑。见 [MARKET-DATA.md](MARKET-DATA.md)。
 - 周日晚:`SundayNightBtc` `cron(1/10 20-23 ? * SUN)` ET。
 - 每日 09:00 ET:`PublishFunction`(全量 publish + 决策)。
+- **周日 20:05 ET:`SundayNightDecision`**(2026-07-29)—— 周一那份决策提前到夜盘开门。
+  09:00 ET 只比开盘早 30 分钟,而夜盘那时已跑 13.5 小时,周末跳空全在用户拿到决策之前
+  (2026-07-26 实例:夜盘 +3.2% 走完才轮到 23:00 墨尔本的决策)。`:05` 是等
+  `SundayNightBtc` 20:01 那条 `live_quote` 落库 + BTC 周日 UTC 线定案。
+  **必须锚 ET**:墨尔本 10 月初进夏令时、纽约 11 月初才退,锚墨尔本 10:00 会从 10 月起
+  提前到 19:00/18:00 ET,那时 `weekend_signal()` 返回 `None`(实测 19:55 ET → None)。
+  台账不重复:`log_prediction` 按 `as_of` 去重,与周一 09:00 那份同为上周五那根日线。
 
 ## 点击审计
 

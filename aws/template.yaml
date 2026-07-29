@@ -115,6 +115,24 @@ Resources:
             ScheduleExpression: "cron(0 9 ? * MON-FRI *)"   # 09:00 ET weekdays
             ScheduleExpressionTimezone: America/New_York
             Description: Auto-publish a fresh decision at market open.
+        SundayNightDecision:
+          Type: ScheduleV2
+          Properties:
+            # 周日 20:05 ET = 美股夜盘开门 + BTC 周日 UTC 线刚定案 = 墨尔本周一 10:05。
+            # 09:00 ET 那份只比开盘早 30 分钟,而夜盘那时已经跑了 13.5 小时 —— 周末
+            # 消息(BTC/地缘)造成的跳空全部发生在用户拿到决策之前(2026-07-26 实例:
+            # 夜盘 +3.2% 走完,23:00 墨尔本才收到决策)。这条把周一的决策提前 13 小时,
+            # 落在用户能下单的第一刻。
+            # 为什么是 :05 —— SundayNightBtc(cron 1/10 20-23)在 20:01 写第一条
+            # live_quote,等到 20:05 周末BTC信号齐了、夜盘实时价也有一条 4 分钟内的。
+            # 为什么锚 ET 而不是墨尔本 —— 两地夏令时切换错开(墨尔本 10 月初进、纽约
+            # 11 月初退),锚墨尔本 10:00 会从 10 月起提前到 19:00/18:00 ET 开跑,那时
+            # 夜盘还没开门、BTC 周日线还没定案,weekend_signal() 直接返回 None。
+            # 台账不受影响:log_prediction 按 as_of 去重,这份与周一 09:00 那份的
+            # as_of 同为上周五那根日线,只会记一条。
+            ScheduleExpression: "cron(5 20 ? * SUN *)"
+            ScheduleExpressionTimezone: America/New_York
+            Description: Monday's decision at US overnight-session open (Sun 20:05 ET).
 
   # ── Live quotes: one push per minute during US market hours ───────────────
   QuoteFunction:

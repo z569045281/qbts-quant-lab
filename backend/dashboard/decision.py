@@ -385,6 +385,17 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
               "单独计入,别把同一条消息数两遍。）"
         )
 
+    # ── ⚠️ 事件日熔断(第二十八轮,2026-07-29)────────────────────
+    # 极端跳空(≥±8%)或 breaking 催化剂 → 技术面读数实测无分辨力(p=0.72),
+    # 强制模型不得拿它们劝进/劝退。放在期权流之前,让它先于所有派生读数被读到。
+    try:
+        from dashboard.event_day import prompt_block as _event_block
+        _eb = _event_block(snapshot.get("event_day"))
+        if _eb:
+            parts.append(_eb)
+    except Exception:
+        pass
+
     # ── 期权流 ────────────────────────────────────────────────
     opt = snapshot.get("options")
     if opt:

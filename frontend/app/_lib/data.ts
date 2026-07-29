@@ -82,6 +82,20 @@ export interface CatalystRadar {
   alerted?:     string[];         // live_quote 携带的已推送 key(去重用)
 }
 
+/** ⚠️ 事件日熔断(第二十八轮):极端跳空 ≥±8% 或 breaking 催化剂 →
+ *  技术面读数实测无分辨力(n=37, t=+0.36, p=0.72),系统既不劝进也不劝退。
+ *  非事件日后端直接给 null,卡片自动消失。 */
+export interface EventDay {
+  is_event_day:    true;
+  reasons:         string[];
+  gap:             number | null;
+  gap_basis:       string;
+  catalyst_level?: string | null;
+  technical_muted: boolean;
+  evidence_cn:     string;
+  note_cn:         string;
+}
+
 export interface Snapshot {
   as_of:        string;
   price:        number;
@@ -143,6 +157,7 @@ export interface Snapshot {
   } | null;
   geopolitics?: GeoRadar | null;
   catalyst?:    CatalystRadar | null;
+  event_day?:   EventDay | null;
   smc?: SmcAnalysis | null;
   volume_profile?:    VolumeProfile | null;
   intrabar_profile?:  IntrabarProfile | null;
@@ -727,6 +742,9 @@ export interface LiveQuote {
   geo?: GeoRadar | null;
   // 📣 公司催化剂雷达(云端 ~10min 刷新,同上优先读 live 版)
   catalyst?: CatalystRadar | null;
+  // ⚠️ 事件日熔断(每分钟判,盘前就能亮 —— 等 09:00 的 publish 就晚了,
+  //    07-27 的跳空在 09:30 开盘那一刻就已经 +10.2%)
+  event_day?: EventDay | null;
 }
 
 /** Live quote — Supabase row in deployed mode, local backend in dev. Null on failure. */

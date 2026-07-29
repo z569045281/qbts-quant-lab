@@ -110,6 +110,21 @@ def quote_handler(event, context):
         if prev_data.get("catalyst"):
             payload["catalyst"] = prev_data["catalyst"]
 
+    # ⚠️ 事件日熔断(第二十八轮):极端跳空(≥±8%)或 breaking 催化剂 → 盘前就推一条,
+    # 告诉用户"今天技术面没有发言权"。**纯本地计算**(吃上面已经算好的 change_pct,
+    # 不拉任何行情),所以不挑分钟、每分钟都判,靠 push_key 每日去重。
+    # 起因:07-27 开盘跳空 +10.2%,而用户手上那份决策的技术面结论是"别追"。
+    try:
+        from dashboard.event_day import maybe_event_day_push
+        ev = maybe_event_day_push(prev_data.get("event_day"), now_et,
+                                  payload.get("quotes"), payload.get("catalyst"))
+        if ev:
+            payload["event_day"] = ev
+    except Exception as e:
+        print(f"! event_day skipped: {type(e).__name__}: {e}")
+        if prev_data.get("event_day"):
+            payload["event_day"] = prev_data["event_day"]
+
     # 千元挑战第二期($5000 云端全自动,Alpaca paper)。模块自己挑
     # minute%15==2 的盘中分钟干活(错开 %5 的 SMC 分钟防超时),其余分钟秒退;
     # 状态直接写 crypto_challenge 表,不走 live_quote。

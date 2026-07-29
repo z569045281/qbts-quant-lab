@@ -312,12 +312,48 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ══ ⚠️ 事件日熔断（第二十八轮）══════════════════════════════════════
+          07-27 那天 QBTS +20.4% / QBTX +40.1%，而系统给的技术面结论是"别追"。
+          复盘后把跳空重新分档：3~8% 档日内确实显著为负(t=-2.02)，但 ≥8% 档
+          t=+0.36 / p=0.72 —— 技术面在极端档没有任何分辨力。这张卡就是在那种日子
+          把"读数今天不算数"明说出来，而不是让一个失效的负期望继续拦人。
+          live 优先：夜盘/盘前就能亮，不用等 09:00 的 publish。 */}
+      {(() => {
+        const ev = live?.event_day ?? snap.event_day;
+        if (!ev?.is_event_day) return null;
+        return (
+          <section className="rounded-2xl border-2 border-orange-400 bg-orange-50 p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">⚠️</span>
+              <span className="text-sm font-bold text-orange-800">事件日 · 技术面结论已熔断</span>
+              {ev.gap !== null && (
+                <span className="ml-auto text-xs font-mono font-bold text-orange-700">
+                  {ev.gap >= 0 ? "+" : ""}{(ev.gap * 100).toFixed(1)}%
+                </span>
+              )}
+            </div>
+            <ul className="mb-2 space-y-1">
+              {ev.reasons.map((r, i) => (
+                <li key={i} className="text-sm text-orange-900">· {r}</li>
+              ))}
+            </ul>
+            <p className="text-[13px] leading-relaxed text-orange-900">{ev.note_cn}</p>
+            <p className="mt-2 text-[11px] text-orange-600 font-mono">{ev.evidence_cn}</p>
+          </section>
+        );
+      })()}
+
       {/* ══ 💌 给 Vivienne 的（大白话，无术语）══════════════════════════════ */}
       <section className="rounded-3xl border border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50/40 p-5 shadow-sm">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-base">💌</span>
           <span className="text-sm font-semibold text-rose-700">给 Vivienne 的</span>
-          <span className="ml-auto text-[10px] text-rose-300 font-mono">{snap.as_of?.slice(0, 10)}</span>
+          {/* 裸日期会被读成"这封信什么时候写的",但 as_of 是【最后一根已收盘日线】——
+              盘前/开盘那一刻发布时它必然是前一个交易日,看起来就像过期(2026-07-29 用户报)。
+              这张卡的读者不懂术语,所以显示生成时间并写清"写于";拿不到才退回带标签的 as_of。 */}
+          <span className="ml-auto text-[10px] text-rose-300 font-mono">
+            {genAt ? `写于 ${genAt}` : snap.as_of ? `数据截至 ${snap.as_of.slice(0, 10)}` : ""}
+          </span>
         </div>
         {(() => {
           const v = vivienneAction(d?.action);

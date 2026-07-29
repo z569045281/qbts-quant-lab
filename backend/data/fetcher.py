@@ -17,6 +17,24 @@ TICKER = "QBTS"
 DATA_DIR = Path(__file__).parent / "cache"
 DATA_DIR.mkdir(exist_ok=True)
 
+_MARKET_CLOSE_HOUR_ET = 16
+
+
+def _last_session_close_et() -> datetime:
+    """最近一次美股收盘时刻(ET,naive)。周末回退到周五。
+
+    **不查节假日**是有意的:节假日会让这个时刻落在一个没有交易的日子上,后果只是
+    缓存多刷一次(刷完文件时间就晚于它,之后照常命中),不会反复空刷。
+    """
+    from zoneinfo import ZoneInfo
+    now = datetime.now(ZoneInfo("America/New_York")).replace(tzinfo=None)
+    close = now.replace(hour=_MARKET_CLOSE_HOUR_ET, minute=0, second=0, microsecond=0)
+    if now < close:
+        close -= timedelta(days=1)
+    while close.weekday() > 4:          # 周六/周日 → 回退到周五
+        close -= timedelta(days=1)
+    return close
+
 
 def _clean_ohlcv(df: pd.DataFrame, freq: str) -> pd.DataFrame:
     """Normalize and clean raw yfinance DataFrame."""
@@ -184,10 +202,21 @@ def load_or_fetch(ticker: str = TICKER, force_refresh: bool = False):
 
     cache_stale = False
     if h_path.exists() and d_path.exists():
+        # 判"新鲜"要按【日线的更新节奏】,不是按挂钟走了多久。旧实现用 age>24h,
+        # 与"每交易日 16:00 ET 出一根新 bar"错配:周一 09:02 的定时发布写下缓存
+        # (里面最新的 bar 是上周五),周一 21:33 再发布时它才 12.5 小时"新",于是
+        # 整晚发出的 as_of 仍停在周五 —— 漏掉一整个交易日(2026-07-29 查实,
+        # 线上 id 123/124 中招)。改成:缓存写入时刻早于最近一次收盘 → 过期。
+        # ⚠️ 盘中不因此而刷新:日线最后一根是活的部分 bar,非强制调用方整天沿用
+        # 写入时的快照(与旧行为一致);当前价由 api 的 _live_price_for_snapshot 负责。
+        from zoneinfo import ZoneInfo
         oldest_mtime = min(h_path.stat().st_mtime, d_path.stat().st_mtime)
-        age_hours = (datetime.now() - datetime.fromtimestamp(oldest_mtime)).total_seconds() / 3600
-        if age_hours > 24:
-            logger.info(f"Cache is {age_hours:.1f}h old — refreshing")
+        written = (datetime.fromtimestamp(oldest_mtime, ZoneInfo("America/New_York"))
+                   .replace(tzinfo=None))
+        last_close = _last_session_close_et()
+        if written < last_close:
+            logger.info(f"Cache written {written:%Y-%m-%d %H:%M} ET, before last close "
+                        f"{last_close:%Y-%m-%d %H:%M} ET — refreshing")
             cache_stale = True
 
     if not force_refresh and not cache_stale and h_path.exists() and d_path.exists():
