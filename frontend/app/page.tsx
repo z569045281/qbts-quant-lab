@@ -979,6 +979,28 @@ export default function Dashboard() {
                 {smc.signal > 0 ? "偏多" : smc.signal < 0 ? "偏空" : "中性"}
               </span>
             </div>
+            {/* 两级结构并列显示。以前只暴露 internal 一个，用户对着 TradingView 的
+                swing 结构问「为什么显示多头锁定，这是重大 bug」——其实两个尺度方向
+                本来就常年不一致，图上的「Strong/Weak Low」标签正是 swing 那一级。 */}
+            {smc.swing_trend && (
+              <div className={`mb-3 rounded-xl border p-3 text-[12px] ${
+                smc.trend_divergence
+                  ? "border-amber-300 bg-amber-50 text-amber-900"
+                  : "border-[#EDEDF0] bg-[#FAFAFB] text-[#525461]"}`}>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 font-mono">
+                  <span>internal(5) <b>{smc.trend}</b> ← 方向锁</span>
+                  <span>swing(50) <b>{smc.swing_trend}</b>
+                    {smc.strong_low_label ? `（图上：${smc.strong_low_label}）` : ""}</span>
+                </div>
+                {smc.trend_divergence && (
+                  <div className="mt-1.5 leading-relaxed">
+                    ⚠️ 两级<b>背离</b>：小级别的反转还没被大级别确认。按「逆大势的战术单」
+                    对待——仓位更小、持有期更短。
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* ── 顺势纪律 Playbook(整体评判标准):全局锁 → 降维中继 → 15m 扣扳机 → FVG ── */}
             {pb && (
               <div className="mb-3 rounded-xl border border-[#EDEDF0] bg-[#FAFAFB] p-3">

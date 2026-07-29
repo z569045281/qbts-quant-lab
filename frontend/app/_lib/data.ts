@@ -226,7 +226,16 @@ export interface SmcPlaybook {
 export interface SmcAnalysis {
   signal: -1 | 0 | 1;
   label:  "BUY" | "SELL" | "HOLD";
+  /** LuxAlgo internal(5) —— 方向锁用它 */
   trend:  "bullish" | "bearish" | "neutral";
+  /** LuxAlgo swing(50) —— 大级别背景。图上「Strong/Weak Low」标签由它决定；
+   *  与 trend 背离是常态，以前只暴露一个才让人误以为是 bug（2026-07-29）。 */
+  swing_trend?: "bullish" | "bearish" | "neutral";
+  trend_divergence?: boolean;
+  strong_low_label?: string;
+  swing_pivot?:    { high: number | null; low: number | null };
+  internal_pivot?: { high: number | null; low: number | null };
+  epoch?: string;
   last_event: { date: string; kind: "BOS" | "CHoCH"; dir: "bullish" | "bearish"; level: number } | null;
   zone:   string;
   range_position: number;

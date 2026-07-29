@@ -57,7 +57,37 @@ TP2 = 区间极值。
 **它是风控/纪律工具,不是收益引擎**(mining.md 已判死:全保真 40 天仅 1 枪;ARMED 版 +5.5%/年)。
 和其它信号一样 **UNPROVEN**,直到纸面台账/journal 的记录真的显出 edge —— 见 [AUDIT-AND-EDGE.md](AUDIT-AND-EDGE.md)。
 
-## 日线摆动敏感度 k(2026-07-29 由 2 → 8,口径代际变更)
+## 结构引擎 = LuxAlgo 忠实移植(2026-07-29,`epoch = luxport-20260729`)
+
+用户贴来 LuxAlgo「Smart Money Concepts」Pine 源码后照它重写了 `lux_structure()`。
+**旧的 `analyze_structure` 与原算法三处都不一样**,已整体删除:
+
+| | 旧实现 | LuxAlgo |
+|---|---|---|
+| pivot 检测 | 对称 fractal(前后各 k 根) | `leg()` **单边前视**:`high[size] > ta.highest(size)`,pivot 在 leg 翻转时落定 |
+| 破坏判定 | 遍历**所有**历史摆动高点,破任一个就翻多 | **只认「当前那一个」** pivot,破了打 `crossed` 永不复用 |
+| crossover | 只要 `close > level` | 还要求 `close[1] <= level` |
+
+**这才是「多头锁定」的真凶**:下跌途中旧实现会攒下一队没被破的老高点,07-27 一根
++20.4% 破掉了三天前的 $18.02 就翻多 —— 而 LuxAlgo 眼里当前 internal pivot high 是
+**$24.73**,19.51 根本够不着,所以它不翻。改 k(2→8)只是压住症状,换引擎才是根治。
+
+### 两级结构必须同时暴露
+
+LuxAlgo 本来就同时跑两套,而且**方向常年不一致**:
+
+```
+internal(5)  bearish   ← 方向锁用它;K 线着色也是它
+swing(50)    bullish   ← 图上「Strong/Weak Low」标签由它决定
+```
+
+用户就是因为只看到其中一个才以为是 bug。现在 `swing_trend` / `trend_divergence` /
+`strong_low_label` 全部随快照带出,决策 prompt 与卡片都明示背离,并要求背离时
+按「逆大势的战术单」处理(仓位更小、持有期更短)。
+
+**外部验证**:移植代码预测「图上底部标签 = Strong Low」,与用户截图一致。
+
+## 附:日线摆动敏感度 k(同日 2 → 8;现仅用于 sweeps/dealing range/order block)
 
 用户对着 TradingView 的 LuxAlgo(swing 50)问「为什么 SMC 显示多头锁定,这是重大 bug」——
 查下来不是显示错,是**参数定错了尺度**。07-27 那根 +20.4% 击穿 $18.02(3 天前的一个

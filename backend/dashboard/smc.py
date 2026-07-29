@@ -27,27 +27,20 @@ except ImportError:  # allow running as a loose module
     from wavetrend import analyze_wavetrend
 
 
-# 日线趋势锁的摆动敏感度。**2026-07-29 由 2 改为 8(用户拍板),这是口径代际变更。**
+# `find_swings` 的对称 fractal 敏感度。**它已不再决定趋势方向** —— 2026-07-29 起
+# 结构判定整体换成 LuxAlgo 忠实移植 `lux_structure()`(见其文档),这个 k 只喂
+# sweeps / dealing range / order block 那几处"有哪些摆动极值"的用途。
 #
-# 起因:07-27 那根 +20.4% 击穿了 $18.02(其实只是 3 天前的一个小高点)→ 触发
-# 看涨 CHoCH → 日线锁翻成「多头锁定:只找做多,不做空」,而同期价格在所有均线
-# 下方、7 月累计 −29%。用户对着 TradingView 的 LuxAlgo(swing 50)问"这不是
-# 重大 bug 吗" —— 查下来不是显示错,是**参数定错了尺度**:
+# 变更轨迹(同日两次,都记在 epoch 里):
+#   ① k 由 2 → 8:压住"下跌途中破一个陈旧小高点就翻多"的症状
+#   ② 换引擎:根治 —— 旧实现遍历所有历史高点、破任意一个就翻多,而 LuxAlgo
+#      只认「当前那一个」pivot。07-27 实测:旧版破 $18.02 翻多,LuxAlgo 眼里
+#      当前 pivot high 是 $24.73,19.51 根本够不着,所以它不翻。
 #
-#   k=2(旧)  → bullish   近1年翻转 6 次 / 平均维持 35.5 天   ← 唯一说多的设置
-#   k=3      → bullish   6 次 / 35.5 天
-#   k=5      → bearish   5 次 / 42.6 天
-#   k=8(新)  → bearish   5 次 / 42.6 天   ← 与用户图上的 swing 结构同向
-#   k=20     → bearish   1 次 / 213 天
-#
-# k=2 = 前后各 2 根就算一个摆动高点,在 ATR 9.6% 的票上那是内部噪声,不是结构 ——
-# 拿它去下「不做空」这种指令性结论,与 07-28/07-29 连着栽的两条同宗:
-# **读数在它没有分辨力的尺度上假装自己有分辨力。**
-#
-# ⚠️ SMC playbook 驱动 ntfy TRIGGER 且是 8/15 受审信号,本次变更后样本横跨两套
-# 口径 —— `smc.epoch` 随快照带出,审判时按它分代统计,别把两代混在一起算胜率。
+# ⚠️ SMC playbook 驱动 ntfy TRIGGER 且是 8/15 受审信号,`smc.epoch` 随快照带出,
+# 审判按代际分组统计,别把几代混在一起算胜率。
 _DAILY_SWING_K = 8
-SMC_EPOCH = "k8-20260729"      # 口径代际标签(8/15 审判按它分组)
+SMC_EPOCH = "luxport-20260729"   # 口径代际标签(8/15 审判按它分组)
 
 # LTF(1h/15m)不动:日内本来就该用短摆动,而且它们不驱动方向锁。
 
@@ -69,45 +62,76 @@ def find_swings(df: pd.DataFrame, k: int = 2) -> tuple[list[dict], list[dict]]:
 
 # ── market structure (BOS / CHoCH) ───────────────────────────────────────────
 
-def analyze_structure(df: pd.DataFrame, swing_highs: list[dict], swing_lows: list[dict]) -> dict:
+_INTERNAL_LEN = 5      # LuxAlgo: getCurrentStructure(5, false, true) —— 硬编码
+_SWING_LEN    = 50     # LuxAlgo: swingsLengthInput 默认 50
+
+
+def lux_structure(df: pd.DataFrame, size: int) -> dict:
+    """LuxAlgo「Smart Money Concepts」结构引擎的**忠实移植**(2026-07-29)。
+
+    对照 Pine 源码三处关键差异 —— 我们旧的 `analyze_structure` 三处都不一样:
+
+    ① **pivot 用单边前视确认,不是对称 fractal**
+       `leg(size)`: `high[size] > ta.highest(size)` —— 只要求"这根比它之后的
+       size 根都高",不管它之前。pivot 在 leg 状态**翻转**的那一刻落定。
+
+    ② **只跟踪「当前那一个」pivot,破了就打 crossed 永不复用**
+       旧实现遍历**所有**历史摆动高点,破掉任意一个就翻多 —— 下跌途中会攒下
+       一队没被破的老高点,一反弹就可能破掉一个又老又低的(2026-07-27 实测:
+       破 $18.02 翻多,而 LuxAlgo 眼里"当前 pivot high"是 $24.73,够都够不着),
+       而且同一根 K 线里能一次点燃多个事件,趋势被其中最弱的那个翻掉。
+
+    ③ **crossover 要求上一根还在下方**(`close[1] <= level`),不是"只要高于"。
+
+    返回结构与旧版一致(trend / last_event / recent_events),额外给出当前未被
+    穿越的 pivot,供上层做背离披露。
     """
-    Walk closes against swing levels to find the latest structure event.
-      BOS   = break in the direction of the prevailing trend (continuation)
-      CHoCH = first break against the prevailing trend (potential reversal)
-    """
-    closes = df["close"].values
+    h = df["high"].astype(float).values
+    l = df["low"].astype(float).values
+    c = df["close"].astype(float).values
     n = len(df)
-    trend = 0                  # +1 bullish / -1 bearish / 0 unknown
-    last_event = None
 
+    leg = 0                      # 0 = BEARISH_LEG, 1 = BULLISH_LEG
+    ph = pl = None
+    ph_crossed = pl_crossed = True
+    trend = 0
     events: list[dict] = []
-    hi_q = [s for s in swing_highs]
-    lo_q = [s for s in swing_lows]
 
-    broken_high_i = set()
-    broken_low_i  = set()
     for i in range(n):
-        c = closes[i]
-        for s in hi_q:
-            if s["i"] < i and s["i"] not in broken_high_i and c > s["price"]:
-                broken_high_i.add(s["i"])
-                kind = "BOS" if trend >= 0 else "CHoCH"
-                trend = 1
-                events.append({"i": i, "date": df.index[i].strftime("%m-%d"),
-                               "kind": kind, "dir": "bullish", "level": s["price"]})
-        for s in lo_q:
-            if s["i"] < i and s["i"] not in broken_low_i and c < s["price"]:
-                broken_low_i.add(s["i"])
-                kind = "BOS" if trend <= 0 else "CHoCH"
-                trend = -1
-                events.append({"i": i, "date": df.index[i].strftime("%m-%d"),
-                               "kind": kind, "dir": "bearish", "level": s["price"]})
+        if i >= size:
+            win_hi = h[i - size + 1:i + 1].max()      # ta.highest(size)
+            win_lo = l[i - size + 1:i + 1].min()      # ta.lowest(size)
+            new_leg = leg
+            if h[i - size] > win_hi:
+                new_leg = 0                           # startOfBearishLeg → pivot HIGH
+            elif l[i - size] < win_lo:
+                new_leg = 1                           # startOfBullishLeg → pivot LOW
+            if new_leg != leg:
+                if new_leg == 1:
+                    pl, pl_crossed = float(l[i - size]), False
+                else:
+                    ph, ph_crossed = float(h[i - size]), False
+                leg = new_leg
 
-    last_event = events[-1] if events else None
+        if i == 0:
+            continue
+        if ph is not None and not ph_crossed and c[i] > ph and c[i - 1] <= ph:
+            events.append({"i": i, "date": df.index[i].strftime("%m-%d"),
+                           "kind": "CHoCH" if trend < 0 else "BOS",
+                           "dir": "bullish", "level": ph})
+            ph_crossed, trend = True, 1
+        if pl is not None and not pl_crossed and c[i] < pl and c[i - 1] >= pl:
+            events.append({"i": i, "date": df.index[i].strftime("%m-%d"),
+                           "kind": "CHoCH" if trend > 0 else "BOS",
+                           "dir": "bearish", "level": pl})
+            pl_crossed, trend = True, -1
+
     return {
         "trend": "bullish" if trend > 0 else ("bearish" if trend < 0 else "neutral"),
-        "last_event": last_event,
-        "recent_events": events[-40:],   # 窗口够 15m CHoCH 回看;find_order_blocks 全扫(未回补即保留)
+        "last_event": events[-1] if events else None,
+        "recent_events": events[-40:],
+        "pivot_high": round(ph, 2) if ph is not None else None,
+        "pivot_low":  round(pl, 2) if pl is not None else None,
     }
 
 
@@ -232,8 +256,7 @@ def _frame_zones(df: pd.DataFrame | None, k: int = 2, tail: int = 320) -> tuple[
     if df is None or len(df) < 2 * k + 12:
         return [], []
     d = df.tail(tail)
-    sh, sl = find_swings(d, k=k)
-    st = analyze_structure(d, sh, sl)
+    st = lux_structure(d, _INTERNAL_LEN)      # 与日线同一套引擎(LuxAlgo internal)
     obs = find_order_blocks(d, st["recent_events"])
     fvgs = find_fvgs(d, lookback=min(120, len(d)))
     return obs, fvgs
@@ -245,8 +268,7 @@ def _ltf15_trigger(df_15m: pd.DataFrame | None, lock: str) -> dict | None:
     if df_15m is None or len(df_15m) < 40:
         return None
     d15 = df_15m.tail(220)
-    sh, sl = find_swings(d15, k=2)
-    st15 = analyze_structure(d15, sh, sl)
+    st15 = lux_structure(d15, _INTERNAL_LEN)  # 同上 —— 一个模块里不留两套结构引擎
     wt = analyze_wavetrend(d15)
     le15 = st15.get("last_event")
     n15 = len(d15)
@@ -543,8 +565,7 @@ def analyze_ltf_structure(df_h: pd.DataFrame, bars: int = 240, k: int = 3) -> di
     if df_h is None or len(df_h) < 2 * k + 5:
         return None
     d = df_h.tail(bars)
-    sh, sl = find_swings(d, k=k)
-    st = analyze_structure(d, sh, sl)
+    st = lux_structure(d, _INTERNAL_LEN)      # 同上
     return {"trend": st["trend"], "last_event": st["last_event"]}
 
 
@@ -562,7 +583,19 @@ def analyze_smc(df: pd.DataFrame, live_price: float | None = None,
     price = float(live_price if live_price else df["close"].iloc[-1])
 
     swing_highs, swing_lows = find_swings(d, k=_DAILY_SWING_K)
-    structure = analyze_structure(d, swing_highs, swing_lows)
+
+    # 结构走 LuxAlgo 忠实移植(见 lux_structure 文档)。在**全量**日线上算,不是
+    # tail(120) —— pivot 的 crossed 状态从图表起点累积,截断会改变"当前 pivot"
+    # 是哪一个。事件下标再平移回 d 的坐标系,供 order block 使用。
+    _off = len(df) - len(d)
+    _full = df.rename(columns=str.lower)
+    structure = lux_structure(_full, _INTERNAL_LEN)
+    swing_struct = lux_structure(_full, _SWING_LEN)
+    structure["recent_events"] = [
+        {**e, "i": e["i"] - _off} for e in structure["recent_events"] if e["i"] >= _off]
+
+    # find_swings 仍然保留 —— sweeps / dealing range / order block 用它,那几处要的是
+    # "有哪些摆动极值",不是"结构翻没翻",与 LuxAlgo 的 leg 机制不冲突。
     fvgs      = find_fvgs(d)
     obs       = find_order_blocks(d, structure["recent_events"])
     sweeps    = find_sweeps(d, swing_highs, swing_lows)
@@ -626,7 +659,17 @@ def analyze_smc(df: pd.DataFrame, live_price: float | None = None,
         "score":  score,
         "epoch":  SMC_EPOCH,      # 口径代际 —— 8/15 审判按它分组,别把两代混算胜率
         "swing_k": _DAILY_SWING_K,
-        "trend":  structure["trend"],
+        "trend":  structure["trend"],          # = LuxAlgo internal(5),方向锁用它
+        # LuxAlgo swing(50):大背景。图上「Strong/Weak Low」标签就是它决定的
+        # (源码 `swingTrend.bias == BULLISH ? 'Strong Low' : 'Weak Low'`)。
+        # 两者背离是常态 —— 用户图上一直是「Strong Low + 空头 K 线着色」并存,
+        # 只是没人告诉他那是两套结构。这里显式带出来,不再让人误以为只有一个趋势。
+        "swing_trend": swing_struct["trend"],
+        "swing_pivot": {"high": swing_struct["pivot_high"], "low": swing_struct["pivot_low"]},
+        "internal_pivot": {"high": structure["pivot_high"], "low": structure["pivot_low"]},
+        "strong_low_label": ("Strong Low" if swing_struct["trend"] == "bullish" else "Weak Low"),
+        "trend_divergence": bool(swing_struct["trend"] != structure["trend"]
+                                 and "neutral" not in (swing_struct["trend"], structure["trend"])),
         "last_event": structure["last_event"],
         "ltf":        ltf,
         "confluence": confluence,
