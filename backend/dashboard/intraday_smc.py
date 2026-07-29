@@ -65,6 +65,19 @@ def maybe_notify_trigger(prev_state: str | None, smc_payload: dict) -> bool:
     state = pb.get("state")
     if state != "TRIGGER" or prev_state == "TRIGGER":
         return False
+
+    # ⛔ 空头腿不响铃(2026-07-29)。铁律:判死的策略不复活 —— 做空 QBTS 的**全部
+    # 已知路径**都已判死(第十三轮空头家族终审、第二十三轮 bear lock、本轮又新判死
+    # 暴涨次日日内空/暴涨日收盘买),档案原文写明 QBTZ 唯一残留用途 = 未来若出现
+    # 新的、独立验证的看空信号,而那个信号目前不存在。
+    #
+    # 为什么现在才需要这道闸:日线摆动 k 由 2 改 8 后,空头 playbook 的 RR 从 1.79
+    # 变成 5.84 —— 以前是被 RR<2 熔断顺手挡住的,现在它能过闸了。**靠另一道闸的
+    # 副作用来维持铁律,等于没有维持。** bear lock 仍然照常进卡片和决策 prompt
+    # 当方向过滤器/风控背景,只是不推"去做空"这个动作。
+    if (pb.get("lock") == "bear") or (pb.get("side_cn") == "做空"):
+        print("! SMC 空头扳机不推送(做空路径已判死,bear lock 只作过滤器)")
+        return False
     ez = pb.get("entry_zone") or {}
     tp1 = (pb.get("tp1") or {}).get("price")
     lines = [

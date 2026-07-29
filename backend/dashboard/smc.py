@@ -27,6 +27,31 @@ except ImportError:  # allow running as a loose module
     from wavetrend import analyze_wavetrend
 
 
+# 日线趋势锁的摆动敏感度。**2026-07-29 由 2 改为 8(用户拍板),这是口径代际变更。**
+#
+# 起因:07-27 那根 +20.4% 击穿了 $18.02(其实只是 3 天前的一个小高点)→ 触发
+# 看涨 CHoCH → 日线锁翻成「多头锁定:只找做多,不做空」,而同期价格在所有均线
+# 下方、7 月累计 −29%。用户对着 TradingView 的 LuxAlgo(swing 50)问"这不是
+# 重大 bug 吗" —— 查下来不是显示错,是**参数定错了尺度**:
+#
+#   k=2(旧)  → bullish   近1年翻转 6 次 / 平均维持 35.5 天   ← 唯一说多的设置
+#   k=3      → bullish   6 次 / 35.5 天
+#   k=5      → bearish   5 次 / 42.6 天
+#   k=8(新)  → bearish   5 次 / 42.6 天   ← 与用户图上的 swing 结构同向
+#   k=20     → bearish   1 次 / 213 天
+#
+# k=2 = 前后各 2 根就算一个摆动高点,在 ATR 9.6% 的票上那是内部噪声,不是结构 ——
+# 拿它去下「不做空」这种指令性结论,与 07-28/07-29 连着栽的两条同宗:
+# **读数在它没有分辨力的尺度上假装自己有分辨力。**
+#
+# ⚠️ SMC playbook 驱动 ntfy TRIGGER 且是 8/15 受审信号,本次变更后样本横跨两套
+# 口径 —— `smc.epoch` 随快照带出,审判时按它分代统计,别把两代混在一起算胜率。
+_DAILY_SWING_K = 8
+SMC_EPOCH = "k8-20260729"      # 口径代际标签(8/15 审判按它分组)
+
+# LTF(1h/15m)不动:日内本来就该用短摆动,而且它们不驱动方向锁。
+
+
 # ── swings ───────────────────────────────────────────────────────────────────
 
 def find_swings(df: pd.DataFrame, k: int = 2) -> tuple[list[dict], list[dict]]:
@@ -536,7 +561,7 @@ def analyze_smc(df: pd.DataFrame, live_price: float | None = None,
 
     price = float(live_price if live_price else df["close"].iloc[-1])
 
-    swing_highs, swing_lows = find_swings(d)
+    swing_highs, swing_lows = find_swings(d, k=_DAILY_SWING_K)
     structure = analyze_structure(d, swing_highs, swing_lows)
     fvgs      = find_fvgs(d)
     obs       = find_order_blocks(d, structure["recent_events"])
@@ -599,6 +624,8 @@ def analyze_smc(df: pd.DataFrame, live_price: float | None = None,
         "signal": signal,
         "label":  label,
         "score":  score,
+        "epoch":  SMC_EPOCH,      # 口径代际 —— 8/15 审判按它分组,别把两代混算胜率
+        "swing_k": _DAILY_SWING_K,
         "trend":  structure["trend"],
         "last_event": structure["last_event"],
         "ltf":        ltf,
