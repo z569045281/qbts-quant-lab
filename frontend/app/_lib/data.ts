@@ -158,6 +158,9 @@ export interface Snapshot {
   geopolitics?: GeoRadar | null;
   catalyst?:    CatalystRadar | null;
   event_day?:   EventDay | null;
+  /** 数据源健康。上游给过坏 bar / 最新一根倒退时 ok=false —— 坏数据已被拦在
+   *  缓存外,但必须让人看见,否则页面照常绿油油、没人知道读的是补回来的缓存。 */
+  data_health?: { ok: boolean; issues: string[] } | null;
   smc?: SmcAnalysis | null;
   volume_profile?:    VolumeProfile | null;
   intrabar_profile?:  IntrabarProfile | null;

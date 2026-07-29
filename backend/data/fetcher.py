@@ -36,6 +36,35 @@ def _last_session_close_et() -> datetime:
     return close
 
 
+# 上游给出坏 bar 时的记录(api.py 读它,让自检/决策看得见数据源出过问题)。
+LAST_FETCH_ISSUES: list[str] = []
+
+
+def _bad_ohlcv_rows(df: pd.DataFrame) -> pd.Index:
+    """违反 OHLC 硬不变式的行。**这些不是"可疑",是数学上不可能的**:
+
+        low ≤ min(open, close) ≤ max(open, close) ≤ high,  且 high ≥ low > 0
+
+    所以零误报 —— 一只票连续两天收在同一价位是正常的,但收盘价掉到当日最低价
+    **之下**永远不正常。
+
+    2026-07-28 实例:yfinance 一度把 QBTS 07-28 这行给成
+    `open 18.70 / high 18.89 / low 17.26 / close 16.21` —— 16.21 恰是 **07-24
+    的收盘价**被贴了进来,比当日最低价还低 1.05。真实收盘 17.64(30m bar、
+    盘后连续报价、Alpaca 夜盘盘口三方一致)。若这根被写进缓存,%R / RSI /
+    SMC 折价区 / 200日线全部会基于一个不存在的价格,而且**没有任何下游能发现**。
+    """
+    o, h, l, c = (df[k].astype(float) for k in ("open", "high", "low", "close"))
+    bad = (
+        (h < l)
+        | (c < l) | (c > h)
+        | (o < l) | (o > h)
+        | (l <= 0)
+        | o.isna() | h.isna() | l.isna() | c.isna()
+    )
+    return df.index[bad]
+
+
 def _clean_ohlcv(df: pd.DataFrame, freq: str) -> pd.DataFrame:
     """Normalize and clean raw yfinance DataFrame."""
     df = df.copy()
@@ -73,11 +102,19 @@ def _clean_ohlcv(df: pd.DataFrame, freq: str) -> pd.DataFrame:
     df.dropna(inplace=True)
 
     # Sanity: high >= low, close within [low, high]
-    bad_mask = (df["high"] < df["low"]) | (df["close"] < df["low"]) | (df["close"] > df["high"])
-    n_bad = bad_mask.sum()
-    if n_bad:
-        logger.warning(f"Dropping {n_bad} rows with invalid OHLC relationships ({freq})")
-        df = df[~bad_mask]
+    # ⚠️ 剔除本身是对的,但**不能静默** —— 被剔掉的如果是最新那根,as_of 会无声
+    # 倒退一天,页面照常绿油油。2026-07-29 实例:yfinance 把 07-24 的收盘 16.21
+    # 贴进 07-28 那行(低于当日 low 17.26),这里剔掉后 as_of 从 07-28 退回 07-27,
+    # 而真实收盘 17.64 三方可证。所以记进 LAST_FETCH_ISSUES 交给上层处理。
+    bad = _bad_ohlcv_rows(df)          # 不变式只此一处定义,别再写第二份
+    if len(bad):
+        det = ", ".join(
+            f"{i:%Y-%m-%d %H:%M} O{df.at[i,'open']:.2f}/H{df.at[i,'high']:.2f}"
+            f"/L{df.at[i,'low']:.2f}/C{df.at[i,'close']:.2f}" for i in bad[-3:])
+        msg = f"{freq} 上游返回 {len(bad)} 根违反 OHLC 不变式的 bar,已剔除: {det}"
+        logger.error(msg)
+        LAST_FETCH_ISSUES.append(msg)
+        df = df.drop(index=bad)
 
     # Ensure no negative prices
     price_cols = ["open", "high", "low", "close"]
@@ -225,11 +262,37 @@ def load_or_fetch(ticker: str = TICKER, force_refresh: bool = False):
         df_d = pd.read_parquet(d_path)
     else:
         logger.info("Fetching fresh data from Yahoo Finance…")
+        LAST_FETCH_ISSUES.clear()      # 每次抓取重新计,别把上一轮的问题带过来
         df_h = fetch_hourly(ticker)
         df_d = fetch_daily(ticker)
+
+        # ── 不许倒退(2026-07-29)──────────────────────────────────────
+        # 坏 bar 已被 _clean_ohlcv 剔掉,但剔掉最新那根 = as_of 无声退回前一天。
+        # 缓存里的 bar 是**写入时通过了同一套不变式的**,所以它比"没有"更可信:
+        # 新抓的最后一根若比缓存还旧,就把缓存里多出来的那几根补回去。
+        merged = {}
+        for label, fresh, path in (("日线", df_d, d_path), ("小时线", df_h, h_path)):
+            merged[label] = fresh
+            if not path.exists() or not len(fresh):
+                continue
+            try:
+                cached = pd.read_parquet(path)
+            except Exception:
+                continue
+            if not len(cached) or cached.index[-1] <= fresh.index[-1]:
+                continue
+            keep = cached[cached.index > fresh.index[-1]]
+            msg = (f"{label}上游最后一根退回到 {fresh.index[-1]:%m-%d},比缓存的 "
+                   f"{cached.index[-1]:%m-%d} 还旧 → 补回缓存里的 {len(keep)} 根")
+            logger.error(msg)
+            LAST_FETCH_ISSUES.append(msg)
+            merged[label] = pd.concat([fresh, keep]).sort_index()
+        df_d, df_h = merged["日线"], merged["小时线"]
+
         df_h.to_parquet(h_path)
         df_d.to_parquet(d_path)
-        logger.info(f"Saved to {DATA_DIR}")
+        logger.info("Saved to %s%s", DATA_DIR,
+                    "" if not LAST_FETCH_ISSUES else f"  ⚠️ {len(LAST_FETCH_ISSUES)} 条数据源问题")
 
     return df_h, df_d
 

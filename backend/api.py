@@ -1085,6 +1085,15 @@ async def dashboard_snapshot(force_refresh: bool = False):
         event_day = None
         logger.warning(f"event_day detect failed: {e}")
     payload["event_day"]      = event_day
+    # 数据源健康:上游给过坏 bar 就带上来。坏 bar 已经被 fetcher 拦在缓存外,
+    # 但**必须让下游看见"这次抓取出过问题"** —— 否则页面照常绿油油,没人知道
+    # 现在用的是上一版缓存(2026-07-29:yfinance 把 07-24 的收盘贴进了 07-28)。
+    try:
+        from data.fetcher import LAST_FETCH_ISSUES
+        payload["data_health"] = ({"ok": False, "issues": list(LAST_FETCH_ISSUES)}
+                                  if LAST_FETCH_ISSUES else {"ok": True, "issues": []})
+    except Exception:
+        payload["data_health"] = {"ok": True, "issues": []}
     payload["options"]        = opt_sig
     payload["intraday"]       = intr_sig
     payload["sentiment"]      = sentiment_sig

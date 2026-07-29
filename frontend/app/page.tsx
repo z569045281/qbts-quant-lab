@@ -312,6 +312,20 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* 数据源健康：坏 bar 已被 fetcher 拦在缓存外，但不能让它无声无息 ——
+          2026-07-29 上游把 07-24 的收盘贴进了 07-28 那行（比当日最低价还低），
+          静默剔除会让 as_of 倒退一天而页面照常正常。 */}
+      {snap.data_health && !snap.data_health.ok && (
+        <div className="bg-yellow-50 border border-yellow-400 text-yellow-900 rounded-xl px-5 py-3 text-sm">
+          <div className="font-bold mb-1">🧪 数据源异常 — 本页读的是校验后的缓存</div>
+          <ul className="space-y-0.5">
+            {snap.data_health.issues.map((s, i) => (
+              <li key={i} className="text-[12px] font-mono leading-relaxed">· {s}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* ══ ⚠️ 事件日熔断（第二十八轮）══════════════════════════════════════
           07-27 那天 QBTS +20.4% / QBTX +40.1%，而系统给的技术面结论是"别追"。
           复盘后把跳空重新分档：3~8% 档日内确实显著为负(t=-2.02)，但 ≥8% 档
