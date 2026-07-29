@@ -189,6 +189,15 @@
   rides ntfy/live_quote (btc_weekend was) is invisible to the decision — wire it into the
   snapshot too.
 
+- **2026-07-29 · 删函数要 grep 全仓,`try/except` 会把死引用变成静音失效。** 上午
+  换 SMC 结构引擎时删掉了 `analyze_structure`,但 `replay.py` 第 ⑫ 段(锁翻多×QBTX×3天
+  观察组)还 `from dashboard.smc import analyze_structure` —— 那段整个包在
+  `try/except Exception` 里,ImportError 被 `logger.warning` 吞掉,策略卡就这么**静静
+  消失**,前端不报错、页面只是少一块。教训:① 删/改任何公共函数前 `grep -rn` 全仓,
+  不能只看当前模块;② 宽 `except` 里最容易藏的不是运行时异常,而是**导入期的死引用**
+  —— 静音失效比崩溃更难发现。修复后该段恢复运行(新引擎下 7 笔 71.4%,与旧引擎的
+  11 笔 9 胜**不可比**,口径已换)。
+
 - **2026-06-24 · For ANY stock/market topic, lead with WebSearch (+ `yfinance`), never
   memory** *(user's standing instruction)*. When a question touches a specific stock —
   lockups / IPO terms / float / catalysts / earnings dates / valuation / "how low can it

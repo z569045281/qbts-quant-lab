@@ -57,9 +57,77 @@ TP2 = 区间极值。
 **它是风控/纪律工具,不是收益引擎**(mining.md 已判死:全保真 40 天仅 1 枪;ARMED 版 +5.5%/年)。
 和其它信号一样 **UNPROVEN**,直到纸面台账/journal 的记录真的显出 edge —— 见 [AUDIT-AND-EDGE.md](AUDIT-AND-EDGE.md)。
 
+## 整张指标的忠实移植 = `backend/dashboard/lux_smc.py`(2026-07-29 第二步)
+
+用户把 LuxAlgo「Smart Money Concepts」Pine v5 源码放进仓库根目录 `SMC.docx`
+(CC BY-NC-SA 4.0 © LuxAlgo),要求**复刻到仪表盘**。当天分两步:上午只移植了结构
+那一段(见下一节),下午把**整张指标**单遍逐 bar 搬进 `lux_smc.py::run_lux`:
+
+| 组件 | 对应 Pine | 说明 |
+|---|---|---|
+| internal(5) / swing(50) 结构 | `getCurrentStructure` + `displayStructure` | 两级**同一遍**跑,因为 internal 事件的成立条件之一是 `internalHigh ≠ swingHigh` |
+| Strong/Weak High-Low | `updateTrailingExtremes` / `drawHighLowSwings` | 标签由 **swing** trend 决定 |
+| 溢价 / 均衡 / 折价 | `drawPremiumDiscountZones` | 5% 带 + 47.5–52.5% 均衡带,锚 trailing extremes |
+| 订单块 | `storeOrdeBlock` / `deleteOrderBlocks` | pivot→破位区间里 `parsedHigh/Low` 的极值那一根;高波动 bar(振幅 ≥ 2×ATR200)高低**对调** |
+| FVG | `drawFairValueGaps` / `deleteFairValueGaps` | 自适应阈值 = 累计平均实体% × 2 |
+| EQH / EQL | `getCurrentStructure(3, true)` | 阈值 0.1 × ATR200 |
+| MTF 高低线 | `drawLevels` | PDH/PDL(日线图=当根)· PWH/PWL · PMH/PML |
+
+**接线**:`analyze_smc` 每次调用 `run_lux` 跑一遍全量日线 → 结构两级直接用它;
+面板经 `_build_lux_panel` 挂在 `smc['lux']`,前端决策页 4.7 区新增「📐 LuxAlgo 原版面板」
+(整行宽,盘中 live 快照同样带)。0.05s / 500 根,零外部依赖。
+
+### ⚠️ 它**零决策权**,和 playbook 是两套口径
+
+面板**不进** `score`、不进 edge、不驱动状态机、不进决策 prompt。原因是原版和我们
+playbook 的定义本来就不同,硬合成一套会毁掉已经在测量期里的信号:
+
+| | LuxAlgo 原版 | playbook(我们的) |
+|---|---|---|
+| 溢价/折价区间 | trailing extremes:$12.75–46.75 → 现价 **14%** | dealing range:$12.75–31.55 → 现价 **26%** |
+| 订单块 | pivot→破位区间的极值那根(07-28 供给 $23.25–24.73) | 破位前最后一根反向蜡烛(供给 $22.44–23.62) |
+| FVG 回补 | **不对称**(见下) | 对称,且只看最近 90 根 |
+
+原版的 trailing extremes 会把均衡线抬到 **$29.75**(2025-10 那个 $46.75 高点还在
+拉着),对 QBTS 这种一年 40× 又腰斩的票不是可用的交易读数 —— 这正是 07-01 精修
+当初改用 dealing range 的理由。所以两者并存、**卡上各自标注来源**,不互相覆盖。
+
+### ⚠️ 照抄了原版 FVG 回补规则的不对称
+
+源码 `fairValueGap.new(currentHigh, last2Low, BEARISH, …)` 把看跌缺口**数值更低**
+的那条边存进了 `top` 字段,而删除条件是 `high > top` ——
+
+- 看涨 FVG:价格**完全打穿**才消除
+- 看跌 FVG:**碰到近端就消除**
+
+后果:未回补列表里几乎只剩看涨的陈年缺口(QBTS 全量日线上 7 个,全是 $0.91–$9.83
+那种一路上来没填过的),越老离现价越远。**卡上写明了,别当成近处支撑**。这是原
+指标的行为,用户图上看到的就是它 —— 要改得先决定"我们到底还要不要和图一致",
+别偷偷修成对称的。
+
+### 面板会标注哪些是原版默认关的
+
+用户图上默认只开:internal/swing 结构、内部订单块、EQH/EQL、Strong-Weak High/Low。
+**FVG、swing 订单块、溢价折价区、MTF 线原版默认是关的**,他不一定见过 —— 所以卡上
+每一块都标了「原版默认开/关」。
+
+### 验证(33 条断言全绿)
+
+逐条钉住 Pine 规则:`ta.rma/ta.atr` 递推恒等式 · `ta.crossover` 比的是上一根的 level ·
+同一 pivot 只点燃一次(构造收盘两次上穿 $11.00 但只出一个事件)· `trend=0` 时首个
+破位是 BOS · `internalHigh == swingHigh` 时 internal 事件被抑制 · 看涨 FVG 需打穿 /
+看跌 FVG 碰近端即删 · 自适应阈值挡掉无实体推动 bar · **真实日线全量**上每个订单块
+都确实落在 pivot→破位区间的极值那根且从未被回补 · 58 根高波动 bar 的高低确实对调 ·
+溢价折价带系数 · PWH/PWL/PDH/PDL · 空输入不炸。
+
+**信号路径零变化**:换引擎前后 `analyze_smc` 的完整输出逐字段对比,**只有 `level`
+字段的小数位**(20.93000030517578 → 20.93)不同,signal/label/lock/state/entry/stop/
+TP/RR/checklist 全部一致 → `SMC_EPOCH` 不分代。
+
 ## 结构引擎 = LuxAlgo 忠实移植(2026-07-29,`epoch = luxport-20260729`)
 
 用户贴来 LuxAlgo「Smart Money Concepts」Pine 源码后照它重写了 `lux_structure()`。
+(同日下午 `lux_structure` 已改为 `lux_smc.run_lux` 的薄封装 —— 见上一节。)
 **旧的 `analyze_structure` 与原算法三处都不一样**,已整体删除:
 
 | | 旧实现 | LuxAlgo |

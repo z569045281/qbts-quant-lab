@@ -10,6 +10,11 @@ Quantifies the ICT/SMC playbook into deterministic, explainable components:
   liquidity sweep   wick through a prior swing extreme that closes back inside
   premium/discount  position of price within the dominant swing range
 
+结构引擎 = `lux_smc.run_lux`(LuxAlgo Pine 源码的忠实移植)。同一个引擎还顺带
+产出**原版面板**(`smc['lux']`,见 `_build_lux_panel`)—— 那是给用户对着
+TradingView 看盘用的只读复刻,**零决策权**;下面这些打分/playbook 用的仍是本
+模块自己的口径(sweeps / dealing range / OB / FVG),两套定义不同,卡上分开标注。
+
 Output is a signal (-1/0/+1) + key levels + a Chinese rationale, consumed by
 both the decision engine (prompt section) and the dashboard (SMC card).
 
@@ -23,8 +28,10 @@ import pandas as pd
 
 try:
     from dashboard.wavetrend import analyze_wavetrend
+    from dashboard.lux_smc import run_lux, mtf_levels
 except ImportError:  # allow running as a loose module
     from wavetrend import analyze_wavetrend
+    from lux_smc import run_lux, mtf_levels
 
 
 # `find_swings` 的对称 fractal 敏感度。**它已不再决定趋势方向** —— 2026-07-29 起
@@ -67,72 +74,23 @@ _SWING_LEN    = 50     # LuxAlgo: swingsLengthInput 默认 50
 
 
 def lux_structure(df: pd.DataFrame, size: int) -> dict:
-    """LuxAlgo「Smart Money Concepts」结构引擎的**忠实移植**(2026-07-29)。
+    """LuxAlgo 结构读数(薄封装 —— 真正的引擎在 `lux_smc.run_lux`)。
 
-    对照 Pine 源码三处关键差异 —— 我们旧的 `analyze_structure` 三处都不一样:
+    2026-07-29 用户把 Pine 源码(仓库根 `SMC.docx`)交进来后分两步走:先只移植了
+    结构那一段,当天再把**整张指标**移植进 `lux_smc.py`(订单块/FVG/EQH-EQL/
+    trailing extremes/premium-discount/MTF 一起),这个函数随之改成调用它,
+    免得一个仓库里养两套会互相打架的结构引擎。
 
-    ① **pivot 用单边前视确认,不是对称 fractal**
-       `leg(size)`: `high[size] > ta.highest(size)` —— 只要求"这根比它之后的
-       size 根都高",不管它之前。pivot 在 leg 状态**翻转**的那一刻落定。
+    ⚠️ **实测等价**:换成单遍引擎后在 07-29 的日线(500 根)/1h(320 根)/
+    15m(220 根)上,internal(5) 与 swing(50) 两级的 trend、逐条事件、当前
+    pivot **全部逐字节一致** —— 所以 `SMC_EPOCH` 不另分代。新引擎多带的两处
+    保真度(internal 事件要求 internal pivot ≠ swing pivot;`ta.crossover` 比
+    的是上一根的 level 而非当前 level)在这批数据上没咬到,但将来可能会。
 
-    ② **只跟踪「当前那一个」pivot,破了就打 crossed 永不复用**
-       旧实现遍历**所有**历史摆动高点,破掉任意一个就翻多 —— 下跌途中会攒下
-       一队没被破的老高点,一反弹就可能破掉一个又老又低的(2026-07-27 实测:
-       破 $18.02 翻多,而 LuxAlgo 眼里"当前 pivot high"是 $24.73,够都够不着),
-       而且同一根 K 线里能一次点燃多个事件,趋势被其中最弱的那个翻掉。
-
-    ③ **crossover 要求上一根还在下方**(`close[1] <= level`),不是"只要高于"。
-
-    返回结构与旧版一致(trend / last_event / recent_events),额外给出当前未被
-    穿越的 pivot,供上层做背离披露。
+    `size == _SWING_LEN` 时返回 swing(50) 那一级,否则返回 internal 那一级。
     """
-    h = df["high"].astype(float).values
-    l = df["low"].astype(float).values
-    c = df["close"].astype(float).values
-    n = len(df)
-
-    leg = 0                      # 0 = BEARISH_LEG, 1 = BULLISH_LEG
-    ph = pl = None
-    ph_crossed = pl_crossed = True
-    trend = 0
-    events: list[dict] = []
-
-    for i in range(n):
-        if i >= size:
-            win_hi = h[i - size + 1:i + 1].max()      # ta.highest(size)
-            win_lo = l[i - size + 1:i + 1].min()      # ta.lowest(size)
-            new_leg = leg
-            if h[i - size] > win_hi:
-                new_leg = 0                           # startOfBearishLeg → pivot HIGH
-            elif l[i - size] < win_lo:
-                new_leg = 1                           # startOfBullishLeg → pivot LOW
-            if new_leg != leg:
-                if new_leg == 1:
-                    pl, pl_crossed = float(l[i - size]), False
-                else:
-                    ph, ph_crossed = float(h[i - size]), False
-                leg = new_leg
-
-        if i == 0:
-            continue
-        if ph is not None and not ph_crossed and c[i] > ph and c[i - 1] <= ph:
-            events.append({"i": i, "date": df.index[i].strftime("%m-%d"),
-                           "kind": "CHoCH" if trend < 0 else "BOS",
-                           "dir": "bullish", "level": ph})
-            ph_crossed, trend = True, 1
-        if pl is not None and not pl_crossed and c[i] < pl and c[i - 1] >= pl:
-            events.append({"i": i, "date": df.index[i].strftime("%m-%d"),
-                           "kind": "CHoCH" if trend > 0 else "BOS",
-                           "dir": "bearish", "level": pl})
-            pl_crossed, trend = True, -1
-
-    return {
-        "trend": "bullish" if trend > 0 else ("bearish" if trend < 0 else "neutral"),
-        "last_event": events[-1] if events else None,
-        "recent_events": events[-40:],
-        "pivot_high": round(ph, 2) if ph is not None else None,
-        "pivot_low":  round(pl, 2) if pl is not None else None,
-    }
+    r = run_lux(df, internal_length=size)
+    return r["swing"] if size == _SWING_LEN else r["internal"]
 
 
 # ── fair value gaps ──────────────────────────────────────────────────────────
@@ -589,8 +547,9 @@ def analyze_smc(df: pd.DataFrame, live_price: float | None = None,
     # 是哪一个。事件下标再平移回 d 的坐标系,供 order block 使用。
     _off = len(df) - len(d)
     _full = df.rename(columns=str.lower)
-    structure = lux_structure(_full, _INTERNAL_LEN)
-    swing_struct = lux_structure(_full, _SWING_LEN)
+    lux = run_lux(_full)                     # 整张指标跑一遍(两级结构 + OB/FVG/EQ/区间)
+    structure    = lux["internal"]
+    swing_struct = lux["swing"]
     structure["recent_events"] = [
         {**e, "i": e["i"] - _off} for e in structure["recent_events"] if e["i"] >= _off]
 
@@ -653,6 +612,8 @@ def analyze_smc(df: pd.DataFrame, live_price: float | None = None,
         playbook = {"lock": "none", "state": "NO_LOCK",
                     "state_cn": f"playbook 计算失败: {str(e)[:60]}", "checklist": []}
 
+    lux_panel = _build_lux_panel(lux, _full, price)
+
     return {
         "signal": signal,
         "label":  label,
@@ -682,6 +643,79 @@ def analyze_smc(df: pd.DataFrame, live_price: float | None = None,
         "rationale": "；".join(notes) if notes else "结构中性，无显著 SMC 信号",
         "price_used": round(price, 2),
         "playbook": playbook,
+        "lux": lux_panel,        # LuxAlgo 原版面板(见 _build_lux_panel)
+    }
+
+
+# ── LuxAlgo 原版面板(只读复刻,不参与打分)───────────────────────────────
+
+def _build_lux_panel(lux: dict, df_full: pd.DataFrame, price: float) -> dict:
+    """把 `run_lux` 的输出整理成仪表盘那张「LuxAlgo 原版面板」。
+
+    **它零决策权** —— 不进 `score`、不进 edge、不驱动 playbook 状态机。存在的
+    理由只有一个:用户对着 TradingView 上的 LuxAlgo 指标看盘,仪表盘得能说出
+    和那张图**同一套**读数,而不是我们自己近似出来的另一套。
+
+    卡上会标注每一块在原版里是**默认开**还是**默认关**,因为用户图上默认只开
+    internal/swing 结构、内部订单块、EQH/EQL、Strong-Weak High/Low —— FVG、
+    swing 订单块、溢价折价区、MTF 线默认是关的,他不一定见过。
+    """
+    price = float(price)
+
+    _DROP = {"i", "pivot_i", "break_i"}
+
+    def _strip(zones: list[dict]) -> list[dict]:
+        # 内部 bar 下标不外发:它是**全量** df 的坐标,前端拿到只会误用
+        return [{k: v for k, v in z.items() if k not in _DROP} for z in zones]
+
+    def _near(zones: list[dict], key_lo="low", key_hi="high", limit=4) -> list[dict]:
+        return _strip(sorted(zones, key=lambda z: min(abs(z[key_lo] - price),
+                                                      abs(z[key_hi] - price)))[:limit])
+
+    def _ev(e: dict | None) -> dict | None:
+        return {k: e[k] for k in ("date", "kind", "dir", "level")} if e else None
+
+    zones = lux.get("zones")
+    zone_cn = None
+    if zones:
+        p = zones["position"]
+        zone_cn = ("折价区 (Discount)" if p < 0.475 else
+                   "溢价区 (Premium)" if p > 0.525 else "均衡区 (Equilibrium)")
+
+    return {
+        "source": "LuxAlgo「Smart Money Concepts」Pine v5 忠实移植",
+        "internal": {"trend": lux["internal"]["trend"],
+                     "last_event": _ev(lux["internal"]["last_event"]),
+                     "pivot_high": lux["internal"]["pivot_high"],
+                     "pivot_low": lux["internal"]["pivot_low"]},
+        "swing": {"trend": lux["swing"]["trend"],
+                  "last_event": _ev(lux["swing"]["last_event"]),
+                  "pivot_high": lux["swing"]["pivot_high"],
+                  "pivot_low": lux["swing"]["pivot_low"]},
+        # 图上 K 线着色跟的是 internal(源码 candleColor = internalTrend.bias)
+        "candle_bias": lux["internal"]["trend"],
+        "trailing": lux["trailing"],
+        "zones": zones,
+        "zone_cn": zone_cn,
+        "internal_ob": _strip(lux["internal_ob"]),
+        "swing_ob": _strip(lux["swing_ob"]),
+        "fvg": _near(lux["fvg"], limit=5),
+        "fvg_total": len(lux["fvg"]),
+        "equal_hl": _strip(lux["equal_hl"][-4:]),
+        "swing_points": _strip(lux["swing_points"][-5:]),
+        "mtf": mtf_levels(df_full),
+        "alerts": lux["alerts"],
+        "atr200": lux["atr"],
+        "defaults_on": ["internal 结构", "swing 结构", "内部订单块", "EQH/EQL",
+                        "Strong/Weak High-Low"],
+        "defaults_off": ["FVG", "swing 订单块", "溢价/折价区", "MTF 高低线"],
+        # 原版 FVG 的回补规则不对称(看涨要打穿、看跌碰一下就删),照抄了,
+        # 后果是列表里几乎只剩看涨的陈年缺口 —— 卡上要说清楚,别让人当成"支撑"。
+        "fvg_note": ("原版口径:看涨 FVG 需价格**完全打穿**才消除、看跌 FVG **碰到近端即消除**"
+                     "(源码 top/bottom 字段命名不对称)。所以这里几乎只会剩看涨的历史缺口,"
+                     "越老的越远离现价,不要当成近处支撑。"),
+        "range_note": ("溢价/折价按原版 trailing extremes 算(Strong/Weak High-Low 那两根线),"
+                       "不是 playbook 用的 dealing range —— 两者定义不同,数值本来就不一样。"),
     }
 
 

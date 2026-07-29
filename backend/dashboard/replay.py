@@ -431,14 +431,17 @@ def compute_replay(df_d: pd.DataFrame) -> dict | None:
     #    去最佳单笔仍+159%、Wilson下界52.3%。n=11 远未达预注册门槛,且与
     #    特调/CHoCH↑ 同吃反转确认那块肉 → 观察组前向验证,8/15 与众马同审。)
     try:
-        from dashboard.smc import analyze_structure, find_swings
+        # 2026-07-29:`analyze_structure` 已随结构引擎换代删除(这里的 import 一度
+        # 是死引用,整个 ⑫ 段被 except 静默吞掉)。改用现役引擎 `lux_structure`
+        # (LuxAlgo internal/5)。⚠️ 口径已换 —— 这一格的历史统计与旧记录不可比,
+        # 8/15 审判按 `smc.epoch` 分代看。
+        from dashboard.smc import lux_structure, _INTERNAL_LEN
         locks: list[str] = []
         for t in range(len(c)):
             w_ = d.iloc[max(0, t - 119): t + 1]
             if len(w_) < 30:
                 locks.append("neutral"); continue
-            sh_, sl_ = find_swings(w_, k=2)
-            locks.append(analyze_structure(w_, sh_, sl_)["trend"])
+            locks.append(lux_structure(w_.rename(columns=str.lower), _INTERNAL_LEN)["trend"])
         _DRAG3 = 0.00095            # QBTX 日拖累(第七轮实测 −9.5bp/日)
         sret3 = pd.Series(0.0, index=idx)
         tr3: list[dict] = []

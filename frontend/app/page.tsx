@@ -216,6 +216,8 @@ export default function Dashboard() {
   const pbLive = !!(liveFresh && live?.smc);   // 「盘中实时」脉冲只在 <3min 时亮
   const choch = smc?.last_event?.kind === "CHoCH" ? smc.last_event : null;
   const pb = smc?.playbook ?? null;
+  // LuxAlgo 原版面板：盘中 live 的 smc 也带它，与上面 smc 同源，别各取各的
+  const lux = smc?.lux ?? null;
 
   // Playbook 的 QBTS 价位 → 实际下单的杠杆 ETF 价格(与 decision.py _conv_etf 同公式:
   // ±2× 线性近似)。空头锁 → QBTZ(−2×),多头锁 → QBTX(+2×);价格与整页同一 liveCurrent
@@ -1152,7 +1154,10 @@ export default function Dashboard() {
                 <span className="text-gray-400"> · 弱信号,散户情绪多为同步反映、非方向依据</span>
               </div>
             )}
-            {/* 关键区域 */}
+            {/* 关键区域 —— 这里是 playbook 自己的口径，和下面 LuxAlgo 原版面板的
+                订单块**定义不同**（原版按"pivot 到破位之间的极值那根"定位），
+                两处数字对不上是正常的，所以各自标注来源。 */}
+            <div className="text-[10px] text-gray-400 mb-1">关键区域 · playbook 口径</div>
             <div className="space-y-1.5 text-xs">
               {smc.supply_zones.map((z, i) => (
                 <div key={`s${i}`} className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-red-50/60 border border-red-100">
@@ -1171,6 +1176,165 @@ export default function Dashboard() {
                   💧 {s.note}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* 📐 LuxAlgo 原版面板 —— `SMC.docx` 那张指标的忠实复刻，**零决策权**。
+            用户对着 TradingView 的 LuxAlgo 看盘，仪表盘必须能说同一套读数；
+            上面那张卡是我们自己的 playbook 口径，两者定义不同，各自标注。 */}
+        {lux && (
+          <div className="lg:col-span-2 bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+                📐 LuxAlgo 原版面板
+              </span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
+                只读复刻 · 不参与打分
+              </span>
+            </div>
+            <p className="text-[10px] text-gray-400 mb-3 leading-relaxed">
+              {lux.source} · 和 TradingView 上那张图同一套算法。K 线着色跟的是 internal
+              （现在是 <b>{lux.candle_bias === "bullish" ? "多头绿" : lux.candle_bias === "bearish" ? "空头红" : "中性"}</b>）。
+            </p>
+
+            {/* 两级结构 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+              {([["internal(5)", lux.internal, "结构标签 / K 线着色"],
+                 ["swing(50)",   lux.swing,    "Strong·Weak High/Low 由它决定"]] as const).map(
+                ([name, side, hint]) => (
+                <div key={name} className="rounded-xl border border-[#EDEDF0] bg-[#FAFAFB] p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[11px] font-semibold text-[#525461] font-mono">{name}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                      side.trend === "bullish" ? "bg-emerald-100 text-emerald-700"
+                      : side.trend === "bearish" ? "bg-red-100 text-red-700"
+                      : "bg-gray-100 text-gray-500"}`}>{side.trend}</span>
+                  </div>
+                  <div className="text-[11px] font-mono text-gray-700">
+                    {side.last_event
+                      ? `${side.last_event.date} ${side.last_event.dir === "bullish" ? "↗" : "↘"} ${side.last_event.kind} @ $${side.last_event.level.toFixed(2)}`
+                      : "尚无结构事件"}
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-1 font-mono">
+                    当前未破 pivot：高 {side.pivot_high != null ? `$${side.pivot_high.toFixed(2)}` : "—"}
+                    {" / "}低 {side.pivot_low != null ? `$${side.pivot_low.toFixed(2)}` : "—"}
+                  </div>
+                  <div className="text-[10px] text-gray-400 mt-0.5">{hint}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Strong/Weak High-Low + 溢价折价 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
+              <div className="rounded-xl border border-[#EDEDF0] p-3">
+                <div className="text-[11px] font-semibold text-[#525461] mb-1.5">
+                  Strong / Weak High-Low <span className="text-gray-400 font-normal">（原版默认开）</span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] font-mono py-0.5">
+                  <span className="text-red-700">{lux.trailing.top_label}</span>
+                  <span className="text-gray-700">
+                    {lux.trailing.top != null ? `$${lux.trailing.top.toFixed(2)}` : "—"}
+                    <span className="text-gray-400"> · {lux.trailing.top_date ?? "—"}</span>
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[11px] font-mono py-0.5">
+                  <span className="text-emerald-700">{lux.trailing.bottom_label}</span>
+                  <span className="text-gray-700">
+                    {lux.trailing.bottom != null ? `$${lux.trailing.bottom.toFixed(2)}` : "—"}
+                    <span className="text-gray-400"> · {lux.trailing.bottom_date ?? "—"}</span>
+                  </span>
+                </div>
+              </div>
+              <div className="rounded-xl border border-[#EDEDF0] p-3">
+                <div className="text-[11px] font-semibold text-[#525461] mb-1.5">
+                  溢价 / 折价区 <span className="text-gray-400 font-normal">（原版默认关）</span>
+                </div>
+                {lux.zones ? (
+                  <>
+                    <div className="text-[11px] font-mono text-gray-700">
+                      现价落在 <b>{lux.zone_cn}</b> · 区间位置 {(lux.zones.position * 100).toFixed(0)}%
+                    </div>
+                    <div className="text-[10px] font-mono text-gray-500 mt-1 space-y-0.5">
+                      <div>溢价 ${lux.zones.premium[0].toFixed(2)} – ${lux.zones.premium[1].toFixed(2)}</div>
+                      <div>均衡 ${lux.zones.equilibrium[0].toFixed(2)} – ${lux.zones.equilibrium[1].toFixed(2)}</div>
+                      <div>折价 ${lux.zones.discount[0].toFixed(2)} – ${lux.zones.discount[1].toFixed(2)}</div>
+                    </div>
+                  </>
+                ) : <div className="text-[11px] text-gray-400">数据不足</div>}
+                <div className="text-[10px] text-amber-700 bg-amber-50 rounded px-2 py-1 mt-2 leading-relaxed">
+                  ⚠️ {lux.range_note}
+                </div>
+              </div>
+            </div>
+
+            {/* 订单块 */}
+            <div className="mb-3">
+              <div className="text-[11px] font-semibold text-[#525461] mb-1.5">
+                订单块 <span className="text-gray-400 font-normal">（内部=原版默认开 · swing=默认关）</span>
+              </div>
+              <div className="space-y-1">
+                {lux.internal_ob.length === 0 && lux.swing_ob.length === 0 && (
+                  <div className="text-[11px] text-gray-400">当前无未回补订单块</div>
+                )}
+                {[...lux.internal_ob.map(z => ({ ...z, lvl: "内部" })),
+                  ...lux.swing_ob.map(z => ({ ...z, lvl: "swing" }))].map((z, i) => (
+                  <div key={`ob${i}`} className={`flex items-center justify-between px-2.5 py-1.5 rounded-md border text-xs ${
+                    z.type === "supply" ? "bg-red-50/60 border-red-100" : "bg-emerald-50/60 border-emerald-100"}`}>
+                    <span className={z.type === "supply" ? "text-red-700 font-medium" : "text-emerald-700 font-medium"}>
+                      {z.type === "supply" ? "▼ 供给" : "▲ 需求"} OB
+                      <span className="text-gray-400 font-normal"> · {z.lvl} · {z.date} 成型
+                        {z.break_date ? ` / ${z.break_date} 破位` : ""}</span>
+                    </span>
+                    <span className="font-mono text-gray-700">${z.low.toFixed(2)} – ${z.high.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* FVG + EQH/EQL + MTF */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="rounded-xl border border-[#EDEDF0] p-3">
+                <div className="text-[11px] font-semibold text-[#525461] mb-1.5">
+                  未回补 FVG <span className="text-gray-400 font-normal">（原版默认关 · 共 {lux.fvg_total} 个）</span>
+                </div>
+                {lux.fvg.length ? lux.fvg.map((z, i) => (
+                  <div key={`f${i}`} className="flex items-center justify-between text-[11px] font-mono py-0.5">
+                    <span className={z.type === "bullish" ? "text-emerald-700" : "text-red-700"}>
+                      {z.type === "bullish" ? "▲" : "▼"} {z.date}
+                    </span>
+                    <span className="text-gray-700">${z.low.toFixed(2)} – ${z.high.toFixed(2)}</span>
+                  </div>
+                )) : <div className="text-[11px] text-gray-400">无</div>}
+                <div className="text-[10px] text-amber-700 bg-amber-50 rounded px-2 py-1 mt-2 leading-relaxed">
+                  ⚠️ {lux.fvg_note}
+                </div>
+              </div>
+              <div className="rounded-xl border border-[#EDEDF0] p-3">
+                <div className="text-[11px] font-semibold text-[#525461] mb-1.5">EQH / EQL · MTF 高低</div>
+                {lux.equal_hl.length ? lux.equal_hl.map((e, i) => (
+                  <div key={`e${i}`} className="flex items-center justify-between text-[11px] font-mono py-0.5">
+                    <span className={e.kind === "EQH" ? "text-red-700" : "text-emerald-700"}>
+                      {e.kind} <span className="text-gray-400">{e.from_date} → {e.date}</span>
+                    </span>
+                    <span className="text-gray-700">${e.level.toFixed(2)}</span>
+                  </div>
+                )) : <div className="text-[11px] text-gray-400">近期无等高/等低</div>}
+                <div className="mt-2 pt-2 border-t border-[#EDEDF0] flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] font-mono text-gray-500">
+                  {(["PDH", "PDL", "PWH", "PWL", "PMH", "PML"] as const).map(k => (
+                    lux.mtf?.[k] != null && (
+                      <span key={k}>{k} <b className="text-gray-700">${Number(lux.mtf[k]).toFixed(2)}</b></span>
+                    )
+                  ))}
+                </div>
+                {lux.swing_points.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-[#EDEDF0] flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] font-mono text-gray-500">
+                    {lux.swing_points.map((p, i) => (
+                      <span key={`sp${i}`}>{p.tag} ${p.price.toFixed(2)}<span className="text-gray-400">({p.date})</span></span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
