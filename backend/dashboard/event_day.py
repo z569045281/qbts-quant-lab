@@ -114,6 +114,10 @@ def from_quote(quotes: dict | None, catalyst: dict | None = None) -> dict | None
         "reasons": reasons,
         "gap": round(float(chg), 4) if chg is not None else None,
         "gap_basis": "实时价",
+        "price": q.get("price"),
+        # 只要雷达手上有任何一条消息就带上 —— 「有事发生」而不告诉你是什么事,
+        # 等于让你自己去翻新闻,那就白推了(哪怕它只判到 watch 级也比没有强)。
+        "catalyst_headline": (catalyst or {}).get("headline_cn"),
         "catalyst_level": lvl,
         "technical_muted": True,
         "evidence_cn": _EVIDENCE_CN,
@@ -139,17 +143,20 @@ def maybe_event_day_push(prev: dict | None, now_et, quotes: dict | None,
         ev["push_key"] = key
         return ev                      # 已推过,只做 carry-forward
 
+    px = ev.get("price")
+    head = ev.get("catalyst_headline")
+    body = (f"QBTS ${px:.2f}\n" if px else "")
+    body += "\n".join(f"· {r}" for r in ev["reasons"])
+    if head and ev.get("catalyst_level") != "breaking":
+        # breaking 已经作为 reason 写进去了,别重复;watch 级则单独带一行当线索
+        body += f"\n· 雷达最近消息:{head[:50]}"
+    body += ("\n\n技术面结论已熔断:跳空≥8% 档实测 t=+0.36 / p=0.72,"
+             "超卖、折价区、均线这些读数今天没有分辨力。\n"
+             "→ 系统不劝进也不劝退,方向由你判断。\n"
+             "→ 做空仍然不做(全部已知路径已判死)。")
     try:
         from dashboard.intraday_smc import _ntfy
-        ok = _ntfy(
-            "QBTS ⚠️ 事件日",
-            "\n".join(f"· {r}" for r in ev["reasons"])
-            + "\n\n技术面结论已熔断:跳空≥8% 档实测 t=+0.36 / p=0.72,"
-              "超卖、折价区、均线这些读数今天没有分辨力。\n"
-              "→ 系统不劝进也不劝退。先查是什么消息,再决定参与不参与。\n"
-              "→ 做空仍然不做(全部已知路径已判死)。",
-            tags="rotating_light", priority="high")
-        if ok:
+        if _ntfy("QBTS ⚠️ 事件日", body, tags="rotating_light", priority="high"):
             ev["push_key"] = key
     except Exception as e:
         logger.warning(f"event_day ntfy failed: {e}")
