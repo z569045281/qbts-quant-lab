@@ -7,6 +7,7 @@ import { ControlPanel } from "./_components/control-panel";
 import PositionsCard from "./_components/positions-card";
 import { RetrospectivePanel } from "./_components/retrospective-panel";
 import { SiteCheckOverview } from "./_components/self-check";
+import { TabBar, TABS, type TabKey } from "./_components/tab-bar";
 import { getSnapshot, getLiveQuote, type Snapshot, type Decision, type LiveQuote, type LiveQuoteEntry } from "./_lib/data";
 import { fmtLocalDateTime, parseUtc, etMelbSuffix, epochMelbTime, macroSurprise } from "./_lib/format";
 import versionData from "../public/version.json";
@@ -102,6 +103,7 @@ export default function Dashboard() {
   // 👀 隐藏点击审计:版本号 1.5s 内连点 3 次打开
   const [auditOpen, setAuditOpen] = useState(false);
   const [modelView, setModelView] = useState<"fable" | "ds">("fable");  // 决策卡 Claude/DeepSeek 切换
+  const [tab, setTab] = useState<TabKey>("today");                      // 二级导航;首屏永远是驾驶舱
   const versionClicks = useRef<number[]>([]);
 
   const refresh = useCallback(async () => {
@@ -116,6 +118,22 @@ export default function Dashboard() {
     }
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
+
+  // 标签写进 URL hash:刷新 / 收藏 / 把链接发给自己,都能直接落到那一页。
+  // 只用 replaceState,免得每切一次标签就往浏览历史里塞一条。
+  useEffect(() => {
+    const fromHash = () => {
+      const h = window.location.hash.slice(1);
+      if (TABS.some(t => t.key === h)) setTab(h as TabKey);
+    };
+    fromHash();
+    window.addEventListener("hashchange", fromHash);
+    return () => window.removeEventListener("hashchange", fromHash);
+  }, []);
+  const changeTab = useCallback((t: TabKey) => {
+    setTab(t);
+    window.history.replaceState(null, "", t === "today" ? window.location.pathname : `#${t}`);
+  }, []);
 
   // Live quote: fetch immediately, then poll every 30s.
   useEffect(() => {
@@ -267,276 +285,381 @@ export default function Dashboard() {
     .filter(c => c.impact !== "low")
     .slice(0, 6);
 
+  // ── 驾驶舱用的几个派生读数 ──────────────────────────────────────────
+  // 价格/涨跌/徽章全走同一个 liveCurrent 口径 —— 价格轨、sticky 条、SMC 卡
+  // 必须是同一个数,否则又会出现"同屏两个现价"那类 cross-source 矛盾(老教训)。
+  const qPrice = liveCurrent && liveQbts ? liveQbts.price : snap.price;
+  const qChg = liveCurrent && liveQbts && liveQbts.change_pct != null
+    ? liveQbts.change_pct : snap.today_change;
+  const qUp = qChg >= 0;
+  // <3min → 实时 session 徽章;更旧但仍是最新数据 → 诚实标「已收盘」
+  const qBadge = liveCurrent && live ? (liveFresh ? SESSION_BADGE[live.session] : SESSION_BADGE.closed) : null;
+  const etfPx = {
+    qbtx: (liveCurrent ? live?.quotes?.qbtx?.price : null) ?? snap.etf_prices?.qbtx,
+    qbtz: (liveCurrent ? live?.quotes?.qbtz?.price : null) ?? snap.etf_prices?.qbtz,
+  };
+  // 薄流动性 ETF 的最后成交常比 QBTS 旧几十分钟(QBTZ 盘后尤甚)——滞后 >15 分钟标 ⏱,
+  // 免得并排的涨跌幅被当成同一时刻的 2× 关系去核对。
+  const etfStale = (() => {
+    const mins = (bt?: string | null) =>
+      bt && bt.length >= 16 ? parseInt(bt.slice(11, 13)) * 60 + parseInt(bt.slice(14, 16)) : null;
+    const ref = mins(liveCurrent ? liveQbts?.bar_time : null);
+    const st = (e?: LiveQuoteEntry | null) => {
+      const m = mins(e?.bar_time);
+      return ref != null && m != null && ref - m > 15;
+    };
+    return { qbtx: st(liveCurrent ? live?.quotes?.qbtx : null),
+             qbtz: st(liveCurrent ? live?.quotes?.qbtz : null) };
+  })();
+  // 观望日首屏最该看的一行:已触发的排前面,否则给最近的那个待触发扳机
+  const topWait = (() => {
+    const ts = snap.waiting_for?.triggers ?? [];
+    return ts.find(t => t.fired === true) ?? ts.find(t => t.fired === false) ?? null;
+  })();
+
   return (
     <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-4">
 
-      {/* ══ 控制台：出决策 / 实时报价按钮（仅本地后端可达时显示）═══════════ */}
-      <ControlPanel onPublished={refresh} />
+      {/* ══════════════════════════════════════════════════════════════════════
+          🛫 驾驶舱 —— 首屏只回答一个问题:**今天买什么、怎么下单**。
 
-      {/* ══ 0-. 周一开盘·周末BTC 信号(周日夜盘 20:00 ET 起显示;第七轮实证)══ */}
-      {live?.btc_weekend && (
-        <div className={`rounded-xl px-5 py-3.5 flex items-start gap-3 shadow-sm border ${
-          live.btc_weekend.green
-            ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
-          <span className="text-xl leading-none mt-0.5">🌉</span>
-          <div className="text-sm leading-relaxed">
-            <span className="font-bold">周一开盘信号 · 周末 BTC {(live.btc_weekend.weekend_ret * 100) >= 0 ? "+" : ""}{(live.btc_weekend.weekend_ret * 100).toFixed(1)}%</span>
-            {live.btc_weekend.green ? (
-              <span className="text-emerald-800"> 🟢 → 夜盘/盘前可先建仓(QBTS 现货限价单,点差大勿追),或开盘买 QBTX;周一收盘前全部卖出,不过夜。
-                回测:开→收 +2.9%、胜率 60%;收→收含跳空 +3.9%</span>
-            ) : (
-              <span className="text-red-800"> 🔴 → 周一不做多,夜盘也不(历史此情形周一日内均值 −3.0%)</span>
-            )}
-            <span className="text-gray-400 text-xs"> · n=55 验证期,小仓 · 已推送{live.btc_weekend.pushed ? "✅" : "…"}</span>
-          </div>
-        </div>
-      )}
+          2026-07-29 重排(用户:"复杂到我已经看不明白了,layout 也不直观")。
+          改之前 21 个顶层区块**全是同一种白卡片、同一个圆角阴影、同一号标题**
+          —— SMC 那 700 行和「今日行动」长得一样重。所以毛病不是信息量,是
+          **没有层级**:视觉重量没有编码重要性,大脑就没法排序。
 
-      {/* ══ 0. 计划状态警报 ═══════════════════════════════════════════════ */}
+          现在首屏只留:警报槽(不出事就零像素) → 价格轨 → 裁决/计划/军规 →
+          给 Vivienne。其余全部降到下面的标签页,一次点击就能拿到。
+          ═════════════════════════════════════════════════════════════════════ */}
+
+      <section className="space-y-2.5">
+      {/* ── 警报槽:平时一个像素都不占,出事才插队 ─────────────────────── */}
       {planBreached && d && (
-        <div className="bg-red-600 text-white rounded-xl px-5 py-3.5 flex items-start gap-3 shadow-md">
-          <span className="text-xl leading-none mt-0.5">🚨</span>
-          <div className="text-sm leading-relaxed">
-            <span className="font-bold">本交易计划已失效</span> — 实时价
-            ${liveQbts!.price.toFixed(2)} 已
+        <div className="rounded-xl bg-red-600 text-white px-4 py-2.5 text-[13px] leading-snug flex items-start gap-2 shadow-md">
+          <span className="leading-none mt-0.5">🚨</span>
+          <div>
+            <b>本交易计划已失效</b> — 实时价 ${liveQbts!.price.toFixed(2)} 已
             {d.action === "LONG_QBTX" ? "跌破" : "涨破"}失效位
             ${(d.invalidation_price ?? d.trade_plan?.qbts_stop)?.toFixed(2)}。
-            下方计划仅作历史参考，请勿按其执行；在本地运行
-            <code className="mx-1 px-1 rounded bg-white/20 font-mono text-xs">python publish.py</code>
+            下方计划仅作历史参考,请勿执行;本地跑
+            <code className="mx-1 px-1 rounded bg-white/20 font-mono text-[11px]">python publish.py</code>
             生成新决策。
           </div>
         </div>
       )}
       {!planBreached && planStale && d && (
-        <div className="bg-amber-50 border border-amber-300 text-amber-800 rounded-xl px-5 py-3 text-sm">
-          ⏳ 本决策生成于 {Math.round(decisionAgeH!)} 小时前，市场可能已变化 — 建议重新运行
-          <code className="mx-1 px-1 rounded bg-amber-100 font-mono text-xs">publish.py</code> 更新。
+        <div className="rounded-xl border border-amber-300 bg-amber-50 text-amber-800 px-4 py-2 text-[13px]">
+          ⏳ 本决策生成于 {Math.round(decisionAgeH!)} 小时前,市场可能已变化 —— 建议重跑
+          <code className="mx-1 px-1 rounded bg-amber-100 font-mono text-[11px]">publish.py</code>。
         </div>
       )}
-
-      {/* 数据源健康：坏 bar 已被 fetcher 拦在缓存外，但不能让它无声无息 ——
-          2026-07-29 上游把 07-24 的收盘贴进了 07-28 那行（比当日最低价还低），
-          静默剔除会让 as_of 倒退一天而页面照常正常。 */}
-      {snap.data_health && !snap.data_health.ok && (
-        <div className="bg-yellow-50 border border-yellow-400 text-yellow-900 rounded-xl px-5 py-3 text-sm">
-          <div className="font-bold mb-1">🧪 数据源异常 — 本页读的是校验后的缓存</div>
-          <ul className="space-y-0.5">
-            {snap.data_health.issues.map((s, i) => (
-              <li key={i} className="text-[12px] font-mono leading-relaxed">· {s}</li>
-            ))}
-          </ul>
+      {d?.intraday_unstable && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 text-amber-800 px-4 py-2 text-[13px] leading-snug">
+          ⚠️ <b>今日判断不稳定</b>:今天多次生成,结果在{" "}
+          <span className="font-mono">
+            {(d.intraday_actions ?? [])
+              .map(a => (a === "LONG_QBTX" ? "做多" : a === "SHORT_QBTZ" ? "做空" : "观望"))
+              .join(" → ")}
+          </span>{" "}
+          之间反复 —— 这本身就说明今天没有清晰优势,<b>按观望处理</b>,别在反复的答案里挑你想要的那个。
         </div>
       )}
-
-      {/* ══ ⚠️ 事件日熔断（第二十八轮）══════════════════════════════════════
-          07-27 那天 QBTS +20.4% / QBTX +40.1%，而系统给的技术面结论是"别追"。
-          复盘后把跳空重新分档：3~8% 档日内确实显著为负(t=-2.02)，但 ≥8% 档
-          t=+0.36 / p=0.72 —— 技术面在极端档没有任何分辨力。这张卡就是在那种日子
-          把"读数今天不算数"明说出来，而不是让一个失效的负期望继续拦人。
-          live 优先：夜盘/盘前就能亮，不用等 09:00 的 publish。 */}
+      {/* 事件日熔断(第二十八轮):|跳空| ≥8% 档技术面 p=0.72、毫无分辨力 →
+          那种日子明说"读数今天不算数",而不是让一个失效的负期望继续拦人。
+          默认折起来,标题行已经把该说的说完了。 */}
       {(() => {
         const ev = live?.event_day ?? snap.event_day;
         if (!ev?.is_event_day) return null;
         return (
-          <section className="rounded-2xl border-2 border-orange-400 bg-orange-50 p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-lg">⚠️</span>
-              <span className="text-sm font-bold text-orange-800">事件日 · 技术面结论已熔断</span>
+          <details className="group rounded-xl border-2 border-orange-400 bg-orange-50 px-4 py-2.5">
+            <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden
+                                text-[13px] font-bold text-orange-800 flex items-center gap-2 flex-wrap">
+              <span>⚠️ 事件日 · 技术面结论已熔断</span>
               {ev.gap !== null && (
-                <span className="ml-auto text-xs font-mono font-bold text-orange-700">
-                  {ev.gap >= 0 ? "+" : ""}{(ev.gap * 100).toFixed(1)}%
-                </span>
+                <span className="font-mono">{ev.gap >= 0 ? "+" : ""}{(ev.gap * 100).toFixed(1)}%</span>
               )}
-            </div>
-            <ul className="mb-2 space-y-1">
+              <span className="ml-auto text-[11px] font-normal text-orange-500">
+                <span className="group-open:hidden">看原因 ›</span>
+                <span className="hidden group-open:inline">收起</span>
+              </span>
+            </summary>
+            <ul className="mt-2 space-y-0.5">
               {ev.reasons.map((r, i) => (
-                <li key={i} className="text-sm text-orange-900">· {r}</li>
+                <li key={i} className="text-[13px] text-orange-900">· {r}</li>
               ))}
             </ul>
-            <p className="text-[13px] leading-relaxed text-orange-900">{ev.note_cn}</p>
-            <p className="mt-2 text-[11px] text-orange-600 font-mono">{ev.evidence_cn}</p>
-          </section>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-orange-900">{ev.note_cn}</p>
+            <p className="mt-1.5 text-[11px] text-orange-600 font-mono">{ev.evidence_cn}</p>
+          </details>
         );
       })()}
 
-      {/* ══ 💌 给 Vivienne 的（大白话，无术语）══════════════════════════════ */}
-      <section className="rounded-3xl border border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50/40 p-5 shadow-sm">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-base">💌</span>
-          <span className="text-sm font-semibold text-rose-700">给 Vivienne 的</span>
-          {/* 裸日期会被读成"这封信什么时候写的",但 as_of 是【最后一根已收盘日线】——
-              盘前/开盘那一刻发布时它必然是前一个交易日,看起来就像过期(2026-07-29 用户报)。
-              这张卡的读者不懂术语,所以显示生成时间并写清"写于";拿不到才退回带标签的 as_of。 */}
-          <span className="ml-auto text-[10px] text-rose-300 font-mono">
-            {genAt ? `写于 ${genAt}` : snap.as_of ? `数据截至 ${snap.as_of.slice(0, 10)}` : ""}
+      {/* ── 价格轨 ────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 py-2.5
+                      flex items-baseline gap-x-3 gap-y-1 flex-wrap">
+        <span className="text-[11px] text-[#525461] uppercase tracking-wider">QBTS</span>
+        <span className="text-[26px] leading-none font-bold text-gray-900 tabular-nums">
+          ${qPrice.toFixed(2)}
+        </span>
+        <span className={`text-[15px] font-semibold tabular-nums ${qUp ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+          {qUp ? "▲" : "▼"} {Math.abs(qChg * 100).toFixed(2)}%
+        </span>
+        {qBadge && (
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${qBadge.cls}`}>
+            {qBadge.label} · {live!.asof_et.slice(11, 16)} ET
+            {epochMelbTime(live!.asof_epoch) ? ` (墨 ${epochMelbTime(live!.asof_epoch)})` : ""}
           </span>
-        </div>
-        {(() => {
-          const v = vivienneAction(d?.action);
-          return (
+        )}
+        <span className="text-[11px] text-gray-400 font-mono">
+          QBTX {fmtPx(etfPx.qbtx)}{etfStale.qbtx && <span title="最后成交比 QBTS 旧 >15 分钟(薄流动性),涨跌口径不同步">⏱</span>}
+          {" · "}QBTZ {fmtPx(etfPx.qbtz)}{etfStale.qbtz && <span title="最后成交比 QBTS 旧 >15 分钟(薄流动性),涨跌口径不同步">⏱</span>}
+        </span>
+        <span className="ml-auto text-[10px] text-gray-400">
+          数据截至 {snap.as_of?.slice(0, 10)}{genAt ? ` · 决策 ${genAt}` : ""}
+        </span>
+      </div>
+
+      {/* ── 裁决 · 交易计划 · 四条军规 ──────────────────────────────────
+          三栏宽度不等是刻意的:裁决最窄但字号最大(它是结论),军规最宽
+          (它是四条并列的执行口径)。 ────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1fr)_minmax(0,1.18fr)] gap-2.5">
+
+        {/* ① 裁决 —— 全页唯一的大字号,颜色即结论 */}
+        <div className={`rounded-2xl border-2 p-4 flex flex-col justify-center ${meta ? meta.cls : "bg-white border-[#EDEDF0]"}`}>
+          <div className="text-[10px] uppercase tracking-widest opacity-60">今日行动</div>
+          {d && meta ? (
             <>
-              <div className="flex items-center gap-2.5 mb-2.5">
-                <span className="text-2xl leading-none">{v.emoji}</span>
-                <span className="text-lg font-bold text-gray-800">{v.line}</span>
-              </div>
-              <p className="text-[15px] leading-relaxed text-gray-700 whitespace-pre-line">
-                {d?.vivienne_note ?? v.fallback}
-              </p>
-              <div className="mt-3 text-[10px] text-rose-300">💕 这是 Vivienne 专属的解释卡，下面是给我看的技术细节</div>
-            </>
-          );
-        })()}
-      </section>
-
-      {/* ══ 1. HERO：价格 + 行动 ══════════════════════════════════════════ */}
-      <section className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] overflow-hidden shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] items-stretch">
-          {/* 价格区 — live quote preferred, snapshot fallback */}
-          <div className="p-6">
-            {(() => {
-              const lq = live?.quotes?.qbts;
-              const price  = liveCurrent && lq ? lq.price : snap.price;
-              const chgPct = liveCurrent && lq && lq.change_pct != null ? lq.change_pct : snap.today_change;
-              const up = chgPct >= 0;
-              // <3min → 实时 session 徽章;更旧但仍是最新数据 → 诚实标「已收盘」+最后报价时间
-              const badge = liveCurrent && live ? (liveFresh ? SESSION_BADGE[live.session] : SESSION_BADGE.closed) : null;
-              const lqx = liveCurrent ? live?.quotes?.qbtx : null;
-              const lqz = liveCurrent ? live?.quotes?.qbtz : null;
-              return (
-                <div className="flex items-baseline gap-3 flex-wrap">
-                  <span className="text-xs text-[#525461] uppercase tracking-wider">QBTS</span>
-                  <span className="text-4xl font-bold text-gray-900">${price.toFixed(2)}</span>
-                  <span className={`text-xl font-semibold ${up ? "text-emerald-600" : "text-[#F03A3E]"}`}>
-                    {up ? "▲" : "▼"} {Math.abs(chgPct * 100).toFixed(2)}%
-                  </span>
-                  {badge && (
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${badge.cls}`}>
-                      {badge.label} · {live!.asof_et.slice(11, 16)} ET
-                      {epochMelbTime(live!.asof_epoch) ? ` (墨 ${epochMelbTime(live!.asof_epoch)})` : ""}
-                    </span>
-                  )}
-                  {(() => {
-                    // 薄流动性 ETF 的最后成交常比 QBTS 旧几十分钟(QBTZ 盘后尤甚)——
-                    // 滞后 >15 分钟标 ⏱,免得并排的涨跌幅被当成同一时刻的 2× 关系核对
-                    const mins = (bt?: string | null) =>
-                      bt && bt.length >= 16 ? parseInt(bt.slice(11, 13)) * 60 + parseInt(bt.slice(14, 16)) : null;
-                    const ref = mins(lq?.bar_time);
-                    const stale = (e?: LiveQuoteEntry | null) => {
-                      const m = mins(e?.bar_time);
-                      return ref != null && m != null && ref - m > 15;
-                    };
-                    return (
-                      <span className="text-xs text-gray-400 font-mono">
-                        QBTX {fmtPx(lqx?.price ?? snap.etf_prices?.qbtx)}
-                        {stale(lqx) && <span title={`最后成交 ${lqx?.bar_time?.slice(11, 16)},比 QBTS 旧 >15 分钟(薄流动性),涨跌口径不同步`}>⏱</span>}
-                        {" · "}QBTZ {fmtPx(lqz?.price ?? snap.etf_prices?.qbtz)}
-                        {stale(lqz) && <span title={`最后成交 ${lqz?.bar_time?.slice(11, 16)},比 QBTS 旧 >15 分钟(薄流动性),涨跌口径不同步`}>⏱</span>}
-                      </span>
-                    );
-                  })()}
-                </div>
-              );
-            })()}
-            {/* 一段话总结 */}
-            {d ? (
-              <p className="mt-3 text-[15px] leading-relaxed text-gray-800">{d.summary}</p>
-            ) : (
-              <p className="mt-3 text-sm text-gray-400">
-                还没有 AI 决策 — 在本地运行 <code className="font-mono bg-gray-100 px-1 rounded">python publish.py</code> 生成。
-              </p>
-            )}
-            {dsd && (
-              <div className="mt-3 flex items-center gap-1.5 flex-wrap">
-                {(["fable", "ds"] as const).map(m => (
-                  <button key={m} onClick={() => setModelView(m)}
-                    className={`text-[11px] px-2.5 py-1 rounded-full border font-medium transition-colors ${
-                      modelView === m
-                        ? "bg-[#006FFF] text-white border-[#006FFF]"
-                        : "bg-white text-[#525461] border-[#EDEDF0] hover:border-gray-300"}`}>
-                    {m === "fable" ? "Fable 5 · 主决策" : "DeepSeek · 影子"}
-                  </button>
-                ))}
-                {modelView === "ds" && (
-                  <span className="text-[10px] text-amber-600 font-medium">
-                    影子对照:不驱动交易/推送/台账;方向表态另记分,8/15 与 Fable 同框宣判
-                  </span>
-                )}
-              </div>
-            )}
-            <div className="mt-2 text-[10px] text-gray-400">
-              数据截至 {snap.as_of?.slice(0, 10)}{genAt ? ` · 决策生成于 ${genAt}` : ""} · 由 {modelView === "ds" && dsd ? "DeepSeek V4 Pro(影子)" : "Claude"} 综合全部信号生成 · 非投资建议
-            </div>
-          </div>
-
-          {/* 行动卡 */}
-          {d && meta && (
-            <div className={`md:w-[300px] border-t-2 md:border-t-0 md:border-l-2 ${meta.cls} p-6 flex flex-col items-center justify-center text-center`}>
-              <div className="text-xs uppercase tracking-widest opacity-70 mb-1">今日行动</div>
-              <div className="text-4xl font-bold">{meta.title}</div>
-              <div className="text-xs opacity-75 mt-1">{meta.sub}</div>
-              {/* 信心条 */}
-              <div className="w-full mt-4">
+              <div className="text-[30px] leading-tight font-bold mt-0.5">{meta.title}</div>
+              <div className="text-[11px] opacity-70">{meta.sub}</div>
+              <div className="mt-2.5">
                 <div className="flex justify-between text-[10px] opacity-70 mb-1">
                   <span>信心 {d.conviction}/10</span>
                   <span>
-                    P(up,5d) {(d.p_up_5d * 100).toFixed(0)}%
+                    P(涨5d) {(d.p_up_5d * 100).toFixed(0)}%
                     {d.bold_call_5d && (
-                      <span className={`ml-1.5 px-1.5 py-0.5 rounded-full font-bold ${
+                      <span className={`ml-1 px-1 rounded-full font-bold ${
                         d.bold_call_5d === "up" ? "bg-emerald-500/20" : "bg-red-500/20"}`}>
-                        押{d.bold_call_5d === "up" ? "涨 ▲" : "跌 ▼"}
+                        押{d.bold_call_5d === "up" ? "涨▲" : "跌▼"}
                       </span>
                     )}
                   </span>
                 </div>
-                <div className="h-2 bg-white/70 rounded-full overflow-hidden border border-current/10">
+                <div className="h-1.5 bg-white/70 rounded-full overflow-hidden border border-current/10">
                   <div className={`h-full ${meta.bar}`} style={{ width: `${d.conviction * 10}%` }} />
                 </div>
-                <div className="text-[9px] opacity-50 mt-1.5 text-center">{CONVICTION_LEGEND}</div>
+                <div className="text-[9px] opacity-50 mt-1">{CONVICTION_LEGEND}</div>
               </div>
+            </>
+          ) : (
+            <div className="text-sm text-gray-400 mt-1">
+              还没有 AI 决策 — 本地跑 <code className="font-mono bg-gray-100 px-1 rounded">python publish.py</code>。
             </div>
           )}
         </div>
+
+        {/* ② 交易计划摘要 —— 只留能直接下单的数字;推理/波动档/ETF 换算在「今日决策」里 */}
+        <div className="bg-white rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] p-4">
+          <div className="flex items-baseline justify-between mb-2">
+            <span className="text-[11px] font-semibold text-[#525461] uppercase tracking-wider">📋 交易计划</span>
+            {d && (
+              <span className="text-[10px] text-gray-400">
+                {d.action === "HOLD" ? "观望 · 0 仓位"
+                  : d.plan_valid === false ? "价位不自洽 · 已隐藏"
+                  : d.trade_plan.etf_ticker}
+              </span>
+            )}
+          </div>
+          {d && d.action !== "HOLD" && d.plan_valid !== false ? (
+            <div className="grid grid-cols-3 gap-x-2 gap-y-2 text-center">
+              {([["入场", fmtPx(d.trade_plan.etf_entry), "text-gray-900"],
+                 ["止损", fmtPx(d.trade_plan.etf_stop), "text-[#F03A3E]"],
+                 ["目标", fmtPx(d.trade_plan.etf_target), "text-emerald-600"],
+                 ["盈亏比", d.trade_plan.rr_ratio ? `1:${d.trade_plan.rr_ratio.toFixed(1)}` : "—", "text-gray-900"],
+                 ["仓位", `${d.trade_plan.suggested_position_pct}%`, "text-gray-900"],
+                 ["敞口上限", snap.regime?.vol_target?.position_pct != null
+                    ? `≤${(snap.regime.vol_target.position_pct * 100).toFixed(0)}%` : "—", "text-indigo-600"],
+                ] as const).map(([k, v, cls]) => (
+                <div key={k}>
+                  <div className="text-[10px] text-gray-400">{k}</div>
+                  <div className={`font-mono font-semibold text-[15px] tabular-nums ${cls}`}>{v}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-[13px] text-[#525461] leading-relaxed">
+              {d?.plan_valid === false
+                ? <span className="text-red-700">⚠️ 止损/目标方向异常,价位已隐藏以防误用 —— 重跑 publish.py。</span>
+                : <>📭 <b className="text-gray-700">暂不持仓</b>,没有入场 / 止损 / 目标,仓位 0%。
+                   {snap.regime?.vol_target?.position_pct != null && (
+                     <span className="block mt-1 text-[12px] text-indigo-700">
+                       📐 投机仓整体敞口仍受 ≤{(snap.regime.vol_target.position_pct * 100).toFixed(0)}% 约束(与今日方向无关)。
+                     </span>
+                   )}</>}
+            </div>
+          )}
+          {/* 观望日最该看的一行:到底在等什么 */}
+          {topWait && (
+            <div className="mt-2 text-[12px] text-[#525461] bg-[#F6F6F8] rounded-lg px-2.5 py-1.5 leading-snug">
+              ⏳ 在等:<b className="text-gray-700">{topWait.name}</b> · {topWait.hint}
+            </div>
+          )}
+          {/* 失效条件常是一大段(双向作废条件全写在里面)——夹成一行,点开看全文,
+              否则它一个人就能把计划卡撑到两倍高。 */}
+          {d?.invalidation && (
+            <details className="group mt-2 text-[11px] text-[#B45309] bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 leading-snug">
+              <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                ⚠️ 失效条件:
+                <span className="group-open:hidden">
+                  {d.invalidation.length > 42 ? d.invalidation.slice(0, 42) : d.invalidation}
+                  {d.invalidation.length > 42 && <span className="opacity-60">… 展开</span>}
+                </span>
+              </summary>
+              <div className="mt-1">{d.invalidation}</div>
+            </details>
+          )}
+        </div>
+
+        {/* ③ 四条军规 —— 254 套回测的最终提炼,数字全实时 */}
+        {snap.champs ? (
+          <div className="bg-white rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] p-4">
+            <div className="flex items-baseline justify-between mb-2">
+              <span className="text-[11px] font-semibold text-[#525461] uppercase tracking-wider">🚦 四条军规</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                snap.champs.risk_on ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+                大盘{snap.champs.risk_on ? "🟢 顺风" : "🔴 逆风"}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[12px] leading-snug">
+              <div className="bg-[#F6F6F8] rounded-lg px-2.5 py-1.5">
+                <div className="text-[10px] text-gray-400">① 大盘红绿灯</div>
+                {snap.champs.risk_on ? <span>🟢 可以玩</span> : <span>🔴 <b>今天什么都不买</b></span>}
+              </div>
+              <div className="bg-[#F6F6F8] rounded-lg px-2.5 py-1.5">
+                <div className="text-[10px] text-gray-400">② 什么价买</div>
+                跌到 <b className="font-mono text-emerald-700">${snap.champs.swing.lo5.toFixed(2)}</b> · 永不追涨
+              </div>
+              <div className="bg-[#F6F6F8] rounded-lg px-2.5 py-1.5">
+                <div className="text-[10px] text-gray-400">③ 什么价卖</div>
+                弹回 <b className="font-mono text-red-600">${(snap.champs.swing.open?.hi5 ?? snap.champs.swing.hi5).toFixed(2)}</b> · 最多 10 天
+              </div>
+              <div className="bg-[#F6F6F8] rounded-lg px-2.5 py-1.5">
+                <div className="text-[10px] text-gray-400">④ 买多少 · 拿什么</div>
+                ≤<b className="font-mono">{((snap.regime?.vol_target?.position_pct ?? snap.champs.vt_pct) * 100).toFixed(0)}%</b> 投机资金,其余现金
+                <span className="block text-[11px] text-gray-500">≤5 天用 QBTX,更久用 QBTS 正股</span>
+              </div>
+            </div>
+            <div className="mt-1.5 bg-amber-50 rounded-lg px-2.5 py-1.5 text-[11px] leading-snug text-amber-900">
+              <b>⓪ 总闸(先于一切)</b>:QBTS 投机仓 ≤ 你全部资产的 <b>10%</b> —— 这只票可能单日 −40%、
+              可能增发腰斩,止损保护不了隔夜跳空,<b>仓位小是唯一真防御</b>。
+              DCA 核心仓(📥定投专区)永远另册,<b>两边不许挪钱</b>。
+            </div>
+          </div>
+        ) : <div />}
+      </div>
+
+      {/* ── 一段话总结 + 给 Vivienne ────────────────────────────────────
+          两条都是"人话",放一起;技术细节全在标签页里。 ───────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
+        <div className="bg-white rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 py-3">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[11px] font-semibold text-[#525461] uppercase tracking-wider">🧭 一句话结论</span>
+            {dsd && (
+              <span className="ml-auto flex items-center gap-1">
+                {(["fable", "ds"] as const).map(m => (
+                  <button key={m} onClick={() => setModelView(m)}
+                    className={`text-[10px] px-2 py-0.5 rounded-full border font-medium transition-colors ${
+                      modelView === m
+                        ? "bg-[#006FFF] text-white border-[#006FFF]"
+                        : "bg-white text-[#525461] border-[#EDEDF0] hover:border-gray-300"}`}>
+                    {m === "fable" ? "主决策" : "影子"}
+                  </button>
+                ))}
+              </span>
+            )}
+          </div>
+          {/* 总结常有十来行 —— 夹到 4 行,想看全文再点。首屏的预算很紧。 */}
+          {d ? (
+            <details className="group">
+              <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                {/* 注意别加 `block`:line-clamp 靠 display:-webkit-box 生效,
+                    `block` 会把它覆盖掉,夹行就静默失效(实测踩过)。 */}
+                <span className="text-[14px] leading-relaxed text-gray-800 line-clamp-4 group-open:line-clamp-none">
+                  {d.summary}
+                </span>
+                <span className="text-[11px] text-[#006FFF] group-open:hidden">展开全文 ›</span>
+              </summary>
+            </details>
+          ) : (
+            <p className="text-[14px] leading-relaxed text-gray-400">还没有 AI 决策。</p>
+          )}
+          {modelView === "ds" && (
+            <div className="mt-1.5 text-[10px] text-amber-600">
+              影子对照:不驱动交易/推送/台账;方向表态另记分,8/15 与 Fable 同框宣判
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50/40 px-4 py-3">
+          {(() => {
+            const v = vivienneAction(d?.action);
+            return (
+              <>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-[11px] font-semibold text-rose-700">💌 给 Vivienne 的</span>
+                  {/* 裸日期会被读成"这封信什么时候写的",但 as_of 是最后一根已收盘日线 */}
+                  <span className="ml-auto text-[10px] text-rose-300 font-mono">
+                    {genAt ? `写于 ${genAt}` : snap.as_of ? `数据截至 ${snap.as_of.slice(0, 10)}` : ""}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl leading-none">{v.emoji}</span>
+                  <span className="text-[15px] font-bold text-gray-800">{v.line}</span>
+                </div>
+                {/* 默认展开:这张卡的读者不看技术细节,那段大白话就是她要的全部,
+                    而且左边那张总结卡本来就比它高,收起来只是留一块空白。 */}
+                <details open className="group mt-1">
+                  <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden
+                                      text-[11px] text-rose-400 hover:text-rose-600">
+                    <span className="group-open:hidden">展开完整说明 ›</span>
+                    <span className="hidden group-open:inline">收起</span>
+                  </summary>
+                  <p className="mt-1.5 text-[14px] leading-relaxed text-gray-700 whitespace-pre-line">
+                    {d?.vivienne_note ?? v.fallback}
+                  </p>
+                </details>
+              </>
+            );
+          })()}
+        </div>
+      </div>
       </section>
 
-      {/* ══ 1.5 🚦 今天怎么做 — 四条军规(254套回测的最终提炼,数字全实时)══════ */}
-      {snap.champs && (
-        <section className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
-              🚦 今天怎么做(四条军规)
-            </span>
-            <span className={`text-[11px] px-2.5 py-1 rounded-full font-bold ${
-              snap.champs.risk_on ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
-              大盘{snap.champs.risk_on ? "🟢 顺风" : "🔴 逆风"}
-            </span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[13px] leading-relaxed">
-            <div className="bg-[#F6F6F8] rounded-xl px-3.5 py-2.5">
-              <div className="text-[11px] text-gray-400 mb-0.5">① 先看大盘红绿灯</div>
-              {snap.champs.risk_on
-                ? <span>🟢 顺风 → <b>可以玩</b>(看下面三条)</span>
-                : <span>🔴 逆风 → <b>今天什么都不买</b>,现金等灯变绿</span>}
-            </div>
-            <div className="bg-[#F6F6F8] rounded-xl px-3.5 py-2.5">
-              <div className="text-[11px] text-gray-400 mb-0.5">② 什么价买</div>
-              跌到 <b className="font-mono text-emerald-700">${snap.champs.swing.lo5.toFixed(2)}</b>(5日新低)才买,<b>永不追涨</b>
-            </div>
-            <div className="bg-[#F6F6F8] rounded-xl px-3.5 py-2.5">
-              <div className="text-[11px] text-gray-400 mb-0.5">③ 什么价卖</div>
-              弹回 <b className="font-mono text-red-600">${(snap.champs.swing.open?.hi5 ?? snap.champs.swing.hi5).toFixed(2)}</b>(5日新高)就卖,最多拿 10 天
-            </div>
-            <div className="bg-[#F6F6F8] rounded-xl px-3.5 py-2.5">
-              <div className="text-[11px] text-gray-400 mb-0.5">④ 买多少</div>
-              最多用 <b className="font-mono">{((snap.regime?.vol_target?.position_pct ?? snap.champs.vt_pct) * 100).toFixed(0)}%</b> 的投机资金,其余现金;拿 5 天以内用 QBTX,更久用 QBTS 正股
-            </div>
-          </div>
-          <div className="mt-2 bg-amber-50 rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed text-amber-900">
-            <b>⓪ 总闸(先于一切)</b>:QBTS 投机仓总额 ≤ 你全部资产的 <b>10%</b>——这只票可能单日 −40%、可能增发腰斩,
-            止损保护不了隔夜跳空,<b>仓位小是唯一真防御</b>。DCA 核心仓(📥定投专区)永远另册,两边不许挪钱。
-          </div>
-        </section>
-      )}
 
+      {/* ══ 二级导航(sticky):滚动时价格 + 裁决 + 分区永远不离开视野 ══════ */}
+      <TabBar
+        tab={tab}
+        onChange={changeTab}
+        dots={{
+          events: (geo?.risk_level === "alert") || catItems.some(c => c.impact === "high"),
+          system: !!(snap.data_health && !snap.data_health.ok),
+        }}
+        rail={
+          <span className="flex items-baseline gap-2 text-[13px]">
+            <span className="font-mono font-bold text-gray-900 tabular-nums">${qPrice.toFixed(2)}</span>
+            <span className={`font-mono tabular-nums ${qUp ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+              {qUp ? "▲" : "▼"}{Math.abs(qChg * 100).toFixed(2)}%
+            </span>
+            {meta && (
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${meta.cls}`}>
+                {meta.title}
+              </span>
+            )}
+          </span>
+        }
+      />
+
+      {tab === "today" && (
+        <div className="space-y-4">
       {/* ══ 1.6 💼 当前持仓 — 你的真金仓位 + AI 每日逐笔操作建议 ═══════════ */}
       <PositionsCard
         initial={snap.user_positions ?? []}
@@ -549,20 +672,6 @@ export default function Dashboard() {
         adviceAsOf={genAt ?? undefined}
       />
 
-      {/* 当日一致性护栏 — 今天多次生成结果反复 → 视为无明确优势 */}
-      {d?.intraday_unstable && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          ⚠️ <span className="font-semibold">今日判断不稳定</span>：今天多次生成,结果在{" "}
-          <span className="font-mono">
-            {(d.intraday_actions ?? [])
-              .map(a => (a === "LONG_QBTX" ? "做多" : a === "SHORT_QBTZ" ? "做空" : "观望"))
-              .join(" → ")}
-          </span>{" "}
-          之间反复。模型本身带随机性,信心临界点上会翻面 —— <span className="font-semibold">这本身就说明今天没有清晰优势</span>。
-          建议<span className="font-semibold">视为观望</span>,别在反复的答案里挑你想要的那个。
-        </div>
-      )}
-
       {d && (
         <>
           {/* ══ 2. 交易计划 + 3. 关键驱动 ══════════════════════════════════ */}
@@ -570,7 +679,10 @@ export default function Dashboard() {
             {/* 交易计划 */}
             <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
               <div className="text-xs font-semibold text-[#525461] uppercase tracking-wider mb-3">
-                📋 交易计划
+                📋 计划细节
+                <span className="normal-case font-normal text-gray-400 ml-1.5">
+                  入场条件 · 波动档 · QBTS 价位 · 杠杆换算
+                </span>
               </div>
               {/* 方向 — 一眼看清是做多还是做空、实际买哪个 ETF */}
               <div className={`text-sm font-semibold rounded-lg px-3 py-2 mb-3 ${
@@ -840,21 +952,121 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* ══ 🔬 进阶分析抽屉 — 结构/宏观等技术细节,小白可整块跳过(AI 决策已替你读过) ═══ */}
-      <details className="group">
-        <summary className="cursor-pointer list-none bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] px-5 py-4 flex items-center justify-between gap-3 select-none">
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold text-[#525461]">🔬 进阶分析(SMC 结构 · 宏观日历 · 技术细节)</span>
-            <span className="block text-[11px] text-gray-400 mt-0.5">上面的决策已替你读过这些 · 想深挖再展开</span>
-          </span>
-          <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-[#007AFF] px-4 py-2 text-[13px] font-semibold text-white shadow-[0_1px_3px_rgba(0,122,255,0.4)] transition-opacity active:opacity-70 group-open:bg-[#E5E5EA] group-open:text-[#525461] group-open:shadow-none">
-            <span className="group-open:hidden">展开深挖</span>
-            <span className="hidden group-open:inline">收起</span>
-            <span className="inline-block transition-transform group-open:rotate-90">›</span>
-          </span>
-        </summary>
-        <div className="mt-4 space-y-4">
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* ⏳ 今天在等什么 — 六个一级扳机的距触发读数(HOLD 不再是黑箱) */}
+        {snap.waiting_for && (
+          <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+                ⏳ 今天在等什么
+              </span>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                snap.waiting_for.n_fired > 0 ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                {snap.waiting_for.n_fired > 0 ? `🟢 ${snap.waiting_for.n_fired} 个扳机已触发` : "全部待触发"}
+              </span>
+            </div>
+            <p className="text-[11px] text-gray-400 mb-3">{snap.waiting_for.summary}
+              {snap.waiting_for.gate?.regime === "risk_off" && (
+                <span className="text-[#F03A3E] font-medium"> · ⚠️ 大盘 risk-off:即使扳机触发也降档</span>
+              )}
+            </p>
+            <div className="space-y-2">
+              {snap.waiting_for.triggers.map(t => (
+                <div key={t.key} className={`rounded-lg px-3 py-2 border ${
+                  t.fired ? "border-emerald-200 bg-emerald-50/60"
+                  : t.fired === null ? "border-[#F0F0F2] bg-[#FAFAFB] opacity-60" : "border-[#F0F0F2]"}`}>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span>{t.fired ? "🟢" : t.fired === null ? "⏸" : "⚪"}</span>
+                    <span className="font-semibold text-gray-800">{t.name}</span>
+                    <span className="text-[10px] text-gray-400">{t.record}</span>
+                    <span className="ml-auto font-mono text-[11px] text-[#525461]">{t.reading}</span>
+                  </div>
+                  <div className={`mt-1 text-[11px] leading-snug ${
+                    t.fired ? "text-emerald-700 font-medium" : "text-gray-500"}`}>
+                    {t.hint}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
+      </section>
+      {/* ══ 0-. 周一开盘·周末BTC 信号(周日夜盘 20:00 ET 起显示;第七轮实证)══ */}
+      {live?.btc_weekend && (
+        <div className={`rounded-xl px-5 py-3.5 flex items-start gap-3 shadow-sm border ${
+          live.btc_weekend.green
+            ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
+          <span className="text-xl leading-none mt-0.5">🌉</span>
+          <div className="text-sm leading-relaxed">
+            <span className="font-bold">周一开盘信号 · 周末 BTC {(live.btc_weekend.weekend_ret * 100) >= 0 ? "+" : ""}{(live.btc_weekend.weekend_ret * 100).toFixed(1)}%</span>
+            {live.btc_weekend.green ? (
+              <span className="text-emerald-800"> 🟢 → 夜盘/盘前可先建仓(QBTS 现货限价单,点差大勿追),或开盘买 QBTX;周一收盘前全部卖出,不过夜。
+                回测:开→收 +2.9%、胜率 60%;收→收含跳空 +3.9%</span>
+            ) : (
+              <span className="text-red-800"> 🔴 → 周一不做多,夜盘也不(历史此情形周一日内均值 −3.0%)</span>
+            )}
+            <span className="text-gray-400 text-xs"> · n=55 验证期,小仓 · 已推送{live.btc_weekend.pushed ? "✅" : "…"}</span>
+          </div>
+        </div>
+      )}
+
+      {/* ══ 5. 今日要闻 + 60日小图 ═══════════════════════════════════════ */}
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+          <div className="text-xs font-semibold text-[#525461] uppercase tracking-wider mb-3">
+            📰 今日要闻
+          </div>
+          {newsTop.length === 0 ? (
+            <div className="text-xs text-gray-400 py-4">暂无高影响新闻</div>
+          ) : (
+            <div className="space-y-2.5">
+              {newsTop.map((n, i) => (
+                <a key={i} href={n.url || "#"} target="_blank" rel="noopener noreferrer"
+                   className="block group">
+                  <div className="flex items-start gap-2">
+                    <span className={`shrink-0 mt-1 w-1.5 h-1.5 rounded-full
+                      ${n.ai.sentiment === "bullish" ? "bg-emerald-500"
+                        : n.ai.sentiment === "bearish" ? "bg-[#F03A3E]" : "bg-gray-300"}`} />
+                    <div className="min-w-0">
+                      <div className="text-sm text-gray-900 group-hover:text-[#006FFF] transition-colors leading-snug">
+                        {n.title}
+                      </div>
+                      <div className="text-[11px] text-[#525461] mt-0.5">
+                        {n.ai.reasoning} <span className="text-gray-400">· {n.publisher} · {n.published?.slice(5, 10)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <MiniChart
+          candles={snap.chart.candles}
+          sma20={snap.chart.sma20}
+          sma200={snap.chart.sma200}
+          high_52w={snap.chart.high_52w}
+          low_52w={snap.chart.low_52w}
+          plan={chartPlan}
+          supply={smc?.supply_zones}
+          demand={smc?.demand_zones}
+          poc={snap.volume_profile?.poc ?? null}
+          markers={chartMarkers}
+          nwBands={snap.nw_envelope?.bands}
+        />
+      </section>
+
+      <footer className="text-center text-[10px] text-gray-400 pb-4">
+        QBTS Quant Lab · AI 决策由 Claude 基于 8 类数据源综合生成 · 每日 publish.py 更新 · 仅供研究参考，非投资建议
+      </footer>
+
+        </div>
+      )}
+
+      {tab === "structure" && (
+        <div className="space-y-4">
       {/* CHoCH 早期反转预警 — 结构性格转变但未被 BOS 确认,不发交易信号 */}
       {choch && (
         <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-xl px-5 py-3 text-sm leading-relaxed flex items-start gap-2">
@@ -869,99 +1081,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ══ 4.5 宏观日历（原始数据直显，独立于 AI 决策）═══════════════════ */}
-      {snap.macro && snap.macro.events.length > 0 && (
-        <section className={`rounded-2xl border p-5 ${
-          snap.macro.risk_window
-            ? "bg-red-50/60 border-red-200"
-            : "bg-white border-[#EDEDF0]"}`}>
-          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-            <div className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
-              🌐 宏观日历 · 未来14天
-            </div>
-            <div className={`text-xs font-medium ${snap.macro.risk_window ? "text-red-700" : "text-gray-400"}`}>
-              {snap.macro.risk_window ? `⚠️ ${snap.macro.risk_note}` : snap.macro.risk_note}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {snap.macro.events.map((e, i) => (
-              <div key={i}
-                   className={`rounded-lg border px-3 py-2 text-xs ${
-                     e.nuclear
-                       ? "bg-white border-red-300"
-                       : "bg-white border-[#EDEDF0]"}`}>
-                <div className="flex items-center gap-1.5">
-                  {e.nuclear && <span className="text-red-500">🔴</span>}
-                  <span className="font-mono font-semibold text-gray-900">
-                    {e.date.slice(5)} {e.time_et}ET{etMelbSuffix(e.date, e.time_et)}
-                  </span>
-                  <span className="font-medium text-gray-800">{e.title}</span>
-                  {e.coef && e.coef.spy >= 1.3 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-orange-100 text-orange-700"
-                          title={`实测事件日波动放大倍数(2022-08~2026-07): 大盘×${e.coef.spy} · 量子ETF×${e.coef.qtum} · QBTS单票×${e.coef.qbts}(宏观日对QBTS单票无额外波动,系数看大盘方向背景)`}>
-                      大盘×{e.coef.spy}
-                    </span>
-                  )}
-                  {(() => {
-                    // Badge 按类型诚实:演讲天生没数值结果,别挂"已公布"让人以为缺数据;
-                    // 有预测的数据过期但没实际值(如免费源没有的 ISM/ADP,或覆盖内待下次补)
-                    // → 标"待结果",一眼看出是数据源局限而非 bug。
-                    const hu = e.hours_until;
-                    const isSpeech = /speaks|speech|testif/i.test(e.title)
-                      || (!e.forecast && !e.previous && !e.actual);
-                    const future = typeof hu === "number" && hu >= 0 && hu <= 48;
-                    const past = typeof hu === "number" && hu < 0 && hu > -24;
-                    if (isSpeech) {
-                      if (future) return (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-red-500 text-white">
-                          {hu! < 1 ? "即将开始" : `${Math.round(hu!)}小时后`}
-                        </span>);
-                      return (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-violet-100 text-violet-600">
-                          🎤 演讲{past ? "已结束" : ""}
-                        </span>);
-                    }
-                    if (future) return (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-red-500 text-white">
-                        {hu! < 1 ? "即将发布" : `${Math.round(hu!)}小时后`}
-                      </span>);
-                    if (past) return e.actual ? (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-gray-200 text-gray-600">已公布</span>
-                    ) : (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-700"
-                            title="发布时间已过,但实际值不在免费数据源里(如 ISM/ADP),或覆盖内数据将在下次更新时补上">
-                        已公布·待结果
-                      </span>);
-                    return null;
-                  })()}
-                  {(() => {
-                    const s = macroSurprise(e.title, e.forecast, e.actual);
-                    if (!s) return null;
-                    const cls = s.tone === "bad" ? "bg-red-100 text-red-700"
-                              : s.tone === "good" ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-500";
-                    return (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${cls}`}>
-                        {s.label}
-                      </span>
-                    );
-                  })()}
-                </div>
-                {(e.forecast || e.previous || e.actual) && (
-                  <div className="text-[10px] text-gray-500 mt-0.5 font-mono">
-                    预测 {e.forecast || "—"} · 前值 {e.previous || "—"}
-                    {e.actual && ` · 实际 ${e.actual}`}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ══ 4.7 SMC 结构 + 历史战绩 ═══════════════════════════════════════ */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
         {/* SMC 聪明钱结构 */}
         {smc && (
           <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
@@ -1339,160 +1459,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ⏳ 今天在等什么 — 六个一级扳机的距触发读数(HOLD 不再是黑箱) */}
-        {snap.waiting_for && (
-          <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
-                ⏳ 今天在等什么
-              </span>
-              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-                snap.waiting_for.n_fired > 0 ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-                {snap.waiting_for.n_fired > 0 ? `🟢 ${snap.waiting_for.n_fired} 个扳机已触发` : "全部待触发"}
-              </span>
-            </div>
-            <p className="text-[11px] text-gray-400 mb-3">{snap.waiting_for.summary}
-              {snap.waiting_for.gate?.regime === "risk_off" && (
-                <span className="text-[#F03A3E] font-medium"> · ⚠️ 大盘 risk-off:即使扳机触发也降档</span>
-              )}
-            </p>
-            <div className="space-y-2">
-              {snap.waiting_for.triggers.map(t => (
-                <div key={t.key} className={`rounded-lg px-3 py-2 border ${
-                  t.fired ? "border-emerald-200 bg-emerald-50/60"
-                  : t.fired === null ? "border-[#F0F0F2] bg-[#FAFAFB] opacity-60" : "border-[#F0F0F2]"}`}>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span>{t.fired ? "🟢" : t.fired === null ? "⏸" : "⚪"}</span>
-                    <span className="font-semibold text-gray-800">{t.name}</span>
-                    <span className="text-[10px] text-gray-400">{t.record}</span>
-                    <span className="ml-auto font-mono text-[11px] text-[#525461]">{t.reading}</span>
-                  </div>
-                  <div className={`mt-1 text-[11px] leading-snug ${
-                    t.fired ? "text-emerald-700 font-medium" : "text-gray-500"}`}>
-                    {t.hint}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 历史战绩 */}
-        <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
-              📒 历史决策战绩
-            </span>
-            <div className="flex flex-col items-end gap-0.5">
-              {snap.journal?.accuracy != null && (
-                <span className={`text-sm font-bold font-mono ${
-                  snap.journal.accuracy >= 0.55 ? "text-emerald-600"
-                  : snap.journal.accuracy >= 0.45 ? "text-amber-500" : "text-[#F03A3E]"}`}>
-                  实盘命中 {(snap.journal.accuracy * 100).toFixed(0)}%
-                  <span className="text-[10px] text-gray-400 ml-1">
-                    ({snap.journal.n_correct}/{snap.journal.n_graded})
-                  </span>
-                </span>
-              )}
-              {snap.journal?.shadow_accuracy != null && (
-                <span className="text-[10px] text-gray-400 font-mono" title="含观望日的方向影子判断 — 即使空仓也评判当时的多空倾向是否正确">
-                  含观望影子 {(snap.journal.shadow_accuracy * 100).toFixed(0)}%
-                  ({snap.journal.n_shadow_correct}/{snap.journal.n_shadow})
-                </span>
-              )}
-              {snap.journal?.hold_accuracy != null && (
-                <span className="text-[10px] text-gray-400 font-mono" title="观望判读:决策日 |QBTS| ≥3% 却观望 = 漏判(双向工具在架,错过任一方向都算)— 观望不是免费的">
-                  观望判读 {(snap.journal.hold_accuracy * 100).toFixed(0)}%
-                  ({snap.journal.n_hold_correct}/{snap.journal.n_hold_graded})
-                </span>
-              )}
-            </div>
-          </div>
-          {jPaper && (
-            <div className="mb-3 rounded-lg bg-[#F6F6F8] px-3 py-2.5 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-gray-700">📊 模拟持仓 · 每次 ${jPaper.trade_usd.toLocaleString()} 跟随决策</span>
-                <span className="text-[10px] text-gray-400">假钱 · 按标的方向,未计 2× 杠杆</span>
-              </div>
-              <div className="mt-1.5 font-mono">
-                已实现累计{" "}
-                <b className={jPaper.realized >= 0 ? "text-emerald-600" : "text-[#F03A3E]"}>{fmtSignedUsd(jPaper.realized)}</b>
-                <span className="text-gray-400 ml-1">
-                  ({jPaper.n_trades} 笔已平{jPaper.win_rate != null ? ` · 胜率 ${(jPaper.win_rate * 100).toFixed(0)}%` : ""})
-                </span>
-              </div>
-              {jPaper.open ? (
-                <div className="mt-1 font-mono">
-                  当前持仓：
-                  <span className={jPaper.open.action === "SHORT_QBTZ" ? "text-red-700 font-semibold" : "text-emerald-700 font-semibold"}>
-                    {jPaper.open.action === "SHORT_QBTZ" ? "做空" : "做多"}
-                  </span>
-                  <span className="text-gray-500"> 入场 ${jPaper.open.entry}（{jPaper.open.date.slice(5)}）</span>
-                  {jUnreal != null && (
-                    <> · 浮动 <b className={jUnreal >= 0 ? "text-emerald-600" : "text-[#F03A3E]"}>{fmtSignedUsd(jUnreal)}</b></>
-                  )}
-                </div>
-              ) : (
-                <div className="mt-1 text-gray-400">当前空仓（最近决策为观望或已平）</div>
-              )}
-              {jPaper.n_trades < 10 && (
-                <div className="mt-1 text-[10px] text-amber-600">⚠️ 样本极少（{jPaper.n_trades} 笔）——系统多数日子观望、方向单稀少,这个数字还说明不了问题</div>
-              )}
-            </div>
-          )}
-          {!snap.journal || snap.journal.records.length === 0 ? (
-            <div className="text-xs text-gray-400 py-6 text-center">
-              暂无记录 — 从下一次决策开始，每个判断都会被记录并在 5 个交易日后评判
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {snap.journal.records.slice(0, 6).map(r => {
-                const res = r.result;
-                const actionLabel = r.action === "LONG_QBTX" ? "做多" : r.action === "SHORT_QBTZ" ? "做空" : "观望";
-                return (
-                  <div key={r.id} className="border border-[#F0F0F2] rounded-lg px-3 py-2">
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="font-mono text-gray-500">{r.date.slice(5)}</span>
-                      <span className={`font-semibold ${
-                        r.action === "LONG_QBTX" ? "text-emerald-700"
-                        : r.action === "SHORT_QBTZ" ? "text-red-700" : "text-gray-600"}`}>
-                        {actionLabel}
-                      </span>
-                      <span className="text-gray-400">信心{r.conviction} · ${r.price}</span>
-                      <span className="ml-auto">
-                        {r.status === "pending" ? (
-                          <span className="text-[10px] text-gray-400">⏳ 待评判</span>
-                        ) : r.action === "HOLD" && res?.correct === false ? (
-                          // 观望漏判(07-22 起):✗ 判的是"决策日 ≥3% 却观望",展示当日波动
-                          <span className="text-xs font-bold text-[#F03A3E]" title="决策日 |QBTS| ≥3% 却观望 = 漏判">
-                            ✗ 漏判 {res.day0_ret_pct != null ? `当日${(res.day0_ret_pct*100).toFixed(1)}%` : ""}
-                          </span>
-                        ) : r.action === "HOLD" && res?.correct === true ? (
-                          <span className="text-[10px] text-gray-400" title="决策日波动 <3%,观望合理">— 观望✓</span>
-                        ) : res?.correct === true ? (
-                          <span className="text-xs font-bold text-emerald-600">✓ {res.ret_pct != null ? `${(res.ret_pct*100).toFixed(1)}%` : ""}</span>
-                        ) : res?.correct === false ? (
-                          <span className="text-xs font-bold text-[#F03A3E]">✗ {res.ret_pct != null ? `${(res.ret_pct*100).toFixed(1)}%` : ""}</span>
-                        ) : (
-                          <span className="text-[10px] text-gray-400">— 观望</span>
-                        )}
-                      </span>
-                    </div>
-                    {res?.reflection && (
-                      <div className="mt-1.5 text-[11px] text-amber-700 bg-amber-50 rounded px-2 py-1 leading-snug">
-                        💡 反思：{res.reflection}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* 🔮 月度复盘按钮 — 一个月后解锁 */}
-          <RetrospectivePanel />
-        </div>
-
         {/* 成交量画像 / POC */}
         {snap.volume_profile?.poc != null && (
           <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
@@ -1659,10 +1625,367 @@ export default function Dashboard() {
           </div>
         )}
       </section>
+        </div>
+      )}
+
+      {tab === "events" && (
+        <div className="space-y-4">
+      {/* ══ 4.5 宏观日历（原始数据直显，独立于 AI 决策）═══════════════════ */}
+      {snap.macro && snap.macro.events.length > 0 && (
+        <section className={`rounded-2xl border p-5 ${
+          snap.macro.risk_window
+            ? "bg-red-50/60 border-red-200"
+            : "bg-white border-[#EDEDF0]"}`}>
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+            <div className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+              🌐 宏观日历 · 未来14天
+            </div>
+            <div className={`text-xs font-medium ${snap.macro.risk_window ? "text-red-700" : "text-gray-400"}`}>
+              {snap.macro.risk_window ? `⚠️ ${snap.macro.risk_note}` : snap.macro.risk_note}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {snap.macro.events.map((e, i) => (
+              <div key={i}
+                   className={`rounded-lg border px-3 py-2 text-xs ${
+                     e.nuclear
+                       ? "bg-white border-red-300"
+                       : "bg-white border-[#EDEDF0]"}`}>
+                <div className="flex items-center gap-1.5">
+                  {e.nuclear && <span className="text-red-500">🔴</span>}
+                  <span className="font-mono font-semibold text-gray-900">
+                    {e.date.slice(5)} {e.time_et}ET{etMelbSuffix(e.date, e.time_et)}
+                  </span>
+                  <span className="font-medium text-gray-800">{e.title}</span>
+                  {e.coef && e.coef.spy >= 1.3 && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-orange-100 text-orange-700"
+                          title={`实测事件日波动放大倍数(2022-08~2026-07): 大盘×${e.coef.spy} · 量子ETF×${e.coef.qtum} · QBTS单票×${e.coef.qbts}(宏观日对QBTS单票无额外波动,系数看大盘方向背景)`}>
+                      大盘×{e.coef.spy}
+                    </span>
+                  )}
+                  {(() => {
+                    // Badge 按类型诚实:演讲天生没数值结果,别挂"已公布"让人以为缺数据;
+                    // 有预测的数据过期但没实际值(如免费源没有的 ISM/ADP,或覆盖内待下次补)
+                    // → 标"待结果",一眼看出是数据源局限而非 bug。
+                    const hu = e.hours_until;
+                    const isSpeech = /speaks|speech|testif/i.test(e.title)
+                      || (!e.forecast && !e.previous && !e.actual);
+                    const future = typeof hu === "number" && hu >= 0 && hu <= 48;
+                    const past = typeof hu === "number" && hu < 0 && hu > -24;
+                    if (isSpeech) {
+                      if (future) return (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-red-500 text-white">
+                          {hu! < 1 ? "即将开始" : `${Math.round(hu!)}小时后`}
+                        </span>);
+                      return (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-violet-100 text-violet-600">
+                          🎤 演讲{past ? "已结束" : ""}
+                        </span>);
+                    }
+                    if (future) return (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-red-500 text-white">
+                        {hu! < 1 ? "即将发布" : `${Math.round(hu!)}小时后`}
+                      </span>);
+                    if (past) return e.actual ? (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-gray-200 text-gray-600">已公布</span>
+                    ) : (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-700"
+                            title="发布时间已过,但实际值不在免费数据源里(如 ISM/ADP),或覆盖内数据将在下次更新时补上">
+                        已公布·待结果
+                      </span>);
+                    return null;
+                  })()}
+                  {(() => {
+                    const s = macroSurprise(e.title, e.forecast, e.actual);
+                    if (!s) return null;
+                    const cls = s.tone === "bad" ? "bg-red-100 text-red-700"
+                              : s.tone === "good" ? "bg-green-100 text-green-700"
+                              : "bg-gray-100 text-gray-500";
+                    return (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${cls}`}>
+                        {s.label}
+                      </span>
+                    );
+                  })()}
+                </div>
+                {(e.forecast || e.previous || e.actual) && (
+                  <div className="text-[10px] text-gray-500 mt-0.5 font-mono">
+                    预测 {e.forecast || "—"} · 前值 {e.previous || "—"}
+                    {e.actual && ` · 实际 ${e.actual}`}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ══ 4.95 🌍 地缘政治雷达 — 伊朗战局/川普政策/量子政策(07-07 暴跌的驱动)═══ */}
+      {geo && (
+        <section className={`rounded-3xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] border ${
+          geo.risk_level === "alert" ? "bg-red-50/70 border-red-200"
+            : geo.risk_level === "watch" ? "bg-amber-50/50 border-amber-200"
+            : "bg-white border-transparent"}`}>
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+              🌍 地缘政治雷达 · 伊朗战局 / 川普政策 / 量子政策
+            </span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+              geo.risk_level === "alert" ? "bg-red-600 text-white"
+                : geo.risk_level === "watch" ? "bg-amber-400 text-amber-950"
+                : "bg-emerald-100 text-emerald-700"}`}>
+              {geo.risk_cn}
+            </span>
+            {geoLive && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-semibold animate-pulse">
+                盘中实时
+              </span>
+            )}
+            <span className="ml-auto text-[10px] text-gray-400 font-mono">
+              {fmtLocalDateTime(geo.as_of) ?? ""}
+            </span>
+          </div>
+
+          <div className="text-[15px] font-bold text-gray-900 mb-1.5">{geo.headline_cn}</div>
+          {geo.summary_cn && (
+            <p className="text-sm leading-relaxed text-gray-700 mb-3">{geo.summary_cn}</p>
+          )}
+
+          {geoItems.length > 0 && (
+            <div className="space-y-2 border-t border-black/5 pt-3">
+              {geoItems.map(g => (
+                <a key={g.key} href={g.url || "#"} target="_blank" rel="noopener noreferrer"
+                   className="block group">
+                  <div className="flex items-start gap-2">
+                    <span className={`shrink-0 mt-1 w-1.5 h-1.5 rounded-full ${
+                      g.stance === "risk_off" ? "bg-[#F03A3E]"
+                        : g.stance === "risk_on" ? "bg-emerald-500" : "bg-gray-300"}`} />
+                    <div className="min-w-0">
+                      <div className="text-sm text-gray-900 group-hover:text-[#006FFF] transition-colors leading-snug">
+                        <span className={`mr-1.5 text-[10px] px-1.5 py-0.5 rounded font-semibold align-[1px] ${
+                          g.track === "iran" ? "bg-red-100 text-red-700"
+                            : g.track === "trump" ? "bg-indigo-100 text-indigo-700"
+                            : "bg-violet-100 text-violet-700"}`}>
+                          {g.track_cn}
+                        </span>
+                        {g.title}
+                        {g.relevance === "high" && (
+                          <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-red-600 text-white font-bold">高影响</span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-[#525461] mt-0.5">
+                        {g.note_cn} <span className="text-gray-400">· {g.source} · {g.published?.slice(5, 16)} UTC</span>
+                      </div>
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-3 text-[10px] text-gray-400">
+            Google News 每~30分钟盘中自动扫描(伊朗谈判/停火/空袭 · 川普关税/行政令 · 量子国防/出口管制)
+            · 出现新高影响条目或风险级别翻转 → ntfy 手机推送 · AI 分级仅供参考
+          </div>
+        </section>
+      )}
+
+      {/* ══ 4.5 公司催化剂雷达（D-Wave 自身消息 + 板块同行）══════════════ */}
+      {cat && (
+        <section className={`rounded-3xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] border ${
+          cat.impact_level === "breaking" ? "bg-red-50/70 border-red-200"
+            : cat.impact_level === "watch" ? "bg-amber-50/50 border-amber-200"
+            : "bg-white border-transparent"}`}>
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+              📣 公司催化剂雷达 · D-Wave 自身 / 板块同行
+            </span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+              cat.impact_level === "breaking" ? "bg-red-600 text-white"
+                : cat.impact_level === "watch" ? "bg-amber-400 text-amber-950"
+                : "bg-emerald-100 text-emerald-700"}`}>
+              {cat.impact_cn}
+            </span>
+            {catLive && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-semibold animate-pulse">
+                盘中实时
+              </span>
+            )}
+            <span className="ml-auto text-[10px] text-gray-400 font-mono">
+              {fmtLocalDateTime(cat.as_of) ?? ""}
+            </span>
+          </div>
+
+          <div className="text-[15px] font-bold text-gray-900 mb-1.5">{cat.headline_cn}</div>
+          {cat.summary_cn && (
+            <p className="text-sm leading-relaxed text-gray-700 mb-3">{cat.summary_cn}</p>
+          )}
+
+          {catItems.length > 0 && (
+            <div className="space-y-2 border-t border-black/5 pt-3">
+              {catItems.map(c => (
+                <a key={c.key} href={c.url || "#"} target="_blank" rel="noopener noreferrer"
+                   className="block group">
+                  <div className="flex items-start gap-2">
+                    <span className={`shrink-0 mt-1 w-1.5 h-1.5 rounded-full ${
+                      c.direction === "bullish" ? "bg-emerald-500"
+                        : c.direction === "bearish" ? "bg-[#F03A3E]" : "bg-gray-300"}`} />
+                    <div className="min-w-0">
+                      <div className="text-sm text-gray-900 group-hover:text-[#006FFF] transition-colors leading-snug">
+                        <span className={`mr-1.5 text-[10px] px-1.5 py-0.5 rounded font-semibold align-[1px] ${
+                          c.track === "company" ? "bg-sky-100 text-sky-700"
+                            : "bg-violet-100 text-violet-700"}`}>
+                          {c.track_cn}
+                        </span>
+                        {c.title}
+                        {c.impact === "high" && (
+                          <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-red-600 text-white font-bold">催化剂</span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-[#525461] mt-0.5">
+                        {c.note_cn} <span className="text-gray-400">
+                          · {c.source}
+                          {typeof c.age_h === "number" && ` · ${c.age_h}h前`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+
+          <div className="mt-3 text-[10px] text-gray-400">
+            Google News 每~10分钟盘中自动扫描(D-Wave 合同/订单/产品/融资/上市变更 · 量子板块同行)
+            · 出现新的高影响催化剂 → ntfy 手机推送(同一条 PR 的多家转载只推一次)
+            · 零决策权,只做事件背景 · AI 分级仅供参考
+          </div>
+        </section>
+      )}
 
         </div>
-      </details>
+      )}
 
+      {tab === "record" && (
+        <div className="space-y-4">
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* 历史战绩 */}
+        <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+              📒 历史决策战绩
+            </span>
+            <div className="flex flex-col items-end gap-0.5">
+              {snap.journal?.accuracy != null && (
+                <span className={`text-sm font-bold font-mono ${
+                  snap.journal.accuracy >= 0.55 ? "text-emerald-600"
+                  : snap.journal.accuracy >= 0.45 ? "text-amber-500" : "text-[#F03A3E]"}`}>
+                  实盘命中 {(snap.journal.accuracy * 100).toFixed(0)}%
+                  <span className="text-[10px] text-gray-400 ml-1">
+                    ({snap.journal.n_correct}/{snap.journal.n_graded})
+                  </span>
+                </span>
+              )}
+              {snap.journal?.shadow_accuracy != null && (
+                <span className="text-[10px] text-gray-400 font-mono" title="含观望日的方向影子判断 — 即使空仓也评判当时的多空倾向是否正确">
+                  含观望影子 {(snap.journal.shadow_accuracy * 100).toFixed(0)}%
+                  ({snap.journal.n_shadow_correct}/{snap.journal.n_shadow})
+                </span>
+              )}
+              {snap.journal?.hold_accuracy != null && (
+                <span className="text-[10px] text-gray-400 font-mono" title="观望判读:决策日 |QBTS| ≥3% 却观望 = 漏判(双向工具在架,错过任一方向都算)— 观望不是免费的">
+                  观望判读 {(snap.journal.hold_accuracy * 100).toFixed(0)}%
+                  ({snap.journal.n_hold_correct}/{snap.journal.n_hold_graded})
+                </span>
+              )}
+            </div>
+          </div>
+          {jPaper && (
+            <div className="mb-3 rounded-lg bg-[#F6F6F8] px-3 py-2.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-gray-700">📊 模拟持仓 · 每次 ${jPaper.trade_usd.toLocaleString()} 跟随决策</span>
+                <span className="text-[10px] text-gray-400">假钱 · 按标的方向,未计 2× 杠杆</span>
+              </div>
+              <div className="mt-1.5 font-mono">
+                已实现累计{" "}
+                <b className={jPaper.realized >= 0 ? "text-emerald-600" : "text-[#F03A3E]"}>{fmtSignedUsd(jPaper.realized)}</b>
+                <span className="text-gray-400 ml-1">
+                  ({jPaper.n_trades} 笔已平{jPaper.win_rate != null ? ` · 胜率 ${(jPaper.win_rate * 100).toFixed(0)}%` : ""})
+                </span>
+              </div>
+              {jPaper.open ? (
+                <div className="mt-1 font-mono">
+                  当前持仓：
+                  <span className={jPaper.open.action === "SHORT_QBTZ" ? "text-red-700 font-semibold" : "text-emerald-700 font-semibold"}>
+                    {jPaper.open.action === "SHORT_QBTZ" ? "做空" : "做多"}
+                  </span>
+                  <span className="text-gray-500"> 入场 ${jPaper.open.entry}（{jPaper.open.date.slice(5)}）</span>
+                  {jUnreal != null && (
+                    <> · 浮动 <b className={jUnreal >= 0 ? "text-emerald-600" : "text-[#F03A3E]"}>{fmtSignedUsd(jUnreal)}</b></>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-1 text-gray-400">当前空仓（最近决策为观望或已平）</div>
+              )}
+              {jPaper.n_trades < 10 && (
+                <div className="mt-1 text-[10px] text-amber-600">⚠️ 样本极少（{jPaper.n_trades} 笔）——系统多数日子观望、方向单稀少,这个数字还说明不了问题</div>
+              )}
+            </div>
+          )}
+          {!snap.journal || snap.journal.records.length === 0 ? (
+            <div className="text-xs text-gray-400 py-6 text-center">
+              暂无记录 — 从下一次决策开始，每个判断都会被记录并在 5 个交易日后评判
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {snap.journal.records.slice(0, 6).map(r => {
+                const res = r.result;
+                const actionLabel = r.action === "LONG_QBTX" ? "做多" : r.action === "SHORT_QBTZ" ? "做空" : "观望";
+                return (
+                  <div key={r.id} className="border border-[#F0F0F2] rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="font-mono text-gray-500">{r.date.slice(5)}</span>
+                      <span className={`font-semibold ${
+                        r.action === "LONG_QBTX" ? "text-emerald-700"
+                        : r.action === "SHORT_QBTZ" ? "text-red-700" : "text-gray-600"}`}>
+                        {actionLabel}
+                      </span>
+                      <span className="text-gray-400">信心{r.conviction} · ${r.price}</span>
+                      <span className="ml-auto">
+                        {r.status === "pending" ? (
+                          <span className="text-[10px] text-gray-400">⏳ 待评判</span>
+                        ) : r.action === "HOLD" && res?.correct === false ? (
+                          // 观望漏判(07-22 起):✗ 判的是"决策日 ≥3% 却观望",展示当日波动
+                          <span className="text-xs font-bold text-[#F03A3E]" title="决策日 |QBTS| ≥3% 却观望 = 漏判">
+                            ✗ 漏判 {res.day0_ret_pct != null ? `当日${(res.day0_ret_pct*100).toFixed(1)}%` : ""}
+                          </span>
+                        ) : r.action === "HOLD" && res?.correct === true ? (
+                          <span className="text-[10px] text-gray-400" title="决策日波动 <3%,观望合理">— 观望✓</span>
+                        ) : res?.correct === true ? (
+                          <span className="text-xs font-bold text-emerald-600">✓ {res.ret_pct != null ? `${(res.ret_pct*100).toFixed(1)}%` : ""}</span>
+                        ) : res?.correct === false ? (
+                          <span className="text-xs font-bold text-[#F03A3E]">✗ {res.ret_pct != null ? `${(res.ret_pct*100).toFixed(1)}%` : ""}</span>
+                        ) : (
+                          <span className="text-[10px] text-gray-400">— 观望</span>
+                        )}
+                      </span>
+                    </div>
+                    {res?.reflection && (
+                      <div className="mt-1.5 text-[11px] text-amber-700 bg-amber-50 rounded px-2 py-1 leading-snug">
+                        💡 反思：{res.reflection}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 🔮 月度复盘按钮 — 一个月后解锁 */}
+          <RetrospectivePanel />
+        </div>
+
+      </section>
       {/* ══ 4.8 恐慌深坑报警器 — 跌20%于20日高抄底(纸面测量,策略动物园胜率冠军但未验证) ═══ */}
       {snap.dip_buy && (
         <section className={`rounded-2xl border p-4 text-sm leading-relaxed ${
@@ -1827,6 +2150,28 @@ export default function Dashboard() {
         </section>
       )}
 
+        </div>
+      )}
+
+      {tab === "system" && (
+        <div className="space-y-4">
+      {/* ══ 控制台：出决策 / 实时报价按钮（仅本地后端可达时显示）═══════════ */}
+      <ControlPanel onPublished={refresh} />
+
+      {/* 数据源健康：坏 bar 已被 fetcher 拦在缓存外，但不能让它无声无息 ——
+          2026-07-29 上游把 07-24 的收盘贴进了 07-28 那行（比当日最低价还低），
+          静默剔除会让 as_of 倒退一天而页面照常正常。 */}
+      {snap.data_health && !snap.data_health.ok && (
+        <div className="bg-yellow-50 border border-yellow-400 text-yellow-900 rounded-xl px-5 py-3 text-sm">
+          <div className="font-bold mb-1">🧪 数据源异常 — 本页读的是校验后的缓存</div>
+          <ul className="space-y-0.5">
+            {snap.data_health.issues.map((s, i) => (
+              <li key={i} className="text-[12px] font-mono leading-relaxed">· {s}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* ══ 4.9 AI 系统自检 — 决策模型以审计者身份报告的数据问题/改进建议(给维护者) ═══ */}
       {(d?.system_notes?.length ?? 0) > 0 && (
         <section className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
@@ -1856,199 +2201,8 @@ export default function Dashboard() {
       {/* ══ 🔬 全站系统体检(publish §4.8 · 六页规则层+Haiku)═══════════════ */}
       <SiteCheckOverview check={snap?.site_check ?? null} />
 
-      {/* ══ 4.95 🌍 地缘政治雷达 — 伊朗战局/川普政策/量子政策(07-07 暴跌的驱动)═══ */}
-      {geo && (
-        <section className={`rounded-3xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] border ${
-          geo.risk_level === "alert" ? "bg-red-50/70 border-red-200"
-            : geo.risk_level === "watch" ? "bg-amber-50/50 border-amber-200"
-            : "bg-white border-transparent"}`}>
-          <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
-              🌍 地缘政治雷达 · 伊朗战局 / 川普政策 / 量子政策
-            </span>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-              geo.risk_level === "alert" ? "bg-red-600 text-white"
-                : geo.risk_level === "watch" ? "bg-amber-400 text-amber-950"
-                : "bg-emerald-100 text-emerald-700"}`}>
-              {geo.risk_cn}
-            </span>
-            {geoLive && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-semibold animate-pulse">
-                盘中实时
-              </span>
-            )}
-            <span className="ml-auto text-[10px] text-gray-400 font-mono">
-              {fmtLocalDateTime(geo.as_of) ?? ""}
-            </span>
-          </div>
-
-          <div className="text-[15px] font-bold text-gray-900 mb-1.5">{geo.headline_cn}</div>
-          {geo.summary_cn && (
-            <p className="text-sm leading-relaxed text-gray-700 mb-3">{geo.summary_cn}</p>
-          )}
-
-          {geoItems.length > 0 && (
-            <div className="space-y-2 border-t border-black/5 pt-3">
-              {geoItems.map(g => (
-                <a key={g.key} href={g.url || "#"} target="_blank" rel="noopener noreferrer"
-                   className="block group">
-                  <div className="flex items-start gap-2">
-                    <span className={`shrink-0 mt-1 w-1.5 h-1.5 rounded-full ${
-                      g.stance === "risk_off" ? "bg-[#F03A3E]"
-                        : g.stance === "risk_on" ? "bg-emerald-500" : "bg-gray-300"}`} />
-                    <div className="min-w-0">
-                      <div className="text-sm text-gray-900 group-hover:text-[#006FFF] transition-colors leading-snug">
-                        <span className={`mr-1.5 text-[10px] px-1.5 py-0.5 rounded font-semibold align-[1px] ${
-                          g.track === "iran" ? "bg-red-100 text-red-700"
-                            : g.track === "trump" ? "bg-indigo-100 text-indigo-700"
-                            : "bg-violet-100 text-violet-700"}`}>
-                          {g.track_cn}
-                        </span>
-                        {g.title}
-                        {g.relevance === "high" && (
-                          <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-red-600 text-white font-bold">高影响</span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-[#525461] mt-0.5">
-                        {g.note_cn} <span className="text-gray-400">· {g.source} · {g.published?.slice(5, 16)} UTC</span>
-                      </div>
-                    </div>
-                  </div>
-                </a>
-              ))}
-            </div>
-          )}
-
-          <div className="mt-3 text-[10px] text-gray-400">
-            Google News 每~30分钟盘中自动扫描(伊朗谈判/停火/空袭 · 川普关税/行政令 · 量子国防/出口管制)
-            · 出现新高影响条目或风险级别翻转 → ntfy 手机推送 · AI 分级仅供参考
-          </div>
-        </section>
-      )}
-
-      {/* ══ 4.5 公司催化剂雷达（D-Wave 自身消息 + 板块同行）══════════════ */}
-      {cat && (
-        <section className={`rounded-3xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] border ${
-          cat.impact_level === "breaking" ? "bg-red-50/70 border-red-200"
-            : cat.impact_level === "watch" ? "bg-amber-50/50 border-amber-200"
-            : "bg-white border-transparent"}`}>
-          <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
-              📣 公司催化剂雷达 · D-Wave 自身 / 板块同行
-            </span>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-              cat.impact_level === "breaking" ? "bg-red-600 text-white"
-                : cat.impact_level === "watch" ? "bg-amber-400 text-amber-950"
-                : "bg-emerald-100 text-emerald-700"}`}>
-              {cat.impact_cn}
-            </span>
-            {catLive && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-semibold animate-pulse">
-                盘中实时
-              </span>
-            )}
-            <span className="ml-auto text-[10px] text-gray-400 font-mono">
-              {fmtLocalDateTime(cat.as_of) ?? ""}
-            </span>
-          </div>
-
-          <div className="text-[15px] font-bold text-gray-900 mb-1.5">{cat.headline_cn}</div>
-          {cat.summary_cn && (
-            <p className="text-sm leading-relaxed text-gray-700 mb-3">{cat.summary_cn}</p>
-          )}
-
-          {catItems.length > 0 && (
-            <div className="space-y-2 border-t border-black/5 pt-3">
-              {catItems.map(c => (
-                <a key={c.key} href={c.url || "#"} target="_blank" rel="noopener noreferrer"
-                   className="block group">
-                  <div className="flex items-start gap-2">
-                    <span className={`shrink-0 mt-1 w-1.5 h-1.5 rounded-full ${
-                      c.direction === "bullish" ? "bg-emerald-500"
-                        : c.direction === "bearish" ? "bg-[#F03A3E]" : "bg-gray-300"}`} />
-                    <div className="min-w-0">
-                      <div className="text-sm text-gray-900 group-hover:text-[#006FFF] transition-colors leading-snug">
-                        <span className={`mr-1.5 text-[10px] px-1.5 py-0.5 rounded font-semibold align-[1px] ${
-                          c.track === "company" ? "bg-sky-100 text-sky-700"
-                            : "bg-violet-100 text-violet-700"}`}>
-                          {c.track_cn}
-                        </span>
-                        {c.title}
-                        {c.impact === "high" && (
-                          <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-red-600 text-white font-bold">催化剂</span>
-                        )}
-                      </div>
-                      <div className="text-[11px] text-[#525461] mt-0.5">
-                        {c.note_cn} <span className="text-gray-400">
-                          · {c.source}
-                          {typeof c.age_h === "number" && ` · ${c.age_h}h前`}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </a>
-              ))}
-            </div>
-          )}
-
-          <div className="mt-3 text-[10px] text-gray-400">
-            Google News 每~10分钟盘中自动扫描(D-Wave 合同/订单/产品/融资/上市变更 · 量子板块同行)
-            · 出现新的高影响催化剂 → ntfy 手机推送(同一条 PR 的多家转载只推一次)
-            · 零决策权,只做事件背景 · AI 分级仅供参考
-          </div>
-        </section>
-      )}
-
-      {/* ══ 5. 今日要闻 + 60日小图 ═══════════════════════════════════════ */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
-          <div className="text-xs font-semibold text-[#525461] uppercase tracking-wider mb-3">
-            📰 今日要闻
-          </div>
-          {newsTop.length === 0 ? (
-            <div className="text-xs text-gray-400 py-4">暂无高影响新闻</div>
-          ) : (
-            <div className="space-y-2.5">
-              {newsTop.map((n, i) => (
-                <a key={i} href={n.url || "#"} target="_blank" rel="noopener noreferrer"
-                   className="block group">
-                  <div className="flex items-start gap-2">
-                    <span className={`shrink-0 mt-1 w-1.5 h-1.5 rounded-full
-                      ${n.ai.sentiment === "bullish" ? "bg-emerald-500"
-                        : n.ai.sentiment === "bearish" ? "bg-[#F03A3E]" : "bg-gray-300"}`} />
-                    <div className="min-w-0">
-                      <div className="text-sm text-gray-900 group-hover:text-[#006FFF] transition-colors leading-snug">
-                        {n.title}
-                      </div>
-                      <div className="text-[11px] text-[#525461] mt-0.5">
-                        {n.ai.reasoning} <span className="text-gray-400">· {n.publisher} · {n.published?.slice(5, 10)}</span>
-                      </div>
-                    </div>
-                  </div>
-                </a>
-              ))}
-            </div>
-          )}
         </div>
-
-        <MiniChart
-          candles={snap.chart.candles}
-          sma20={snap.chart.sma20}
-          sma200={snap.chart.sma200}
-          high_52w={snap.chart.high_52w}
-          low_52w={snap.chart.low_52w}
-          plan={chartPlan}
-          supply={smc?.supply_zones}
-          demand={smc?.demand_zones}
-          poc={snap.volume_profile?.poc ?? null}
-          markers={chartMarkers}
-          nwBands={snap.nw_envelope?.bands}
-        />
-      </section>
-
-      <footer className="text-center text-[10px] text-gray-400 pb-4">
-        QBTS Quant Lab · AI 决策由 Claude 基于 8 类数据源综合生成 · 每日 publish.py 更新 · 仅供研究参考，非投资建议
-      </footer>
+      )}
 
       {/* 右下角版本号 — 连点 3 次(1.5s 内)打开隐藏的点击审计查看窗 */}
       <div
