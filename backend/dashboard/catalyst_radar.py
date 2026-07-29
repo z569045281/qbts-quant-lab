@@ -21,11 +21,17 @@ Source: Google News RSS search(免费无 key,`when:1d` 窗口 —— 比地缘�
 
 推送纪律 —— 这里比地缘雷达更严,因为公司消息的「同一件事反复改写标题」比地缘更凶
 (一条 PR 会被 20 家媒体转,每家标题都不一样 → md5 key 全不同 → 每跳推一条)。
-2026-07-10 那个「一晚 20 条轰炸」就是这么来的。两道闸:
-  ① **故事级去重**(不是标题级): 新条目与已推过的标题做 token Jaccard,≥0.6 视为
+2026-07-10 那个「一晚 20 条轰炸」就是这么来的。四道闸(③④是 2026-07-29 补的 ——
+用户一天收到 3 条同一件 AT&T 的推送,①②对那两条天生无效):
+  ① **故事级去重**(不是标题级): 剔掉无区分度的词后,与已推标题共享任一专名 =
      同一件事,静默登记不推。这才是根治 —— 光靠冷却时间会把真·突发也一起憋住。
   ② 冷却: 升到 breaking 立推;同级别的**不同**故事 ≥45min;降级根本不推
      (公司消息「没新消息了」不是一个值得响铃的事件,与地缘缓和不同)。
+  ③ **要因不要果**(代码层): 「Why ... Stock Surged Today」「Should You Buy」这类
+     描述价格结果的标题一律不推。提示词里早写了这条,但 Haiku 照样判 high ——
+     按 2026-07-22 的教训,规则必须落在代码里(`is_price_result`)。
+  ④ **无故事身份 = 只可能是转述**: 剔掉无区分度的词后专名集合为空的标题,
+     连自己在讲什么都说不出来,不可能是一件新催化剂。
 
 零决策权: 只进 snapshot + 决策 prompt 作事件背景,**不进 edge** —— news.py 已经占了
 `_NEWS_WEIGHT=0.15`,同一个消息面计两次就是自欺。UNPROVEN,8/15 与其他信号同堂受审。
@@ -103,15 +109,52 @@ def _item_key(title: str) -> str:
     return hashlib.md5(title.lower().strip()[:80].encode("utf-8")).hexdigest()[:10]
 
 
+def _stem(w: str) -> str:
+    """极简词干:只砍 ed/ing/s。用来对齐 `_UBIQUITOUS` —— 枚举屈折形是填不完的坑,
+    2026-07-29 就栽在表里有 surge/surges 却没有 **surged**,于是
+    「Why D-Wave Quantum Stock Surged Today」的故事身份变成了 {surged},
+    与「Soars on AT&T Deal」零交集 → 同一件事推了两遍。"""
+    for suf in ("ing", "ed", "es", "s"):
+        if len(w) > len(suf) + 2 and w.endswith(suf):
+            return w[: -len(suf)]
+    return w
+
+
+# 「描述价格结果」的标题模式 —— 提示词里已经写了"要因不要果",但 LLM 不照做
+# (2026-07-29 实测把「Why ... Stock Surged Today」判成 high)。按 2026-07-22
+# 的教训:**提示词里的规则不会自执行,护栏要落在代码里。**
+_PRICE_RESULT_RX = re.compile(
+    r"(why\s+.*\b(surg|soar|jump|plung|tumbl|slid|rall|pop|climb|sink|drop|fall)"
+    r"|\b(surged|soared|jumped|plunged|tumbled|slid|rallied|popped|climbed|sank|sunk)\b"
+    r"|should\s+you\s+(buy|sell|hold)"
+    r"|\bis\s+it\s+too\s+late\b"
+    r"|\b(moved|moves)\s+a\s+\w+\s+stock\b"
+    r"|\bstock\s+(is\s+)?(up|down)\s+\d"
+    r"|\b\d+\s+(quantum\s+)?stocks?\s+to\s+(buy|watch)\b)", re.I)
+
+
+def is_price_result(title: str) -> bool:
+    """标题只在描述"股价怎么动了"或"该不该买" → 是果不是因,不配 high。"""
+    return bool(_PRICE_RESULT_RX.search(title or ""))
+
+
 def _entities(title: str) -> set[str]:
     """标题 → 专名集合(故事身份)。
 
     `&` 保留在词内 —— 否则 "AT&T" 会被切成 "at"+"t" 两个垃圾 token 双双出局,
     而它恰恰是那条新闻的故事身份本身(实测踩过)。
+    比对前过词干,免得 surge/surged 这类屈折差异被当成两个不同的故事身份。
     """
     words = re.findall(r"[a-z0-9&]+", title.lower())
-    return {w for w in words
-            if len(w) >= 3 and w not in _STOPWORDS and w not in _UBIQUITOUS}
+    out = set()
+    for w in words:
+        if len(w) < 3 or w in _STOPWORDS:
+            continue
+        s = _stem(w)
+        if w in _UBIQUITOUS or s in _UBIQUITOUS or _stem(w) in {_stem(u) for u in _UBIQUITOUS}:
+            continue
+        out.add(s)
+    return out
 
 
 def _same_story(title: str, seen_titles: list[str]) -> bool:
@@ -336,11 +379,20 @@ def maybe_catalyst_refresh(prev: dict | None, now_et: datetime) -> dict | None:
     escalated = bool(prev) and prev_level and \
         _LEVEL_RANK.get(cur_level, 0) > _LEVEL_RANK.get(prev_level, 0)
 
-    # 候选 = high 影响 且 key 没推过 且 不是已推故事的改写版
+    # 候选 = high 影响 且 key 没推过 且 不是已推故事的改写版 且 不是"果" 且 有故事身份
+    #
+    # 最后那条(`_entities` 非空)是第三道闸,专治前两道天生管不着的一类:
+    # 「Why D-Wave Quantum Stock Surged Today」这种转述稿**通篇不提 AT&T**,
+    # 剔掉无区分度的词之后专名集合是**空的** —— 一条自己都说不出在讲什么的标题,
+    # 不可能是一件新的催化剂,只可能是对已发生之事的复述。
+    # (2026-07-29:用户一天收到 3 条同一件 AT&T 的推送,其中两条就是这样溜过去的。)
     hot = [it for it in fresh.get("items", [])
            if it.get("impact") == "high"
+           and not is_price_result(it.get("title", ""))     # 代码层护栏,不信 LLM
+           and _entities(it.get("title", ""))               # 无故事身份 = 只可能是转述
            and it["key"] not in alerted
            and not _same_story(it["title"], alerted_titles)]
+
 
     def _register(batch):
         for it in batch:
