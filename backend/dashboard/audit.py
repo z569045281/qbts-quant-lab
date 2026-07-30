@@ -25,8 +25,34 @@ CLAUDE.md 的常设提醒:edge.py 的所有权重都是硬编码先验,等各源
 分歧一目了然。修订依据=设计常数与判决标准矛盾,非对已见结果不满意;
 2026-07-24 写死,审判日仍不得看着数字改标准。
 
-只读不写:工具产出报告(stdout + cache/audit_report.json),权重改动仍走
-人工 code review(edge.py 常量),证据在手再动刀。
+**预注册修订 2026-07-30(用户拍板,依据 = docs/REVIEW-2026-07.md §5/§7)—— 两项:**
+
+(A) **判决主体从「AI 方向单」改为「方向表态 bold_call」。** 依据是可达性算术,不是
+    结果好看:方向单池 n=1、速率 0.02/天 → 到 n=30 要 **1247 天(2029-12-28)**;
+    表态池每个交易日 +1。两者测的是同一件事(模型看对没看对),但表态不受
+    "能不能下单"的闸门污染 —— 而那道闸门在 2026-06/07 把 14 次连续看空全变成了
+    观望(死区上沿 p_up≥0.58 在 36 天里 0 次触发 + 空腿四轮判死)。方向单池
+    **继续记录、继续展示**,只是不再是判决主体。**这项修订放宽了什么必须写明:
+    它把判决门槛从"不可达"变成"可达",没有降低 n≥30 或 Wilson 任何一项。**
+
+(B) **多视界并行评分(1/2/3/5 日)。** 用户 2026-07-30:"我基本上持仓只拿 2 天 3 天,
+    系统也只需要测这 2 到 3 天"。原先模型预测 5 日、评分 5 日、edge regime 常数按
+    P(5d up) 实测 —— 全系统在测一个没人交易的视界。**不改** prompt 字段与
+    _GRADE_AFTER_BARS(改=清零本就不够的样本),改为同一份表态并行评在 4 个视界上,
+    并对历史记录回填。**判决线在看到更多数据之前定死**(见 `_HORIZON_RULE`)。
+    ⚠️ 2026-07-30 回填读数(每视界 n=9~14)**不得作为任何视界的晋升依据** ——
+    当天一次性试了 5 个视界,挑最好的看着漂亮是 n=14 下的随机常态。
+
+**2026-07-30 修的一个真 bug(不是口径变更)**:`daily_call` 池原本用
+`res.correct if not None else res.shadow_correct` 合并 —— 但 2026-07-22 起 HOLD 记录
+的 `correct` 变成了「漏判判读」而非方向表态,于是 29 条里 **28 条读的是漏判判读**,
+那行"每日方向表态命中 48%"**根本没在测方向**,只是 HOLD 漏判率换了个标签。
+journal.py 的 `_lean` 当时已按 action 分流修好,audit.py 这份读者被漏掉 ——
+与 2026-07-22 校准混代记录同一个病根(改字段语义必须 grep 全部读者)。
+
+只读不写(唯一例外:`backfill_horizons` 给老记录补新字段,幂等,不改任何已有值);
+工具产出报告(stdout + cache/audit_report.json),权重改动仍走人工 code review
+(edge.py 常量),证据在手再动刀。
 
 2026-07-13 报告口径补充(判决规则本身未动,以下均为新增可见度):
   · HOLD 判读(预注册):AI 决策 HOLD 也可评判 —— 决策覆盖的那个交易日
@@ -56,6 +82,19 @@ _OUT = Path(__file__).parent.parent / "data" / "cache" / "audit_report.json"
 
 _N_MIN = 30           # 判决门槛(预注册)
 _Z = 1.96             # Wilson 95%
+
+# ── 多视界预注册判决线(2026-07-30 写死,在积累数据之前定;审判日不得改)──────
+# 关键设计:**不跟 0.5 比,跟「常喊同一边」的基线比。** 2026-06/07 单边下跌里
+# 83% 的 5 日窗口是跌的 —— 一个无脑常喊 down 的模型能拿 83% 命中率而技巧为零。
+# 判活条件(三条全过):
+#   ① n ≥ _N_MIN(30)
+#   ② Wilson95% 下界 > 该视界的**同期基线命中率**(= 常喊多数边的命中率),不是 > 0.5
+#   ③ 该视界的技巧值(命中 − 基线)在**四个视界里为正**且不是唯一为正的孤例
+#      —— 单视界孤高 = 多重比较产物(4 个视界任选其一,n=30 下假阳性不低)
+# 判死:Wilson95% 上界 < 基线 → 该视界表态无信息,报告明示。
+# 视界间只做**展示排序**,不自动改任何权重/prompt;换 prompt 视界需用户单独拍板。
+_HORIZON_RULE = ("判活须三条全过:n≥30 · Wilson下界>同期基线(非0.5) · "
+                 "技巧值为正且非四视界中的孤例(防多重比较)")
 
 
 def _wilson(hits: int, n: int) -> tuple[float, float]:
@@ -115,6 +154,81 @@ def _expectancy_r(rs: list[float]) -> dict | None:
             "avg_loss_r": round(sum(losses) / len(losses), 3) if losses else None}
 
 
+def _horizon_audit(recs: list[dict], df_d) -> dict:
+    """方向表态 × 1/2/3/5 日视界(新判决主体)。基线 = 常喊多数边的命中率。"""
+    from dashboard.journal import _HORIZONS
+
+    out: dict = {"rule": _HORIZON_RULE, "by_horizon": {}}
+    for h in _HORIZONS:
+        key = f"{h}d"
+        # 读记录**顶层** horizons(不是 result)—— 这样 2 日表态不必等 5 日评分闸门,
+        # 短视界池比长视界池先长(journal.backfill_horizons 每次审判前补齐)。
+        rows = [(r.get("bold_call_5d"), (r.get("horizons") or {}).get("fwd_ret", {}).get(key))
+                for r in recs]
+        rows = [(c, f) for c, f in rows if c in ("up", "down") and f is not None]
+        # 基线:该视界所有可评日里,多数边的占比(= 无脑常喊那一边的命中率)。
+        # 用**全部**有 fwd 的记录算,不只有表态的那些 —— 基线是市场属性,不是模型属性。
+        allf = [f for r in recs
+                for f in [(r.get("horizons") or {}).get("fwd_ret", {}).get(key)]
+                if f is not None]
+        if not rows or not allf:
+            continue
+        down_share = sum(1 for f in allf if f < 0) / len(allf)
+        base = max(down_share, 1 - down_share)
+        hits = sum(1 for c, f in rows if (c == "up") == (f > 0))
+        v = _verdict(hits, len(rows), breakeven=base)
+        v["baseline"] = round(base, 3)
+        v["baseline_side"] = "down" if down_share >= 0.5 else "up"
+        v["skill_pp"] = round((hits / len(rows) - base) * 100, 1)
+        v["n_baseline_days"] = len(allf)
+        v["mean_fwd_pct"] = round(sum(f for _, f in rows) / len(rows) * 100, 2)
+        out["by_horizon"][key] = v
+    # 孤例检查(判活条件③):技巧值为正的视界数
+    pos = [k for k, v in out["by_horizon"].items() if (v.get("skill_pp") or 0) > 0]
+    out["n_positive_skill"] = len(pos)
+    out["positive_horizons"] = pos
+    out["multiple_comparison_warn"] = len(pos) == 1
+    return out
+
+
+def _p_up_diagnostic(recs: list[dict]) -> dict:
+    """p_up 反预测立案(用户 2026-07-30 拍板,REVIEW-2026-07 §7 P1)。
+
+    **预注册判决线(在数据攒够之前定死)**:当 n ≥ 30 时,若 corr(p_up, fwd5) 的
+    95% 置信区间**整段位于 0 以下**(即显著为负)→ 建议把 `p_up` 从决策 prompt
+    **摘除**,不是调权重。理由:v1(24 条命中 24%、崩盘段 12/13 天喊 BUY)与 v2
+    (2026-07-30 实测 corr −0.406,n=29)**两代同向**;第三次调参没有先验支持。
+    corr 的 CI 用 Fisher z 变换(小样本下比 bootstrap 稳,且可手算复现)。
+    """
+    pairs = [(float(r["p_up_5d"]), float(r["result"]["fwd5_ret"]))
+             for r in recs
+             if r.get("p_up_5d") is not None
+             and (r.get("result") or {}).get("fwd5_ret") is not None]
+    if len(pairs) < 4:
+        return {"n": len(pairs), "verdict": "样本不足·继续测量"}
+    xs = [a for a, _ in pairs]; ys = [b for _, b in pairs]
+    n = len(pairs)
+    mx, my = sum(xs) / n, sum(ys) / n
+    sx = math.sqrt(sum((a - mx) ** 2 for a in xs))
+    sy = math.sqrt(sum((b - my) ** 2 for b in ys))
+    r_ = sum((a - mx) * (b - my) for a, b in pairs) / (sx * sy) if sx and sy else 0.0
+    r_ = max(-0.999999, min(0.999999, r_))
+    z = 0.5 * math.log((1 + r_) / (1 - r_))
+    se = 1 / math.sqrt(n - 3) if n > 3 else float("inf")
+    lo, hi = (math.tanh(z - _Z * se), math.tanh(z + _Z * se))
+    if n < _N_MIN:
+        verdict = "样本不足·继续测量(线已预注册)"
+    elif hi < 0:
+        verdict = "❌ 显著反预测 → 建议把 p_up 从决策 prompt 摘除(非调权重)"
+    elif lo > 0:
+        verdict = "✅ 正相关·保留"
+    else:
+        verdict = "中性·继续测量"
+    return {"n": n, "corr": round(r_, 3), "ci95": [round(lo, 3), round(hi, 3)],
+            "verdict": verdict,
+            "rule": "n≥30 且 corr 的 95%CI 整段 <0 → 摘除 p_up(v1/v2 两代同向,不再调参)"}
+
+
 def run_audit() -> dict:
     from data.fetcher import load_or_fetch
     from dashboard.calibration import grade_predictions
@@ -150,6 +264,14 @@ def run_audit() -> dict:
 
     # ── ② AI 决策台账(决策本身当一个"源"审)────────────────────────────
     try:
+        # 老记录补多视界字段(2026-07-30 新增;幂等,不改任何已有值)—— 必须在
+        # load_recent 之前,否则本次报告读到的还是没有 fwd_ret_by_h 的旧快照。
+        try:
+            n_bf = jr.backfill_horizons(df_d)
+            if n_bf:
+                report["backfilled_horizon_records"] = n_bf
+        except Exception as e:
+            report["backfill_error"] = str(e)[:120]
         j = jr.load_recent(500)
         recs = j.get("records") or []
         graded = [r for r in recs if (r.get("result") or {}).get("ret_pct") is not None
@@ -180,6 +302,7 @@ def run_audit() -> dict:
             "planned_rr_mean": round(sum(rrs) / len(rrs), 2) if rrs else None,
             "expectancy": _expectancy_r(r_mults),
             "paper": j.get("paper"),
+            "paper_avoided": j.get("avoided"),
         }
         # HOLD 判读(2026-07-13 预注册补充,见模块 docstring;展示用,不触发权重)。
         # 决策是 09:00 ET 盘前发布 → 覆盖的是 record 日期起的第一个交易日;
@@ -210,10 +333,17 @@ def run_audit() -> dict:
         # 与 HOLD 影子分(bold_call_5d 强制二选一;旧记录回退 p_up≷0.5)合并成
         # 一条日频方向台账 —— 观望月也能攒方向样本。附 p_up 骑墙率作病征指标
         # (07-13 体检:21 天 95% 挤在 [0.45,0.55],方向能力整月不可测)。
+        # ⚠️ 2026-07-30 修 bug:原实现 `correct if not None else shadow_correct`,
+        # 而 07-22 起 HOLD 的 correct = 漏判判读(不是方向表态)→ 29 条里 28 条
+        # 读的是漏判率,这一行根本没在测方向。改为**按 action 分流**,与
+        # journal.py `_lean`(07-22 已修好的那份)逐字同口径。
         lean = []
         for r in recs:
             res = r.get("result") or {}
-            v = res.get("correct") if res.get("correct") is not None else res.get("shadow_correct")
+            if r.get("action") in ("LONG_QBTX", "SHORT_QBTZ"):
+                v = res.get("correct")
+            else:                                    # HOLD:方向只看影子表态
+                v = res.get("shadow_correct")
             if v is not None:
                 lean.append(bool(v))
         p_all = [float(r["p_up_5d"]) for r in recs if r.get("p_up_5d") is not None]
@@ -221,7 +351,11 @@ def run_audit() -> dict:
         report["sections"]["decision_journal"]["daily_call"] = {
             **_verdict(sum(lean), len(lean)),
             "p_up_fence_pct": round(fence / len(p_all), 3) if p_all else None,
+            "basis": "方向单用 correct,HOLD 用 shadow_correct(漏判判读不冒充方向分)",
         }
+        # ── 判决主体:方向表态 × 多视界(预注册修订 2026-07-30 A+B)────────────
+        report["sections"]["decision_journal"]["horizons"] = _horizon_audit(recs, df_d)
+        report["sections"]["decision_journal"]["p_up_diagnostic"] = _p_up_diagnostic(recs)
         # 影子考场:Fable vs DeepSeek vs v1反向影子(2026-07-21,用户拍板) 的
         # bold_call 按统一 fwd5 口径同框
         for fld, key in (("bold_correct", "bold_fable"), ("ds_bold_correct", "bold_deepseek"),
@@ -384,6 +518,35 @@ def format_report(report: dict) -> str:
             if b and b.get("n"):
                 L.append(f"   {label} n={b['n']} 命中{b['hit_rate']*100:.0f}% "
                          f"CI[{b['ci95'][0]*100:.0f},{b['ci95'][1]*100:.0f}] {b['verdict']}")
+        # ── ②★ 新判决主体:方向表态 × 多视界(预注册修订 2026-07-30)────────
+        hz = dj.get("horizons") or {}
+        by = hz.get("by_horizon") or {}
+        if by:
+            L.append(f"\n②★ 【判决主体】方向表态 × 视界 — {hz.get('rule','')}")
+            L.append(f"   {'视界':<6}{'n':>4}  {'命中':>6} {'Wilson95%':<12}"
+                     f"{'基线':>6}{'技巧':>8}  判决")
+            for k, d in by.items():
+                star = " ←你的持有期" if k in ("2d", "3d") else ""
+                L.append(f"   {k:<6}{d['n']:>4}  {d['hit_rate']*100:>5.0f}% "
+                         f"[{d['ci95'][0]*100:>3.0f},{d['ci95'][1]*100:>3.0f}]  "
+                         f"{d['baseline']*100:>5.0f}%{d['skill_pp']:>+7.1f}pp  "
+                         f"{d['verdict']}{star}")
+            L.append(f"   基线 = 该视界无脑常喊「{next(iter(by.values())).get('baseline_side','?')}」"
+                     f"的命中率;技巧 = 命中 − 基线。**跟基线比,不跟 50% 比。**")
+            if hz.get("multiple_comparison_warn"):
+                L.append(f"   ⚠️ 只有 {hz.get('positive_horizons')} 一个视界技巧为正 = "
+                         f"多重比较高危,按预注册条件③**不得晋升**")
+        pu = dj.get("p_up_diagnostic") or {}
+        if pu.get("corr") is not None:
+            L.append(f"\n②☠ p_up 反预测立案 — corr(p_up, fwd5)={pu['corr']:+.3f} "
+                     f"CI[{pu['ci95'][0]:+.2f},{pu['ci95'][1]:+.2f}] n={pu['n']} → {pu['verdict']}")
+            L.append(f"   线(预注册): {pu.get('rule','')}")
+        av = (dj.get("paper_avoided") or {})
+        if av.get("n_hold_days"):
+            L.append(f"\n②$ 规避回撤(观望 {av['n_hold_days']} 天的 2× 反事实)— "
+                     f"若那些天满仓 QBTX: {av['long_2x_pct']:+.1f}%"
+                     f"  (对照 2× 空 {av['short_2x_pct']:+.1f}%,空腿四轮判死,不构成建议)")
+            L.append(f"   口径: {av.get('basis','')}")
     hs = report["sections"].get("paper_horses", {})
     if hs and "error" not in hs:
         L.append("\n③ 纸面马竞速:")

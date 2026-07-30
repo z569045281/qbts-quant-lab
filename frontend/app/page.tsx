@@ -260,6 +260,7 @@ export default function Dashboard() {
 
   // 模拟持仓:当前未平方向单的浮动盈亏(用实时 QBTS 价 vs 入场,按标的、未计 2× 杠杆)
   const jPaper = snap.journal?.paper ?? null;
+  const jAvoided = snap.journal?.avoided ?? null;   // 🛡️ 规避回撤(观望日 2× 反事实)
   const jLiveQ = liveCurrent ? live?.quotes?.qbts?.price : snap.price;  // 与页面价同源
   let jUnreal: number | null = null;
   if (jPaper?.open && typeof jLiveQ === "number" && jPaper.open.entry > 0) {
@@ -1944,6 +1945,37 @@ export default function Dashboard() {
               )}
               {jPaper.n_trades < 10 && (
                 <div className="mt-1 text-[10px] text-amber-600">⚠️ 样本极少（{jPaper.n_trades} 笔）——系统多数日子观望、方向单稀少,这个数字还说明不了问题</div>
+              )}
+              {/* 规避回撤(2026-07-30 用户拍板):上面那行"胜率"只会显示没赚到钱,
+                  而观望躲开的亏损从不出现在任何一栏。这里补上,零决策权。 */}
+              {jAvoided && (
+                <div className="mt-2 pt-2 border-t border-[#E6E6EA]">
+                  <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                    <span className="font-semibold text-gray-700">
+                      🛡️ 规避回撤 · 那 {jAvoided.n_hold_days} 天观望
+                    </span>
+                    <span className="text-[10px] text-gray-400">2× 反事实 · 零决策权</span>
+                  </div>
+                  <div className="mt-1 font-mono">
+                    若那些天满仓 QBTX：{" "}
+                    <b className={jAvoided.long_2x_pct >= 0 ? "text-emerald-600" : "text-[#F03A3E]"}>
+                      {jAvoided.long_2x_pct >= 0 ? "+" : ""}{jAvoided.long_2x_pct.toFixed(1)}%
+                    </b>
+                    <span className="text-gray-400">
+                      {" "}（观望实际 0.0% → 相对{" "}
+                      <b className={-jAvoided.long_2x_pct >= 0 ? "text-emerald-600" : "text-[#F03A3E]"}>
+                        {-jAvoided.long_2x_pct >= 0 ? "+" : ""}{(-jAvoided.long_2x_pct).toFixed(1)}pp
+                      </b>）
+                    </span>
+                  </div>
+                  {/* 渲染的是纯文本,不能写 markdown 的 ** —— 会原样印出来
+                      (2026-07-29 超买超卖卡踩过同一个坑)。强调走 className。 */}
+                  <div className="mt-1 text-[10px] text-gray-400 leading-snug">
+                    口径：{jAvoided.basis}。对照 2× 空 {jAvoided.short_2x_pct >= 0 ? "+" : ""}
+                    {jAvoided.short_2x_pct.toFixed(1)}% —— 做空家族四轮判死，
+                    <span className="font-semibold text-[#B45309]">这个数字不是建议</span>。
+                  </div>
+                </div>
               )}
             </div>
           )}

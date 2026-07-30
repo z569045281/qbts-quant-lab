@@ -37,6 +37,18 @@ _JOURNAL.parent.mkdir(parents=True, exist_ok=True)
 _GRADE_AFTER_BARS = 5     # final grade horizon (trading days)
 _HOLD_MISS_PCT    = 0.03  # HOLD 判读:决策日 |QBTS| ≥3% = 漏判(audit.py 07-13 预注册同一口径)
 
+# ── 多视界评分(2026-07-30,用户:"我基本上持仓只拿 2 天 3 天,系统也只需要测这 2 到 3 天")
+# 病征:模型被要求预测 5 日(`bold_call_5d`)、评分按 5 日、edge 的 regime 常数按 P(5d up)
+# 实测 —— 而用户真实持有期是 2–3 天。**全系统在测一个没人交易的视界。**
+# 处理方式(刻意不做的事同样重要):
+#   · **不改** prompt 里的 `bold_call_5d` 字段,**不改** _GRADE_AFTER_BARS —— 改了就把
+#     已积累的 5 日池清零,而 REVIEW-2026-07 §5 刚指出样本本来就不够。
+#   · 改为**同一个表态在多个视界上并行评分**:零新样本成本,且可对全部历史记录回填。
+#   · 判决线在**看到更多数据之前**预注册(见 audit.py `_HORIZON_RULE`)。
+# ⚠️ 2026-07-30 回填当日的读数(n=9~14)**不得**作为任何视界的晋升依据:当时一次性
+#    试了 5 个视界,挑最好的那个看着漂亮是 n=14 下的随机常态(多重比较)。
+_HORIZONS = (1, 2, 3, 5)
+
 # Storage: a Supabase `decision_journal` table when credentials are present
 # (so the journal persists across stateless cloud runs — Lambda's /tmp is wiped
 # on every cold start), otherwise the local JSONL file. Each record is one row:
@@ -292,6 +304,9 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
             if vic in ("up", "down"):
                 v1inv_correct = (vic == "up") == (fwd5 > 0)
 
+        # 多视界:同一份表态,在 1/2/3/5 日上各评一次(见 _HORIZONS 注释)
+        fwd_h, bold_by_h = _horizon_grades(r, p0, closes, after)
+
         r["status"] = "graded"
         r["result"] = {
             "graded_at": datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
@@ -308,6 +323,12 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
             "ds_bold_correct": ds_correct,
             "v1inv_bold_correct": v1inv_correct,
         }
+        # 多视界存在**记录顶层**而不是 result 里 —— 关键设计:2 日表态不该等 5 根 bar
+        # 才有结论。result 的生成被 `len(after) < _GRADE_AFTER_BARS: continue` 闸着
+        # (5 日漂移评分本来就得等 5 天),若把视界数据塞进 result,2d/3d 池会连带
+        # 被压 5 天才长 —— 正是用户要修的那件事。顶层字段由 backfill_horizons
+        # 对 pending / graded 一视同仁地维护。
+        r["horizons"] = {"fwd_ret": fwd_h, "bold": bold_by_h}
         newly_graded.append(r)
 
     if newly_graded:
@@ -318,6 +339,70 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
                 res["reflection"] = _reflect(r)
         _save(records)
     return newly_graded
+
+
+_BOLD_FIELDS = {"fable": "bold_call_5d", "ds": "ds_bold_call", "v1inv": "v1inv_bold_call"}
+
+
+def _horizon_grades(r: dict, p0: float, closes, after) -> tuple[dict, dict]:
+    """同一份 bold_call 表态在 _HORIZONS 每个视界上的对错。
+
+    返回 (fwd_ret_by_h, bold_by_h):
+      fwd_ret_by_h = {"2d": 0.031, …}      纯漂移收益,与 action / 止损路径无关
+      bold_by_h    = {"fable": {"2d": True, …}, "ds": {…}, "v1inv": {…}}
+
+    视界 bar 数不足(记录太新)→ 该视界缺键,不写 None:缺键=还没到期,
+    None 会被下游误读成"评过但无表态"。
+    """
+    fwd_h: dict[str, float] = {}
+    for h in _HORIZONS:
+        if len(after) < h:
+            continue
+        fwd_h[f"{h}d"] = round((float(closes.loc[after[h - 1]]) - p0) / p0, 4)
+    bold_by_h: dict[str, dict] = {}
+    for who, fld in _BOLD_FIELDS.items():
+        call = r.get(fld)
+        if call not in ("up", "down"):
+            continue
+        bold_by_h[who] = {k: ((call == "up") == (v > 0)) for k, v in fwd_h.items()}
+    return fwd_h, bold_by_h
+
+
+def backfill_horizons(df_daily) -> int:
+    """维护每条记录顶层的 `horizons`(2026-07-30 新增),**pending / graded 一视同仁**。
+
+    两个作用:
+      ① 回填历史 —— 零新样本成本地把多视界池拉到与 5 日池同样的 n(这是"不清零
+         旧池"换来的好处);
+      ② **让短视界比长视界先出结论** —— 一条 2 天前的记录,`result` 还等着满 5 根
+         bar 才生成,但它的 2 日表态今天就该有答案。每次审判前跑一遍即可补齐。
+
+    幂等:内容不变则跳过、不写库。视界 bar 数不足 → 该视界缺键(不写 None),
+    所以随着交易日推进,同一条记录的 horizons 会从 {"1d","2d"} 长到 {"1d".."5d"}。
+    只增补不改写任何已有值,`result` / `status` 一律不碰。
+    """
+    closes = df_daily["close"]
+    dates = pd.DatetimeIndex(df_daily.index).normalize()
+    records = _load()
+    touched = 0
+    for r in records:
+        try:
+            d0 = pd.Timestamp(r["date"]).normalize()
+            p0 = float(r["price"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        after = dates[dates > d0]
+        fwd_h, bold_by_h = _horizon_grades(r, p0, closes, after)
+        if not fwd_h:
+            continue
+        blk = {"fwd_ret": fwd_h, "bold": bold_by_h}
+        if r.get("horizons") == blk:
+            continue
+        r["horizons"] = blk
+        touched += 1
+    if touched:
+        _save(records)
+    return touched
 
 
 def _reflect(r: dict) -> str | None:
@@ -351,6 +436,42 @@ def _reflect(r: dict) -> str | None:
 
 
 _PAPER_USD = 1000.0   # 模拟持仓:每个方向单跟随的假钱本金
+
+
+def _avoided_drawdown(allr: list[dict]) -> dict | None:
+    """规避回撤 —— 观望日的 2× 反事实(2026-07-30 用户拍板)。
+
+    动机(REVIEW-2026-07 §3):记分板只有胜率,而 2026-06/07 这一个月系统的
+    **全部产出就是没让人亏钱** —— QBTS −32.3%、QBTX −58.2%,而系统 35/36 天观望。
+    胜率栏永远显示 0%,真实相对收益 +58pp 无处体现。这一栏只是让记分板承认
+    已经发生的事。
+
+    口径(写死,别事后调):
+      · 只取**已评判的 HOLD** 记录里的 `day0_ret_pct`(决策覆盖那个交易日的
+        QBTS 涨跌)—— 与 HOLD 判读用的完全同一个数,不引入第二套口径。
+      · 按日复利 2× 敞口:`prod(1 + 2·r) − 1`。**不含**杠杆 ETF 的每日再平衡
+        损耗,所以这是 QBTX/QBTZ 真实结果的**乐观上界**(2026-07-30 实测:
+        持有 3 天 QBTX 中位再损 0.43pp / QBTZ 1.03pp)。
+      · 多、空两条都给。空腿数字**只作对照,不构成任何建议** —— 做空家族在
+        第 7/9/13/23 轮四次判死,不因这一栏复活(CLAUDE.md 铁律)。
+
+    **零决策权**:不进 edge / 打分 / playbook / 决策 prompt。纯记分板列。
+    """
+    rets = [float(r["result"]["day0_ret_pct"]) for r in allr
+            if r.get("action") == "HOLD" and r.get("status") == "graded"
+            and (r.get("result") or {}).get("day0_ret_pct") is not None]
+    if not rets:
+        return None
+    long_nav = short_nav = 1.0
+    for x in rets:
+        long_nav  *= (1 + 2 * x)
+        short_nav *= (1 - 2 * x)
+    return {
+        "n_hold_days":   len(rets),
+        "long_2x_pct":   round((long_nav - 1) * 100, 1),    # 观望日全仓 QBTX 的话
+        "short_2x_pct":  round((short_nav - 1) * 100, 1),   # 对照,不是建议
+        "basis": "已评判 HOLD 日的 day0 涨跌按 2× 日复利;未扣杠杆 ETF 再平衡损耗(乐观上界)",
+    }
 
 
 def load_recent(n: int = 12) -> dict:
@@ -409,6 +530,7 @@ def load_recent(n: int = 12) -> dict:
     return {
         "records":   records,
         "paper":     paper,
+        "avoided":   _avoided_drawdown(allr),
         "n_graded":  len(graded),
         "n_correct": n_correct,
         "accuracy":  round(n_correct / len(graded), 3) if graded else None,

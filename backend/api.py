@@ -46,6 +46,7 @@ from dashboard.nadaraya_watson    import analyze_nw_envelope
 from dashboard.squeeze           import analyze_squeeze
 from dashboard.relative_strength import analyze_relative_strength
 from dashboard.journal     import record as journal_record, grade_pending, load_recent as journal_recent
+from dashboard.journal     import backfill_horizons
 from dashboard.calibration import log_prediction, grade_predictions, save_learned_weights
 from factors.generator import generate_and_validate, generate_and_validate_ml
 from factors.ml_factor import run_ml_walk_forward
@@ -1437,6 +1438,10 @@ async def refresh_decision():
         extras["calibration"] = await asyncio.to_thread(grade_predictions, df_d)
         # Grade past decisions FIRST so today's prompt includes fresh lessons
         await asyncio.to_thread(grade_pending, df_d)
+        # 多视界字段(2026-07-30):grade_pending 只给**新评判**的记录写 horizons,而
+        # pending 记录的 2/3 日视界今天就该有答案(5 日评分闸门不该压住短视界 ——
+        # 用户实际持有期只有 2-3 天)。每次发布补一遍,幂等,不改任何已有值。
+        await asyncio.to_thread(backfill_horizons, df_d)
         extras["journal"] = await asyncio.to_thread(journal_recent, 10)
     except Exception:
         pass

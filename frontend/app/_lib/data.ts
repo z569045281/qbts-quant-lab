@@ -529,9 +529,19 @@ export interface JournalPaper {
     target: number | null;
   } | null;
 }
+// 规避回撤(2026-07-30):观望日的 2× 反事实。胜率栏只会显示"没赚",
+// 这一栏让记分板承认"没亏"—— 2026-06/07 那一个月的全部产出就是它。
+// 零决策权;short_2x_pct 只作对照(做空家族四轮判死,不构成建议)。
+export interface JournalAvoided {
+  n_hold_days:  number;
+  long_2x_pct:  number;   // 观望日全仓 QBTX 的话
+  short_2x_pct: number;   // 对照,不是建议
+  basis:        string;   // 口径披露(未扣杠杆 ETF 再平衡损耗 = 乐观上界)
+}
 export interface DecisionJournal {
   records:   JournalRecord[];
   paper?:    JournalPaper;
+  avoided?:  JournalAvoided | null;
   n_graded:  number;
   n_correct: number;
   accuracy:  number | null;
