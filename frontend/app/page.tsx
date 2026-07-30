@@ -415,8 +415,13 @@ export default function Dashboard() {
           QBTX {fmtPx(etfPx.qbtx)}{etfStale.qbtx && <span title="最后成交比 QBTS 旧 >15 分钟(薄流动性),涨跌口径不同步">⏱</span>}
           {" · "}QBTZ {fmtPx(etfPx.qbtz)}{etfStale.qbtz && <span title="最后成交比 QBTS 旧 >15 分钟(薄流动性),涨跌口径不同步">⏱</span>}
         </span>
-        <span className="ml-auto text-[10px] text-gray-400">
-          数据截至 {snap.as_of?.slice(0, 10)}{genAt ? ` · 决策 ${genAt}` : ""}
+        <span className="ml-auto flex items-center gap-2.5">
+          <span className="text-[10px] text-gray-400">
+            数据截至 {snap.as_of?.slice(0, 10)}{genAt ? ` · 决策 ${genAt}` : ""}
+          </span>
+          {/* 🧠 出今天的决策 —— 每天都要点的动作,必须在首屏。完整控制台
+              (报价开关 / 生成复盘 / 失败日志)在「系统」标签,同一套请求逻辑。 */}
+          <ControlPanel compact onPublished={refresh} />
         </span>
       </div>
 
@@ -2165,7 +2170,10 @@ export default function Dashboard() {
 
       {tab === "system" && (
         <div className="space-y-4">
-      {/* ══ 控制台：出决策 / 实时报价按钮（仅本地后端可达时显示）═══════════ */}
+      {/* ══ 控制台(完整版)：出决策 + 实时报价开关 + 生成复盘 + 失败日志。
+          「出今天的决策」那一个按钮另有紧凑版嵌在驾驶舱价格轨里(每天都要点的
+          动作不该藏在二级菜单——2026-07-30 用户当天就问按钮去哪了)。
+          本地模式下后端不可达时整块自动隐藏。═══════════════════════════════ */}
       <ControlPanel onPublished={refresh} />
 
       {/* 数据源健康：坏 bar 已被 fetcher 拦在缓存外，但不能让它无声无息 ——

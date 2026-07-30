@@ -16,14 +16,24 @@ import { clientHints } from "../_lib/data";
 
 const PUBLISH_URL = process.env.NEXT_PUBLIC_PUBLISH_URL;
 
-export function ControlPanel({ onPublished }: { onPublished: () => void }) {
+/** `compact` = 只给「出今天的决策」这一个按钮、不带外壳。
+ *  2026-07-30:重排把整个控制台归到「系统」标签,结果**每天都要点的那个按钮
+ *  也跟着藏进二级菜单**了(用户当天就问"为什么按钮不见了")。现在紧凑版嵌在
+ *  驾驶舱的价格轨里,完整版(报价开关 / 生成复盘 / 失败日志)仍在「系统」。
+ *  两处共用同一套请求逻辑,不复制 fetch。 */
+export function ControlPanel({ onPublished, compact = false }:
+  { onPublished: () => void; compact?: boolean }) {
   return PUBLISH_URL
-    ? <CloudPanel onPublished={onPublished} />
-    : <LocalPanel onPublished={onPublished} />;
+    ? <CloudPanel onPublished={onPublished} compact={compact} />
+    : <LocalPanel onPublished={onPublished} compact={compact} />;
 }
 
+/** 紧凑模式共用的按钮外观 */
+const COMPACT_BTN = "px-2.5 py-1 text-[12px] font-medium rounded-lg bg-[#006FFF] text-white "
+  + "hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5";
+
 /* ── CLOUD: button → Lambda Function URL; quotes are auto ─────────────────── */
-function CloudPanel({ onPublished }: { onPublished: () => void }) {
+function CloudPanel({ onPublished, compact }: { onPublished: () => void; compact?: boolean }) {
   const [busy, setBusy]     = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
@@ -50,6 +60,24 @@ function CloudPanel({ onPublished }: { onPublished: () => void }) {
       setBusy(false);
     }
   };
+
+  if (compact) {
+    return (
+      <span className="inline-flex items-center gap-2">
+        <button onClick={run} disabled={busy} className={COMPACT_BTN}
+                title="在云端跑全套分析并更新本页(Opus 4.8 ≈ $0.1/次,约 1–2 分钟)">
+          {busy
+            ? <><span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse" />出决策中…</>
+            : <>🧠 出今天的决策</>}
+        </button>
+        {result && (
+          <span className={`text-[11px] ${result.ok ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+            {result.ok ? `✓ ${result.msg}` : `✗ ${result.msg}`}
+          </span>
+        )}
+      </span>
+    );
+  }
 
   return (
     <Shell>
@@ -94,7 +122,7 @@ interface ControlStatus {
   pusher: { running: boolean; pid: number | null };
 }
 
-function LocalPanel({ onPublished }: { onPublished: () => void }) {
+function LocalPanel({ onPublished, compact }: { onPublished: () => void; compact?: boolean }) {
   const [status, setStatus]       = useState<ControlStatus | null>(null);
   const [reachable, setReachable] = useState<boolean | null>(null);
   const [busy, setBusy]           = useState<string | null>(null);
@@ -166,6 +194,24 @@ function LocalPanel({ onPublished }: { onPublished: () => void }) {
       setBusy(null);
     }
   };
+
+  if (compact) {
+    return (
+      <span className="inline-flex items-center gap-2">
+        <button onClick={runPublish} disabled={pub.running || busy === "publish"} className={COMPACT_BTN}
+                title="调用 Opus 4.8(约 $0.1/次)跑全套分析并更新本页">
+          {pub.running
+            ? <><span className="inline-block w-2 h-2 rounded-full bg-white animate-pulse" />出决策中…</>
+            : <>🧠 出今天的决策</>}
+        </button>
+        {!pub.running && pub.ok !== null && (
+          <span className={`text-[11px] ${pub.ok ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+            {pub.ok ? "✓ 已更新" : "✗ 失败(日志在「系统」标签)"}
+          </span>
+        )}
+      </span>
+    );
+  }
 
   return (
     <Shell>
