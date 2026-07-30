@@ -185,6 +185,7 @@ export interface Snapshot {
   journal?: DecisionJournal | null;
   waiting_for?: WaitingFor | null;   // 「今天在等什么」六扳机卡
   oscillators?: Oscillators | null;  // 🌡️ 超买/超卖状态板(零决策权)
+  second_ticker?: SecondTickerBoards | null;  // 🔬 第二考场(MU 表态测量轨)
 }
 
 /* ── SMC (smart money concepts) structural read ─────────────────────────── */
@@ -257,6 +258,56 @@ export interface Oscillators {
   n_os: number; n_cool: number; n_warm: number; n_ob: number;
   fired: string[];
   discipline_cn: string;
+}
+
+/* ── 🔬 第二考场(second_ticker)────────────────────────────────────────────
+ * 第二只票(当前 MU)的「涨/跌表态」测量轨。**纯测量**:只出方向表态,
+ * 不给入场/止损/目标、不给仓位建议、不发推送、不进 QBTS 的决策 prompt。
+ * 存在的理由:判决主体(方向表态)每交易日只 +1 个样本,一个考场的结论
+ * 永远可能是运气 —— 加一只低相关的票 = 样本翻倍 + 两场独立考试。 */
+export interface SecondRecord {
+  id:    string;
+  ticker: string;
+  date:  string;
+  as_of: string;
+  price: number;
+  p_up_5d: number;
+  bold_call_5d: "up" | "down";
+  conviction: number;
+  why:   string;
+  model: string | null;
+  technical_muted: boolean;
+  status: "pending" | "graded";
+  horizons: {
+    fwd_ret: Record<string, number>;                    // {"1d":0.031,…}
+    bold:    Record<string, Record<string, boolean>>;    // {"fable":{"1d":true,…}}
+  } | null;
+}
+/** 逐视界成绩。**基线是市场属性** —— 判决跟基线比,不跟 50% 比。 */
+export interface SecondHorizon {
+  n: number; hits: number; hit_rate: number;
+  ci95: [number, number];
+  verdict: string;
+  breakeven?: number;
+  baseline: number;
+  baseline_side: "up" | "down";
+  skill_pp: number;
+}
+export interface SecondBoard {
+  ticker: string;
+  why_this_ticker: string;
+  /** 选票理由里被当天实测推翻的那条 —— 刻意留在 payload 里,不许悄悄删 */
+  known_weakness: string;
+  latest: SecondRecord;
+  records: SecondRecord[];
+  n_total: number;
+  by_horizon: Record<string, SecondHorizon>;
+  rule: string;
+  discipline_cn: string;
+}
+export interface SecondTickerBoards {
+  tickers: string[];
+  boards:  Record<string, SecondBoard>;
 }
 
 /* ── LuxAlgo 原版面板 ──────────────────────────────────────────────────────

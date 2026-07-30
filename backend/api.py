@@ -1117,6 +1117,13 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["squeeze"]        = squeeze
     payload["journal"]        = journal
     payload["user_positions"] = user_positions
+    # 🔬 第二考场:只读回台账给 /mu 页面渲染。**不进决策 prompt**(纪律 3)。
+    try:
+        from dashboard.second_ticker import load_all_boards
+        payload["second_ticker"] = load_all_boards()
+    except Exception as e:
+        logger.warning(f"second_ticker board failed: {e}")
+        payload["second_ticker"] = None
     payload["strategy_replay"] = strategy_replay
     # 「今天在等什么」卡:六个一级扳机的距触发读数(纯展示,复用上面已算好的
     # champs/rel_strength/btc_weekend/market_light,零新拉取,不进决策权重)
@@ -1438,6 +1445,14 @@ async def refresh_decision():
         extras["calibration"] = await asyncio.to_thread(grade_predictions, df_d)
         # Grade past decisions FIRST so today's prompt includes fresh lessons
         await asyncio.to_thread(grade_pending, df_d)
+        # 🔬 第二考场(MU 表态测量轨,2026-07-30):独立一张表、零决策权于 QBTS ——
+        # **刻意放在 extras["journal"] 之前但不写进 extras**:两个考场互相看答案就
+        # 不独立了(second_ticker.py 纪律 3)。失败只记日志,不影响 QBTS 决策。
+        try:
+            from dashboard.second_ticker import run_daily as _second_daily
+            logger.info("second_ticker: %s", await asyncio.to_thread(_second_daily))
+        except Exception as e:
+            logger.warning(f"second_ticker failed: {e}")
         # 多视界字段(2026-07-30):grade_pending 只给**新评判**的记录写 horizons,而
         # pending 记录的 2/3 日视界今天就该有答案(5 日评分闸门不该压住短视界 ——
         # 用户实际持有期只有 2-3 天)。每次发布补一遍,幂等,不改任何已有值。

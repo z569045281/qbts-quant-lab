@@ -68,6 +68,14 @@ function IconSpacex() {  // 🚀 rocket / SpaceX second dashboard
     </svg>
   );
 }
+function IconSecond() {  // 🔬 flask / 第二考场(表态测量轨)
+  return (
+    <svg width="25" height="25" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M9 3h6M10 3v5.5L5.5 17a2.5 2.5 0 002.2 3.5h8.6a2.5 2.5 0 002.2-3.5L14 8.5V3" {...ico} />
+      <path d="M7 15h10" {...ico} />
+    </svg>
+  );
+}
 function IconMine() {  // ⛏️ sparkles / AI factor lab (local only)
   return (
     <svg width="25" height="25" viewBox="0 0 24 24" aria-hidden="true">
@@ -81,6 +89,7 @@ const tabs = [
   { href: "/",        label: "🎯 决策仪表盘", short: "决策", Icon: IconDecision },
   { href: "/watch",   label: "🔭 自选扫描",   short: "扫描", Icon: IconScan     },
   { href: "/dca",     label: "📥 定投专区",   short: "定投", Icon: IconDca      },
+  { href: "/mu",      label: "🔬 第二考场",   short: "MU",   Icon: IconSecond   },
   { href: "/factors", label: "🏇 策略战绩", short: "战绩", Icon: IconFactors  },
   { href: "/challenge", label: "🎰 千元挑战",  short: "挑战", Icon: IconChallenge },
   { href: "/spacex",  label: "🚀 SpaceX",    short: "SPCX", Icon: IconSpacex   },

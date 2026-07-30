@@ -23,7 +23,7 @@ Instructions for any Claude session working in this repo. Auto-loaded every sess
 | 任何信号模块(NW/地缘/SEC/情绪/游击战/等什么卡/宏观) | [docs/SIGNALS.md](docs/SIGNALS.md) |
 | edge 权重、校准、台账评分、8/15 审判、`audit.py` | [docs/AUDIT-AND-EDGE.md](docs/AUDIT-AND-EDGE.md) |
 | 「系统到底有没有用」/ 月度复盘 / 为什么天天观望 | [docs/REVIEW-2026-07.md](docs/REVIEW-2026-07.md) — 首次全面体检 |
-| `/watch` 扫描、`/dca` 定投、`/factors` 战绩、产品判断 | [docs/SURFACES.md](docs/SURFACES.md) |
+| `/watch` 扫描、`/dca` 定投、`/factors` 战绩、`/mu` 第二考场、产品判断 | [docs/SURFACES.md](docs/SURFACES.md) |
 | 千元挑战 bot / `/challenge` | [docs/CHALLENGE.md](docs/CHALLENGE.md) |
 | SpaceX `/spacex` | [docs/SPACEX.md](docs/SPACEX.md) |
 | **改任何前端代码** | [frontend/AGENTS.md](frontend/AGENTS.md) — Next 16 有破坏性改动 |

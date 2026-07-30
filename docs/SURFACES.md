@@ -98,6 +98,49 @@
 2. **同一个数不许在两处显示成两个样**。sticky 条和价格轨的涨跌幅统一 2 位小数,
    价格/徽章全走同一个 `liveCurrent` 口径 —— 否则又是 cross-source 矛盾那类老病。
 
+## 🔬 第二考场 `/mu`(`second_ticker.py`)—— 2026-07-30 用户点单
+
+**这是测量轨,不是第二个交易页。** 存在的理由是 REVIEW-2026-07 §5 的算术:判决主体
+(方向表态)每个交易日只 +1 个样本 → 9 月初才够 n=30,而**一个考场的结论永远可能是
+运气**。加一只与 QBTS 低相关的票 = 样本速度翻倍 + 两场独立考试。
+
+**选票过程(用户问"什么票值得盯",实测 20 个候选)**:先按「与 QBTS 相关性 + 跳空
+频率 + 3 日波幅 + 流动性」排序,并**逐个用真实成交量验证 2× 杠杆 ETF 是否存在**。
+直接排除同族:IONQ **0.81** / RGTI **0.88** / OKLO 0.65 / ASTS 0.55(同一个赌注
+下两遍;ASTS 跳空还比 QBTS 更频繁)。选中 **MU**:相关 +0.28、MUU 日均 $2.7B(最厚)、
+有真财报 → 财报/宏观/板块/「QQQ vs 50 日线」这几个模块**第一次有意义**
+(它们装在营收为 0、对宏观免疫的 QBTS 上一直是摆设)。
+
+⚠️ **选票理由里有一条当天就被自己推翻,已写进代码与 payload,不许悄悄删**:
+原说"跳空少 → 盲区小",但按近 60 日窗口 MU 跳空 ≥8% 的频率 **6.7% = QBTS(3.3%)
+的两倍**,年化波动 77%→114%。第二十八轮那个盲区在 MU 身上**更严重**。保留 MU 的
+理由只剩「低相关 + 真财报 + 工具厚」—— 对"测方向"仍然充分(波动大只影响每笔盈亏,
+不影响能不能测)。要零盲区就换 NVDA(跳空 0.0%、相关 +0.18),`_TICKERS` 加一行即可。
+
+### 六条纪律(改 `second_ticker.py` 前必读,模块 docstring 里有完整版)
+
+1. **只表态,不给动作** —— 无 entry/stop/target、无仓位建议、无 ntfy。表态可以说
+   down,因为**没有任何东西会执行它**;绝不能拿"换了票没测过"当开空腿的后门。
+2. **绝不写 `decision_journal`** —— 自己一张 `second_journal` 表,id = `<票>-<日期>`。
+3. **零决策权于 QBTS** —— 不进 QBTS 的 snapshot/prompt/edge。两个考场互相看答案就
+   不独立了。
+4. **同一个考场标准** —— 同一个模型(借 `decision._MODEL` + 同一 fallback)、同一
+   `bold_call` 语义、**直接复用 `journal._horizon_grades`**、同一条预注册线
+   `audit._HORIZON_RULE`。换标准 = 换考试。
+5. **判决分池** —— 不与 QBTS 合并成一个大 n(同一天两票的表态不独立,合并虚增样本)。
+6. **成本可见** —— 每票每天 1 次 LLM 调用(加票 = 一行配置 + 约 $0.1/天)。
+
+### 落地细节
+- 简报**不新写任何指标**:复用 `analyze_smc` / `analyze_regime` / `analyze_nw_envelope`
+  / `analyze_wavetrend` / `analyze_volume_profile` / `scan_ticker` / `detect_event_day`
+  (它们本来就只吃 DataFrame,与票无关)。
+- `run_daily()` **先 grade 再 record** —— 反了的话今天刚写的记录会被立刻空评一遍。
+- `_save()` **返回是否真写成功**;失败时 `record()` 返回 None。否则表还没建时页面会
+  显示一个没落库的表态、第二天凭空消失 = 假账本。
+- 范围 clamp 在 `generate_lean` **和** `record` 两处都做:结构化输出 schema 不支持
+  `minimum/maximum`(API 直接 400),代码是唯一防线,而 `lean` 可由调用方传入绕过。
+- ⚠️ 需在 Supabase 跑 `sql/second_journal_migration.sql`(按仓库惯例迁移不入 git)。
+
 ## 🔭 自选扫描(`scan.py` / `scan_store.py`)
 
 机械多票买点扫描(SMC/volume/regime + trend/RSI + **NW 包络**),~$0(一次 Haiku 点评)。
