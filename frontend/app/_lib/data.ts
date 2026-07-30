@@ -184,6 +184,7 @@ export interface Snapshot {
   } | null;
   journal?: DecisionJournal | null;
   waiting_for?: WaitingFor | null;   // 「今天在等什么」六扳机卡
+  oscillators?: Oscillators | null;  // 🌡️ 超买/超卖状态板(零决策权)
 }
 
 /* ── SMC (smart money concepts) structural read ─────────────────────────── */
@@ -223,6 +224,41 @@ export interface SmcPlaybook {
   checklist: SmcChecklistItem[];
   conditions_met: string;
 }
+/* ── 🌡️ 超买 / 超卖状态板 ─────────────────────────────────────────────────
+ * 各振荡器**自己的**读数与**自己的**阈值并排陈列。刻意没有合成分数 ——
+ * 一个 0–100「超卖分」看起来就是信号,而它没有任何前向验证。
+ * 零决策权:不进 edge / 不进打分 / 不驱动 playbook / 不发推送,也不进决策 prompt
+ * (读数已经通过 waiting_for / NW / SMC 三条路进过 prompt,再喂一遍就是把同一份
+ * 证据当独立证据数两次 —— mining 第二十四轮的原话)。 */
+export type OscBand = "os" | "cool" | "mid" | "warm" | "ob";
+export interface OscRow {
+  key: string;
+  name: string;
+  value_cn: string;
+  /** 0 = 该指标量程里最超卖那端,1 = 最超买那端。全表同一轴向:便宜 → 贵 */
+  pos: number;
+  band: OscBand;
+  band_cn: string;
+  threshold_cn: string;
+  source: string;
+  marks: { at: number; label: string }[];
+  /** true/false = 该行背后有在册扳机且是否已触发;null = 这行没有扳机 */
+  fired?: boolean | null;
+  hint_cn?: string;
+}
+export interface Oscillators {
+  as_of: string | null;
+  state: "cold" | "cool" | "mid" | "warm" | "hot";
+  state_cn: string;
+  rows: OscRow[];
+  summary_cn: string;
+  /** 「没有任何在册扳机触发 —— 偏冷不等于该买」那一句,前端单独上样式 */
+  caveat_cn: string;
+  n_os: number; n_cool: number; n_warm: number; n_ob: number;
+  fired: string[];
+  discipline_cn: string;
+}
+
 /* ── LuxAlgo 原版面板 ──────────────────────────────────────────────────────
  * `SMC.docx`(LuxAlgo「Smart Money Concepts」Pine v5)的忠实移植输出，**零决策权**。
  * 存在的理由：用户对着 TradingView 上的 LuxAlgo 看盘，仪表盘得说同一套读数。

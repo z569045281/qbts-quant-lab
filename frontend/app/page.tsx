@@ -8,6 +8,7 @@ import PositionsCard from "./_components/positions-card";
 import { RetrospectivePanel } from "./_components/retrospective-panel";
 import { SiteCheckOverview } from "./_components/self-check";
 import { TabBar, TABS, type TabKey } from "./_components/tab-bar";
+import { OscillatorBoard, OscillatorStrip } from "./_components/oscillator-board";
 import { getSnapshot, getLiveQuote, type Snapshot, type Decision, type LiveQuote, type LiveQuoteEntry } from "./_lib/data";
 import { fmtLocalDateTime, parseUtc, etMelbSuffix, epochMelbTime, macroSurprise } from "./_lib/format";
 import versionData from "../public/version.json";
@@ -418,6 +419,12 @@ export default function Dashboard() {
           数据截至 {snap.as_of?.slice(0, 10)}{genAt ? ` · 决策 ${genAt}` : ""}
         </span>
       </div>
+
+      {/* ── 🌡️ 超买/超卖一行(用户 2026-07-30 点单)。贴着价格轨放,因为它回答的
+          就是"这个价现在贵还是便宜";逐项细节在「结构」标签。 ───────────── */}
+      {snap.oscillators && (
+        <OscillatorStrip osc={snap.oscillators} onOpen={() => changeTab("structure")} />
+      )}
 
       {/* ── 裁决 · 交易计划 · 四条军规 ──────────────────────────────────
           三栏宽度不等是刻意的:裁决最窄但字号最大(它是结论),军规最宽
@@ -1082,6 +1089,9 @@ export default function Dashboard() {
       )}
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* 🌡️ 超买/超卖逐项 —— 驾驶舱那一行的展开版 */}
+        {snap.oscillators && <OscillatorBoard osc={snap.oscillators} />}
+
         {/* SMC 聪明钱结构 */}
         {smc && (
           <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">

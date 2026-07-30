@@ -1126,6 +1126,16 @@ async def dashboard_snapshot(force_refresh: bool = False):
         logger.warning(f"waiting_for failed: {e}")
         payload["waiting_for"] = None
 
+    # 🌡️ 超买/超卖状态板(2026-07-30 用户点单)。**必须排在 nw_envelope / smc /
+    # champs 之后** —— 它从这些已算好的字段读回读数,不自己重算,免得同一个数在两
+    # 张卡上显示成两个值。零决策权,不进 edge/打分/推送。
+    try:
+        from dashboard.oscillators import build_oscillator_board
+        payload["oscillators"] = build_oscillator_board(df_d, payload)
+    except Exception as e:
+        logger.warning(f"oscillators failed: {e}")
+        payload["oscillators"] = None
+
     # ── Source status map: tells the UI which signals are active/inactive/error
     # so the user knows when something needs setup (e.g. Reddit OAuth missing). ─
     def _src_status(sig: dict | None) -> dict:
