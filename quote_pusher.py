@@ -137,17 +137,91 @@ def fetch_quote(symbol: str) -> dict | None:
             price = float(t.fast_info.last_price)
         except Exception:
             return None
-    try:
-        prev_close = float(t.fast_info.previous_close)
-    except Exception:
-        prev_close = None
+    prev_close, trusted = _prev_close(t, symbol)
     chg = (price / prev_close - 1) if prev_close else None
     return {
         "price":      round(price, 4),
         "prev_close": round(prev_close, 4) if prev_close else None,
         "change_pct": round(chg, 6) if chg is not None else None,
+        # False = 前收对不上账,下游**不得**据此判"极端跳空"(见 _prev_close)
+        "prev_close_trusted": trusted,
         "bar_time":   bar_time,
     }
+
+
+# 前收缓存:一天只变一次,别每分钟为它多打一次行情
+_PREV_CLOSE_CACHE: dict[str, tuple[str, float | None, bool]] = {}
+
+
+def _prev_close(t, sym: str) -> tuple[float | None, bool]:
+    """上一个常规交易日收盘 + **它可不可信**。
+
+    起因(2026-07-31 实测):`fast_info.previous_close` 给了 QBTS **16.45**,
+    而当天真实收盘是 **17.97**。事件日熔断器直接吃它算出「隔夜 +9.8%,极端跳空」
+    并高优先级推送 —— 而真实隔夜只有 **+0.5%**,那 9.8% 是前一个交易日**盘中**
+    就走完的。**一个没人对过账的字段,凭空造出了一次极端行情警报。**
+
+    做法:用小时线聚出上一个交易日的收盘(与 fetcher 里重建坏日线同一套办法,
+    实测能还原出 17.97),与 `fast_info.previous_close` 对账:
+      · 两者相差 ≤1% → 用 fast_info 的,标 trusted
+      · 相差 >1%    → **用小时线重建的那个**(它可复算、可解释),标 untrusted
+      · 拿不到小时线 → 退回 fast_info,但标 untrusted(没对过账就是没对过账)
+    untrusted 时下游禁止据此判极端跳空 —— 宁可漏报,不可凭错误基准发警报。
+    """
+    import pandas as pd
+    day_key = datetime.now(ET).strftime("%Y-%m-%d")
+    hit = _PREV_CLOSE_CACHE.get(sym)
+    if hit and hit[0] == day_key:
+        return hit[1], hit[2]
+
+    fast = None
+    try:
+        fast = float(t.fast_info.previous_close)
+    except Exception:
+        pass
+
+    rebuilt = None
+    try:
+        h = t.history(period="5d", interval="1h")
+        if len(h):
+            h = h.rename(columns=str.lower)
+            days = pd.DatetimeIndex(h.index).normalize()
+            # ⚠️ yfinance 的小时线 index 带 ET 时区,`pd.Timestamp("YYYY-MM-DD")`
+            # 不带 —— 直接比较抛 "Cannot compare tz-naive and tz-aware",
+            # 而下面那个 except 会把它整个吞掉、悄悄退化成"没对账"。
+            # 必须造一个同时区的 today。
+            today = pd.Timestamp(day_key, tz=ET).normalize()
+            # 「上一个收盘」取决于现在在哪个时段:盘中/盘前时今天还没收,要往前找;
+            # 收盘后(post/closed/夜盘)今天的收盘**就是**最新的那个前收。
+            # 首版一律 `< today`,在 07-30 20:55 ET 取到了 07-29 的 16.18,
+            # 而正确答案是 07-30 的 17.97 —— 差一天,整个对账就白做了。
+            cur = us_session(datetime.now(ET))
+            cand = [d for d in set(days) if d < today or (d == today and cur in ("post", "closed"))]
+            for d in sorted(cand, reverse=True):
+                chunk = h[days == d]
+                if len(chunk) >= 4:                 # 半天数据聚出来的不算收盘
+                    rebuilt = float(chunk["close"].iloc[-1])
+                    break
+    except Exception as e:
+        # 不许静默 —— 首版这里是 `except: pass`,把一个 tz 比较的 TypeError 整个
+        # 吞掉,对账功能等于没上线,而调用方看到的只是"trusted=False"。
+        print(f"! prev_close 小时线重建失败 {sym}: {type(e).__name__}: {e}")
+
+    if fast is not None and rebuilt is not None:
+        ok = abs(fast / rebuilt - 1) <= 0.01
+        val = fast if ok else rebuilt
+        if not ok:
+            print(f"! prev_close 对不上账 {sym}: fast_info={fast:.4f} vs "
+                  f"小时线重建={rebuilt:.4f} → 采用重建值,并标记 untrusted")
+        out = (round(val, 4), ok)
+    elif rebuilt is not None:
+        out = (round(rebuilt, 4), False)            # 没得对账
+    elif fast is not None:
+        out = (round(fast, 4), False)
+    else:
+        out = (None, False)
+    _PREV_CLOSE_CACHE[sym] = (day_key, out[0], out[1])
+    return out
 
 
 def build_payload() -> dict:

@@ -102,8 +102,19 @@ def from_quote(quotes: dict | None, catalyst: dict | None = None) -> dict | None
     q = ((quotes or {}).get("qbts") or {})
     chg = q.get("change_pct")
     reasons: list[str] = []
-    if chg is not None and abs(float(chg)) >= _GAP_MUTE:
+    # ⚠️ 前收对不上账时**不许**据此判极端跳空(2026-07-31)。实测事故:
+    # `fast_info.previous_close` 给了 16.45 而真实收盘 17.97 → 这里算出
+    # 「隔夜 +9.8% 极端跳空」并高优先级推送,而真实隔夜只有 +0.5%。
+    # 一个没对过账的基准凭空造出了一次警报。宁可漏报,不可错报:
+    # 错报会让技术面无谓熔断一整天,还教用户不要信这个铃。
+    # (`prev_close_trusted` 由 quote_pusher._prev_close 打;老 payload 无此字段
+    #  → None → 按旧行为放行,不因为升级把历史数据判成不可信。)
+    trusted = q.get("prev_close_trusted")
+    if chg is not None and abs(float(chg)) >= _GAP_MUTE and trusted is not False:
         reasons.append(f"现价较前收 {float(chg) * 100:+.1f}%(≥±8% 极端档)")
+    elif chg is not None and abs(float(chg)) >= _GAP_MUTE:
+        logger.warning("event_day: 跳空 %.1f%% 但 prev_close 未对上账 → 不判事件日",
+                       float(chg) * 100)
     lvl = (catalyst or {}).get("impact_level")
     if lvl == "breaking":
         reasons.append(f"催化剂雷达 🔴 breaking:{((catalyst or {}).get('headline_cn') or '')[:40]}")

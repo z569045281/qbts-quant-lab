@@ -229,6 +229,65 @@ def load_15m(ticker: str = TICKER, force_refresh: bool = False) -> pd.DataFrame 
         return None
 
 
+_REBUILD_MIN_BARS = 4      # 一个常规交易日 6.5 小时 → 至少 4 根才认为覆盖够
+_REBUILD_MAX_DAYS = 5      # 只补最近几天;更早的缺口交给缓存,别改写历史
+
+
+def _rebuild_daily_from_hourly(df_d: pd.DataFrame, df_h: pd.DataFrame) -> pd.DataFrame:
+    """日线缺了某天、而小时线有那天 → 用小时线聚合出这根日线。
+
+    只补**最近 `_REBUILD_MAX_DAYS` 天**内的缺口(更早的缺口可能是真实停牌/假期,
+    改写历史比缺一天更危险),且要求当天至少 `_REBUILD_MIN_BARS` 根小时线
+    —— 半天数据聚出来的"收盘"不是收盘。重建结果**必须自己通过同一套 OHLC
+    不变式**,否则宁可继续缺着(坏数据进缓存后没有任何下游能发现)。
+
+    重建的 volume 是当日小时线之和:盘前盘后不在 1h 常规序列里,所以它会略低于
+    官方日成交量。**量能类读数据此会偏小**,已在 LAST_FETCH_ISSUES 里写明。
+    """
+    if df_d is None or df_h is None or not len(df_d) or not len(df_h):
+        return df_d
+    try:
+        h_days = pd.DatetimeIndex(df_h.index).normalize()
+        d_days = set(pd.DatetimeIndex(df_d.index).normalize())
+        recent = sorted({d for d in h_days if d not in d_days})[-_REBUILD_MAX_DAYS:]
+        if not recent:
+            return df_d
+        # 只补不早于现有日线最后一根的缺口 —— 往前补历史不是本函数的职责
+        last_d = pd.DatetimeIndex(df_d.index).normalize()[-1]
+        rows = {}
+        for day in recent:
+            if day < last_d:
+                continue
+            chunk = df_h[h_days == day]
+            if len(chunk) < _REBUILD_MIN_BARS:
+                continue
+            bar = {
+                "open":   float(chunk["open"].iloc[0]),
+                "high":   float(chunk["high"].max()),
+                "low":    float(chunk["low"].min()),
+                "close":  float(chunk["close"].iloc[-1]),
+                "volume": float(chunk["volume"].sum()) if "volume" in chunk else 0.0,
+            }
+            probe = pd.DataFrame([bar], index=[day])
+            if len(_bad_ohlcv_rows(probe)):        # 重建的也得过同一道闸
+                continue
+            rows[day] = bar
+        if not rows:
+            return df_d
+        add = pd.DataFrame.from_dict(rows, orient="index")
+        add = add.reindex(columns=df_d.columns, fill_value=0.0)
+        out = pd.concat([df_d, add]).sort_index()
+        det = ", ".join(f"{d:%m-%d} 收{rows[d]['close']:.2f}" for d in rows)
+        msg = (f"日线缺 {len(rows)} 天(上游坏 bar 已剔),已用小时线重建: {det}"
+               f" —— 成交量为 1h 之和,不含盘前盘后,量能读数偏小")
+        logger.warning(msg)
+        LAST_FETCH_ISSUES.append(msg)
+        return out
+    except Exception as e:                          # 重建失败 = 维持原样,绝不弄坏
+        logger.warning(f"daily rebuild from hourly failed: {e}")
+        return df_d
+
+
 def load_or_fetch(ticker: str = TICKER, force_refresh: bool = False):
     """
     Returns (hourly_df, daily_df).
@@ -265,6 +324,14 @@ def load_or_fetch(ticker: str = TICKER, force_refresh: bool = False):
         LAST_FETCH_ISSUES.clear()      # 每次抓取重新计,别把上一轮的问题带过来
         df_h = fetch_hourly(ticker)
         df_d = fetch_daily(ticker)
+
+        # ── 坏日线用小时线重建(2026-07-31)────────────────────────────
+        # 剔掉坏 bar 是对的,但**剔掉 = 那一天整天消失**。2026-07-30 实测:
+        # yfinance 又一次把一个陈旧收盘(16.21)贴进当日行,低于当日最低 16.71 →
+        # 被剔 → 日线序列停在 07-29,而那天真实收盘 17.97、涨了 11%。
+        # 后果是所有日线派生读数(%R / RSI / SMC / 均线 / 特调扳机)全部少看一天。
+        # 我们**手上就有**同一天的小时线,重建比丢弃诚实得多。
+        df_d = _rebuild_daily_from_hourly(df_d, df_h)
 
         # ── 不许倒退(2026-07-29)──────────────────────────────────────
         # 坏 bar 已被 _clean_ohlcv 剔掉,但剔掉最新那根 = as_of 无声退回前一天。
