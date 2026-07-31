@@ -1702,13 +1702,23 @@ export default function Dashboard() {
                       <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-red-500 text-white">
                         {hu! < 1 ? "即将发布" : `${Math.round(hu!)}小时后`}
                       </span>);
-                    if (past) return e.actual ? (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-gray-200 text-gray-600">已公布</span>
-                    ) : (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-700"
-                            title="发布时间已过,但实际值不在免费数据源里(如 ISM/ADP),或覆盖内数据将在下次更新时补上">
-                        已公布·待结果
-                      </span>);
+                    if (past) {
+                      if (e.actual) return (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-gray-200 text-gray-600">已公布</span>);
+                      // 「会来」和「永远不会来」必须分开说 —— 用户 2026-07-30 报
+                      // "显示已出结果但没数据",根子就是这两种情况共用一个徽章:
+                      // 等一个永远不来的值,看起来永远像 bug。
+                      if (e.actual_status === "no_source") return (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-gray-100 text-gray-500"
+                              title="这一项免费数据源(FRED)没有对得上口径的序列 —— 不会再补上，不是故障">
+                          已公布·无免费数据源
+                        </span>);
+                      return (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-700"
+                              title="发布时间已过，FRED 通常滞后几小时才更新；下一次发布会自动补上">
+                          已公布·等数据回填
+                        </span>);
+                    }
                     return null;
                   })()}
                   {(() => {

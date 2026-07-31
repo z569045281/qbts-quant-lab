@@ -636,6 +636,10 @@ export interface MacroEvent {
   // 第十五轮实测事件日影响系数(|ret| 相对无事件日的倍数;null=未测该类事件)
   coef?:       { spy: number; qtum: number; qbts: number; label: string } | null;
   hours_until?: number;   // negative = already released
+  /** 已过期事件的实际值状态(2026-07-30 加)。此前 UI 无法区分「FRED 还没更新，
+   *  一会儿就有」和「免费源根本没有这条，永远不会有」，两者共用一个「待结果」
+   *  徽章 → 后者看起来永远像 bug。未来事件不带此字段。 */
+  actual_status?: "released" | "pending" | "no_source";
 }
 
 /* ── AI trade decision (the user-facing verdict) ─────────────────────────── */
