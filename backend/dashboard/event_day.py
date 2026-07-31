@@ -146,12 +146,38 @@ def maybe_event_day_push(prev: dict | None, now_et, quotes: dict | None,
     而那份决策的技术面结论是"别追"。这条推送的唯一职责是**在开盘前把熔断
     这件事本身告诉他** —— 不给方向,只解除那个错误的拦阻。
     """
+    today = now_et.date().isoformat()
+    prev_key = str((prev or {}).get("push_key") or "")
+
     ev = from_quote(quotes, catalyst)
     if not ev:
+        # ⚠️ **判不出事件日 ≠ 今天不是事件日**(2026-07-31 实况修复)。
+        # 事故:用户一早收到两条一模一样的「⚠️ 事件日」,间隔 100 分钟。
+        # 病理:去重键 `push_key` 存活在 live_quote 里,而 live_quote 每分钟被
+        # **整块覆写** —— 这一分钟 `from_quote` 返回 None(催化剂分级挂了、
+        # 返回 unknown 而不是 breaking),handler 的 `if ev:` 就不写 event_day,
+        # 键随之消失;下一跳分级恢复 → prev 里没键 → 当成第一次,再推一遍。
+        # 只要上游读数偶尔抖一下,这条推送就会一天响好几次。
+        #
+        # 修法:**键与状态分离**。键属于"今天推没推过",跟这一分钟判不判得出来
+        # 无关,同一 ET 日一律带走;`is_event_day` 属于"现在还熔不熔断",判不出来
+        # 就老实说 False,不冒充在熔断(与第三十轮「分级挂了就说不知道」同一条纪律)。
+        if prev_key.startswith(today):
+            return {"push_key": prev_key, "is_event_day": False,
+                    "carry_note": "本分钟判不出事件日(上游读数缺失);今日已推过,不重复响铃"}
         return None
-    key = f"{now_et.date().isoformat()}#{len(ev['reasons'])}"
-    if prev and prev.get("push_key") == key:
-        ev["push_key"] = key
+    key = f"{today}#{len(ev['reasons'])}"
+    # 原因**变多**才值得再响一次(比如跳空之外又来了 breaking 新闻);原因变少
+    # 只是读数回落,不是新情况 —— 早先版本用 `== key` 判等,2 条掉回 1 条时键不
+    # 相等就会再推一遍。改成"只认已推过的最高档"。
+    prev_n = 0
+    if prev_key.startswith(today) and "#" in prev_key:
+        try:
+            prev_n = int(prev_key.rsplit("#", 1)[1])
+        except ValueError:
+            prev_n = 0
+    if prev_n >= len(ev["reasons"]):
+        ev["push_key"] = prev_key      # 保留最高档,别被降档冲掉
         return ev                      # 已推过,只做 carry-forward
 
     px = ev.get("price")
@@ -175,8 +201,12 @@ def maybe_event_day_push(prev: dict | None, now_et, quotes: dict | None,
 
 
 def prompt_block(ev: dict | None) -> str:
-    """决策 prompt 里的事件日段。非事件日返回空串。"""
-    if not ev:
+    """决策 prompt 里的事件日段。非事件日返回空串。
+
+    `is_event_day` 必须显式为真才渲染 —— carry-forward 的那种只带去重键、
+    不带熔断状态的记录(见 `maybe_event_day_push`)不能触发熔断段。
+    """
+    if not ev or not ev.get("is_event_day"):
         return ""
     why = " · ".join(ev["reasons"])
     return (

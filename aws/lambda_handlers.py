@@ -114,6 +114,12 @@ def quote_handler(event, context):
     # 告诉用户"今天技术面没有发言权"。**纯本地计算**(吃上面已经算好的 change_pct,
     # 不拉任何行情),所以不挑分钟、每分钟都判,靠 push_key 每日去重。
     # 起因:07-27 开盘跳空 +10.2%,而用户手上那份决策的技术面结论是"别追"。
+    # ⚠️ `live_quote.data` 是**整块覆写**的(push_payload 直接 upsert 整个 payload)。
+    # 所以凡是把"今天推没推过"存在这个 blob 里的模块,只要有**一分钟**没往 payload
+    # 里写回自己的状态,去重键就永久消失,下一跳会当成第一次再推一遍。
+    # 各模块的约定:非工作跳一律 `return prev`(carry-forward),不许返回 None。
+    # 2026-07-31 事故:event_day 违反了这条(判不出事件日就返回 None)→ 用户一早
+    # 收到两条一模一样的「⚠️ 事件日」。已在 event_day.py 里把**键与状态分离**。
     try:
         from dashboard.event_day import maybe_event_day_push
         ev = maybe_event_day_push(prev_data.get("event_day"), now_et,
