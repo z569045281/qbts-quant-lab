@@ -274,3 +274,30 @@
   a tool first (repo `yfinance`: `yf.Ticker(t).info` for longName/price; or WebSearch).
   The dashboard's numbers are already computed from live fetched data — only off-hand
   factual claims I make from memory risk being stale.
+
+## 🔔 HTTP 头装不下 emoji —— 推送静默失效两天(2026-07-31)
+
+**症状**:用户问"07-30 夜盘暴涨 10% 为什么不推 ntfy,系统看不见吗"。
+**系统看得见** —— live_quote 里 `qbts chg = +10.18%`、`event_day` 熔断已触发、
+`reasons: 现价较前收 +10.2%`。它只是**推不出去**。
+
+**根因**:`_ntfy` 把标题塞进 HTTP 头,而 HTTP 头按 latin-1 编码。
+`event_day` 传的是 `"QBTS ⚠️ 事件日"` → urllib 在发送前就抛
+`UnicodeEncodeError: 'latin-1' codec can't encode characters in position 5-6`。
+从 2026-07-29 建成起 **一次都没成功过**;讽刺的是这条推送本身就是为了补
+07-27 错过 +20.4% 而建的 —— **补丁自己坏了,又漏掉了下一次。**
+
+**三条教训**:
+1. **docstring 不是守门员。** `_ntfy` 的注释白纸黑字写着 "Title stays ASCII
+   (HTTP header is latin-1)",调用方照样违约,而函数没有任何约束。
+   契约要靠代码强制:非 ASCII 标题现在由 `_hdr()` 走 RFC 2047 编码
+   (`=?utf-8?b?...?=`,实测 ntfy 能正确解码)。**约定写在注释里 = 迟早被破坏。**
+2. **日志不是监控。** 错误每分钟打进 CloudWatch,刷了两天,没有任何界面提到它。
+   现在 `_ntfy` 记 `_LAST_PUSH`,quote_handler 把它带进 `payload["ntfy_health"]`,
+   前端最近一次失败就报红。**没人看的错误日志等于没有错误处理。**
+3. **只有一个调用点出事,但错的是共用函数。** 18 个调用点里 17 个是 ASCII 标题、
+   一直正常,所以"推送好着呢"的印象是真的 —— 只是坏的那一个恰好是最重要的那个
+   (极端行情才触发)。**低频路径的失败最难发现,必须主动上报而不是等人注意到。**
+
+排查路径(下次可复用):`push_key` 是否落库 → 有 `NTFY_TOPIC` 吗 →
+`aws logs filter-log-events --filter-pattern "ntfy"`。

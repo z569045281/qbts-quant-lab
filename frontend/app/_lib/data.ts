@@ -902,6 +902,15 @@ export interface LiveQuote {
   // ⚠️ 事件日熔断(每分钟判,盘前就能亮 —— 等 09:00 的 publish 就晚了,
   //    07-27 的跳空在 09:30 开盘那一刻就已经 +10.2%)
   event_day?: EventDay | null;
+  /** 🔔 推送通道健康(2026-07-31 加)。事件日推送因标题编码从 07-29 起每分钟
+   *  静默失败、日志刷了两天没人看见,07-30 夜盘 +10.2% 又漏推一次 ——
+   *  **日志不是监控**,失败必须在页面上能看见。err_at 非空 = 最近一次推送失败。 */
+  ntfy_health?: {
+    ok_at:  string | null;
+    err_at: string | null;
+    err:    string | null;
+    title:  string | null;
+  } | null;
 }
 
 /** Live quote — Supabase row in deployed mode, local backend in dev. Null on failure. */

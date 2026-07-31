@@ -169,6 +169,15 @@ def quote_handler(event, context):
     elif prev_smc:
         payload["smc"] = prev_smc                  # carry forward on off-minutes
 
+    # 🔔 推送通道健康(2026-07-31)。放在**所有推送调用之后** —— 起因是事件日推送
+    # 从 07-29 起因标题编码每分钟静默失败,日志里刷了两天没人看见,07-30 夜盘
+    # +10.2% 又漏推一次。日志不是监控:把最后一次成败带进 payload 让前端能报警。
+    try:
+        from dashboard.intraday_smc import ntfy_health
+        payload["ntfy_health"] = ntfy_health()
+    except Exception as e:
+        print(f"! ntfy_health skipped: {type(e).__name__}: {e}")
+
     quote_pusher.push_payload(sb, payload)
     q = (payload.get("quotes") or {}).get("qbts") or {}
     return {"ok": True, "session": payload.get("session"), "qbts_price": q.get("price"),

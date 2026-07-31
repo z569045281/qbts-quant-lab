@@ -2236,6 +2236,25 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* 🔔 推送通道故障。起因:事件日推送(为补 07-27 错过 +20.4% 而建)标题里带
+          ⚠️，HTTP 头装不下 → 从 07-29 建成起每分钟静默失败、一次都没推成功过，
+          07-30 夜盘 +10.2% 又漏了。日志不是监控 —— 推送坏了必须在页面上说。 */}
+      {live?.ntfy_health?.err_at && (
+        <div className="bg-red-50 border border-[#F03A3E] text-red-900 rounded-xl px-5 py-3 text-sm">
+          <div className="font-bold mb-1">🔔 推送通道故障 — 手机收不到提醒</div>
+          <div className="text-[12px] leading-relaxed">
+            最近一次推送失败于 {fmtLocalDateTime(live.ntfy_health.err_at)}
+            {live.ntfy_health.title && <>（标题「{live.ntfy_health.title}」）</>}
+          </div>
+          <div className="text-[11px] font-mono text-red-700 mt-1 break-all">
+            {live.ntfy_health.err}
+          </div>
+          <div className="text-[11px] text-red-700 mt-1">
+            扳机/事件日/催化剂这些提醒此刻都发不出去 —— 别指望手机响，盯页面。
+          </div>
+        </div>
+      )}
+
       {/* ══ 4.9 AI 系统自检 — 决策模型以审计者身份报告的数据问题/改进建议(给维护者) ═══ */}
       {(d?.system_notes?.length ?? 0) > 0 && (
         <section className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
