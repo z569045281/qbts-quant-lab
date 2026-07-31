@@ -333,8 +333,10 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
         parts.append("## 近期新闻（已 AI 初筛）\n" + "\n".join(rows))
 
     # ── 🌍 地缘政治/政策雷达（伊朗战局/川普政策/量子政策）────────
+    # risk_level == "unknown" = Haiku 分级那一跳挂了,条目的 relevance/stance 全是
+    # 兜底填的假值 —— 整块跳过,宁可模型看不到地缘,也别喂它一份编的分级。
     geo = snapshot.get("geopolitics")
-    if geo and geo.get("risk_level"):
+    if geo and geo.get("risk_level") and geo["risk_level"] != "unknown":
         rows = [f"  [{it.get('track_cn','?')}/{it.get('stance','?')}] "
                 f"{it.get('title','')[:80]} — {it.get('note_cn','')}"
                 for it in (geo.get("items") or [])
@@ -364,7 +366,7 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
     # 07-27 教训:AT&T 签约驱动的 +20.4% 单日暴涨,机械信号全盲。这一段专门回答
     # 「今天的价格里有没有一件**事**」,与上面的价格派生读数是两类证据。
     cat = snapshot.get("catalyst")
-    if cat and cat.get("impact_level"):
+    if cat and cat.get("impact_level") and cat["impact_level"] != "unknown":  # 同上,假分级不进提示词
         hot = [it for it in (cat.get("items") or []) if it.get("impact") == "high"]
         mid = [it for it in (cat.get("items") or []) if it.get("impact") == "medium"]
         rows = [f"  ★ [{it.get('track_cn','?')}/{_DIR_CN_D.get(it.get('direction'),'?')}]"

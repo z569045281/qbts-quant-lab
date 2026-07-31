@@ -77,6 +77,10 @@ _TRACKS = [
 
 _IMPACT_CN = {"breaking": "🔴 重大催化", "watch": "🟡 有消息", "quiet": "🟢 无事"}
 _LEVEL_RANK = {"quiet": 0, "watch": 1, "breaking": 2}
+
+# 与 geopolitics 同一处理:Haiku 挂了又无缓存时不伪造 "watch",标 unknown。
+_UNKNOWN_LEVEL = "unknown"
+_UNKNOWN_CN    = "⚪️ 分级不可用"
 _DIR_CN = {"bullish": "偏多", "bearish": "偏空", "neutral": "中性"}
 
 _PUSH_COOLDOWN_SAME = 45 * 60    # 同级别的**不同**故事:距上次推送 ≥45min
@@ -328,11 +332,14 @@ def get_catalyst_snapshot(force_refresh: bool = False) -> dict | None:
         logger.warning(f"catalyst Haiku analysis failed: {e}")
         if cached:
             return cached["payload"]
+        # 级别标 unknown(不是 watch),**且这一份绝不写缓存** —— 写了会被上面
+        # 「头条没变 + _analyzed 还新鲜」那条捷径认成有效分析,一次瞬时 API
+        # 失败就把雷达焊死 4 小时。不写 = 下一跳(10min 后)自动重试。
         for it in items:
             it.update({"impact": "medium", "direction": "neutral", "note_cn": ""})
-        payload = {
+        return {
             "as_of": datetime.now(timezone.utc).isoformat(),
-            "impact_level": "watch", "impact_cn": _IMPACT_CN["watch"],
+            "impact_level": _UNKNOWN_LEVEL, "impact_cn": _UNKNOWN_CN,
             "headline_cn": "AI 分级不可用,仅原始头条",
             "summary_cn": "", "items": items,
         }
@@ -356,6 +363,16 @@ def _should_refresh(now_et: datetime) -> bool:
     return now_et.minute % 10 == 3
 
 
+def _last_good(prev: dict | None) -> str | None:
+    """上一次**真实**分级出来的级别(跳过 unknown 那些跳)。见 geopolitics 同名函数。"""
+    p = prev or {}
+    lg = p.get("last_good_level")
+    if lg:
+        return lg
+    il = p.get("impact_level")
+    return il if il and il != _UNKNOWN_LEVEL else None
+
+
 def maybe_catalyst_refresh(prev: dict | None, now_et: datetime) -> dict | None:
     """Carry-forward off-tick; on-tick refresh + push. Never raises past itself."""
     if not _should_refresh(now_et):
@@ -369,12 +386,21 @@ def maybe_catalyst_refresh(prev: dict | None, now_et: datetime) -> dict | None:
         return prev
 
     fresh = dict(fresh)
+    if fresh.get("impact_level") == _UNKNOWN_LEVEL:
+        # 这一跳没有判断:条目的 impact 全是兜底填的,不能拿来挑 hot;级别也
+        # 不能参与 escalated 比较。push 状态 + 最后一次真实级别原样带走。
+        fresh["alerted"]         = list((prev or {}).get("alerted") or [])
+        fresh["alerted_titles"]  = list((prev or {}).get("alerted_titles") or [])
+        fresh["last_push_ts"]    = float((prev or {}).get("last_push_ts") or 0)
+        fresh["last_good_level"] = _last_good(prev)
+        return fresh
+
     alerted = list((prev or {}).get("alerted") or [])
     alerted_titles = list((prev or {}).get("alerted_titles") or [])
     last_push = float((prev or {}).get("last_push_ts") or 0)
     now_ts = time.time()
 
-    prev_level = (prev or {}).get("impact_level")
+    prev_level = _last_good(prev)          # 跳过 unknown,拿最后一次真实级别比
     cur_level = fresh.get("impact_level")
     escalated = bool(prev) and prev_level and \
         _LEVEL_RANK.get(cur_level, 0) > _LEVEL_RANK.get(prev_level, 0)
@@ -430,6 +456,7 @@ def maybe_catalyst_refresh(prev: dict | None, now_et: datetime) -> dict | None:
     fresh["alerted"] = alerted[-100:]
     fresh["alerted_titles"] = alerted_titles[-40:]      # 标题比 key 占地方,少留些
     fresh["last_push_ts"] = last_push
+    fresh["last_good_level"] = cur_level
     return fresh
 
 

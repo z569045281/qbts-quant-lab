@@ -1749,6 +1749,8 @@ export default function Dashboard() {
             <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
               geo.risk_level === "alert" ? "bg-red-600 text-white"
                 : geo.risk_level === "watch" ? "bg-amber-400 text-amber-950"
+                // unknown = 分级挂了 → 画灰,绝不能落到绿色(那是「平静」的意思)
+                : geo.risk_level === "unknown" ? "bg-gray-200 text-gray-600"
                 : "bg-emerald-100 text-emerald-700"}`}>
               {geo.risk_cn}
             </span>
@@ -1819,6 +1821,8 @@ export default function Dashboard() {
             <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
               cat.impact_level === "breaking" ? "bg-red-600 text-white"
                 : cat.impact_level === "watch" ? "bg-amber-400 text-amber-950"
+                // unknown = 分级挂了 → 画灰,绝不能落到绿色(那是「无事」的意思)
+                : cat.impact_level === "unknown" ? "bg-gray-200 text-gray-600"
                 : "bg-emerald-100 text-emerald-700"}`}>
               {cat.impact_cn}
             </span>

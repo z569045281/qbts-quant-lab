@@ -70,6 +70,13 @@ _TRACKS = [
 _RISK_CN = {"alert": "🔴 升温", "watch": "🟡 观察", "calm": "🟢 平静"}
 _LEVEL_RANK = {"calm": 0, "watch": 1, "alert": 2}
 
+# Haiku 挂了、又没有缓存可退时的降级级别。**刻意不是 "watch"**:一个伪造的
+# 🟡 观察会被 decision.py 当真读进提示词,也会污染任何拿级别做的统计
+# (2026-07-31 回测这条链路时发现)。"unknown" = 「本模块这一跳没有判断」,
+# 前端画灰、决策提示词整块跳过、推送静默。
+_UNKNOWN_LEVEL = "unknown"
+_UNKNOWN_CN    = "⚪️ 分级不可用"
+
 _PUSH_COOLDOWN_SAME = 3 * 3600   # 同级别的持续报道:距上次推送 ≥3h 才再推
 _PUSH_COOLDOWN_DOWN = 1 * 3600   # 降级(缓和):≥1h,防 alert↔watch 横跳刷屏
 
@@ -228,12 +235,15 @@ def get_geo_snapshot(force_refresh: bool = False) -> dict | None:
         logger.warning(f"geo Haiku analysis failed: {e}")
         if cached:
             return cached["payload"]
-        # 无缓存也别全黑:给未分级的原始头条,级别保守置 watch
+        # 无缓存也别全黑:给未分级的原始头条,级别标 unknown(不是 watch)。
+        # **且这一份绝不写缓存** —— 写了会被上面「头条没变 + _analyzed 还新鲜」
+        # 那条捷径认成有效分析,于是一次瞬时 API 失败能把雷达焊死 6 小时,
+        # 哪怕下一跳 Haiku 早就恢复了。不写 = 下一跳自动重试。
         for it in items:
             it.update({"relevance": "medium", "stance": "neutral", "note_cn": ""})
-        payload = {
+        return {
             "as_of": datetime.now(timezone.utc).isoformat(),
-            "risk_level": "watch", "risk_cn": _RISK_CN["watch"],
+            "risk_level": _UNKNOWN_LEVEL, "risk_cn": _UNKNOWN_CN,
             "headline_cn": "AI 分级不可用,仅原始头条",
             "summary_cn": "", "items": items,
         }
@@ -254,6 +264,21 @@ def _should_refresh(now_et: datetime) -> bool:
     return now_et.weekday() == 6 and now_et.hour == 20 and now_et.minute == 1
 
 
+def _last_good(prev: dict | None) -> str | None:
+    """上一次**真实**分级出来的级别(跳过 unknown 那些跳)。
+
+    `last_good_level` 是这次改动新加的键;老 payload 没有 → 退回 risk_level,
+    但要是它本身就是 unknown(旧版本的 payload 不会有,只可能是同版本前一跳)
+    就当没有,免得 unknown 参与 flip 比较。
+    """
+    p = prev or {}
+    lg = p.get("last_good_level")
+    if lg:
+        return lg
+    rl = p.get("risk_level")
+    return rl if rl and rl != _UNKNOWN_LEVEL else None
+
+
 def maybe_geo_refresh(prev: dict | None, now_et: datetime) -> dict | None:
     """Carry-forward off-tick; on-tick refresh + push. Never raises past itself."""
     if not _should_refresh(now_et):
@@ -267,12 +292,22 @@ def maybe_geo_refresh(prev: dict | None, now_et: datetime) -> dict | None:
         return prev
 
     fresh = dict(fresh)                       # live_quote copy carries push state
+    if fresh.get("risk_level") == _UNKNOWN_LEVEL:
+        # 这一跳没有判断 → 卡片照常显示原始头条,但推送全部静默:所有条目的
+        # relevance 都是兜底填的,拿它当「新高影响条目」会响一堆假警报。
+        # push 状态 + 最后一次真实级别原样带走,好让下一跳恢复后拿真级别比
+        # flip(否则 unknown→alert 会被算成「升级」,凭空推一条)。
+        fresh["alerted"]        = list((prev or {}).get("alerted") or [])
+        fresh["last_push_ts"]   = float((prev or {}).get("last_push_ts") or 0)
+        fresh["last_good_level"] = _last_good(prev)
+        return fresh
+
     alerted = list((prev or {}).get("alerted") or [])
     last_push = float((prev or {}).get("last_push_ts") or 0)
     now_ts = time.time()
     hot = [it for it in fresh.get("items", [])
            if it.get("relevance") == "high" and it["key"] not in alerted]
-    prev_level = (prev or {}).get("risk_level")
+    prev_level = _last_good(prev)          # 跳过 unknown,拿最后一次真实级别比
     cur_level = fresh.get("risk_level")
     level_flip = bool(prev) and prev_level and prev_level != cur_level
     escalated = level_flip and \
@@ -308,6 +343,7 @@ def maybe_geo_refresh(prev: dict | None, now_et: datetime) -> dict | None:
     # 只保留仍在雷达上的 key + 最近 100 个,防无限增长
     fresh["alerted"] = alerted[-100:]
     fresh["last_push_ts"] = last_push
+    fresh["last_good_level"] = cur_level
     return fresh
 
 

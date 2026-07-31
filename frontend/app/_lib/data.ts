@@ -49,7 +49,8 @@ export interface GeoItem {
 }
 export interface GeoRadar {
   as_of:       string;
-  risk_level:  "alert" | "watch" | "calm";
+  /** "unknown" = Haiku 分级那一跳挂了,只有原始头条,条目上的 relevance/stance 是兜底假值 */
+  risk_level:  "alert" | "watch" | "calm" | "unknown";
   risk_cn:     string;
   headline_cn: string;
   summary_cn:  string;
@@ -74,7 +75,8 @@ export interface CatalystItem {
 /** 📣 公司催化剂雷达 — D-Wave 自身消息 + 板块同行(零决策权,只做事件背景) */
 export interface CatalystRadar {
   as_of:        string;
-  impact_level: "breaking" | "watch" | "quiet";
+  /** "unknown" = 分级那一跳挂了,只有原始头条(条目上的 impact/direction 是兜底假值) */
+  impact_level: "breaking" | "watch" | "quiet" | "unknown";
   impact_cn:    string;
   headline_cn:  string;
   summary_cn:   string;
