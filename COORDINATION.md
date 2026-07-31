@@ -225,4 +225,4 @@ Format (newest at top):
 2026-07-17 [fable] 自读 AI 自检修当日 bug: ①edge命中21%→prompt Wilson上界<50%动态反向警告 ②Philly Fed回填映射(41.4实测)/Core Retail显式不支持 ③特调buy_trigger_px反解%R(实测$18.80) ④挑战digest字段名sleeve_cash/floor_line [done]
 2026-07-17 [fable] 元模型 edge v2 重设计(用户下令): 单源帽±0.35+软信号帽±0.50+实测regime门(锁±0.14/QQQ50 +0.13/−0.29)+死区42-58%+model:v2分代记账 → mining.md 第二十四轮 [done]
 2026-07-17 [fable] 轮动图加商品点+象限速览条(用户拍板): sector_rotation.py +GLD/USO(商品vs股市相对强度) + rotation-map.tsx 象限分组文字条(17点挤图找不到能源金矿的保底) + v2.18.0 [done]
-[done] 2026-07-31 12:05 [opus] 数据源噪音审计(用户点单"哪些是噪音就扔掉"): edge.py 事件日熔断+摘重复源/散户情绪 · decision.py 陈旧13F与散户情绪段 · options.py spot 用清洗价 · docs/SIGNALS.md 存档 · files: backend/dashboard/edge.py, decision.py, options.py, docs/SIGNALS.md, frontend/public/version.json
+[done] 2026-07-31 12:05 [opus] 数据源噪音审计 + 板块记分卡建账(用户点单"哪些是噪音就扔掉"): edge.py 事件日熔断+摘重复源/散户情绪 · decision.py 陈旧13F与散户情绪段 · options.py spot 用清洗价 · docs/SIGNALS.md 存档 · files: backend/dashboard/edge.py, decision.py, options.py, docs/SIGNALS.md, frontend/public/version.json

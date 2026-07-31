@@ -191,6 +191,57 @@ def _horizon_audit(recs: list[dict], df_d) -> dict:
     return out
 
 
+def _readings_audit(recs: list[dict]) -> dict:
+    """📋 板块记分卡 —— 决策 prompt 里"有发言权但没记分卡"那三分之二的成绩。
+
+    (2026-07-31 建账,用户点单。名册与表态导出规则在 `readings.py`,六条纪律同上。)
+
+    判决线**沿用判决主体那三条,一条不放宽**(`_HORIZON_RULE`):
+      n≥30 · Wilson 下界 > 同期基线 · 技巧为正且非四视界孤例。
+    基线与 `_horizon_audit` 用**同一个数**(该视界无脑常喊多数边的命中率),
+    这样板块跟 bold_call 可以同框比 —— 两套基线就没法比了。
+
+    只报 2d/3d(用户真实持有期);1d/5d 的数一并算出但不参与晋升判断,
+    避免又一次"四个视界挑最好的那个"。
+    """
+    from dashboard.journal import _HORIZONS
+    from dashboard.readings import NAMES, NO_DIRECTION
+
+    out: dict = {"rule": _HORIZON_RULE, "by_source": {},
+                 "no_direction": sorted(NO_DIRECTION),
+                 "note": "零决策权台账;跨过三条线之前一律 UNPROVEN,不得据此改任何权重"}
+    for h in _HORIZONS:
+        key = f"{h}d"
+        allf = [f for r in recs
+                for f in [(r.get("horizons") or {}).get("fwd_ret", {}).get(key)]
+                if f is not None]
+        if not allf:
+            continue
+        down_share = sum(1 for f in allf if f < 0) / len(allf)
+        base = max(down_share, 1 - down_share)
+        for src, cn in NAMES.items():
+            rows = [g for r in recs
+                    for g in [((r.get("horizons") or {}).get("readings", {})
+                               .get(src, {}) or {}).get(key)]
+                    if g is not None]
+            if not rows:
+                continue
+            hits = sum(1 for g in rows if g)
+            v = _verdict(hits, len(rows), breakeven=base)
+            v["baseline"] = round(base, 3)
+            v["skill_pp"] = round((hits / len(rows) - base) * 100, 1)
+            out["by_source"].setdefault(src, {"name": cn, "by_horizon": {}})
+            out["by_source"][src]["by_horizon"][key] = v
+    # 每个板块单独做孤例检查 —— 15 个板块 × 4 视界 = 60 次比较,不设这道闸
+    # 迟早会有一个纯靠运气的板块看起来"活了"。
+    for src, blk in out["by_source"].items():
+        pos = [k for k, v in blk["by_horizon"].items() if (v.get("skill_pp") or 0) > 0]
+        blk["n_positive_skill"] = len(pos)
+        blk["multiple_comparison_warn"] = len(pos) == 1
+    out["n_sources_scored"] = len(out["by_source"])
+    return out
+
+
 def _p_up_diagnostic(recs: list[dict]) -> dict:
     """p_up 反预测立案(用户 2026-07-30 拍板,REVIEW-2026-07 §7 P1)。
 
@@ -356,6 +407,8 @@ def run_audit() -> dict:
         # ── 判决主体:方向表态 × 多视界(预注册修订 2026-07-30 A+B)────────────
         report["sections"]["decision_journal"]["horizons"] = _horizon_audit(recs, df_d)
         report["sections"]["decision_journal"]["p_up_diagnostic"] = _p_up_diagnostic(recs)
+        # 📋 板块记分卡(2026-07-31 建账):prompt 里有发言权、§1 却没记分卡的那些
+        report["sections"]["decision_journal"]["readings"] = _readings_audit(recs)
         # 影子考场:Fable vs DeepSeek vs v1反向影子(2026-07-21,用户拍板) 的
         # bold_call 按统一 fwd5 口径同框
         for fld, key in (("bold_correct", "bold_fable"), ("ds_bold_correct", "bold_deepseek"),
@@ -541,6 +594,33 @@ def format_report(report: dict) -> str:
             L.append(f"\n②☠ p_up 反预测立案 — corr(p_up, fwd5)={pu['corr']:+.3f} "
                      f"CI[{pu['ci95'][0]:+.2f},{pu['ci95'][1]:+.2f}] n={pu['n']} → {pu['verdict']}")
             L.append(f"   线(预注册): {pu.get('rule','')}")
+        # ── ②📋 板块记分卡(2026-07-31 建账)────────────────────────────
+        rd = dj.get("readings") or {}
+        bysrc = rd.get("by_source") or {}
+        if bysrc:
+            L.append(f"\n②📋 板块记分卡 — prompt 里有发言权但 ① 没记它的板块"
+                     f"(零决策权台账,判决线同判决主体)")
+            L.append(f"   {'板块':<20}{'2d':>14}{'3d':>14}   判决")
+            for src, blk in sorted(bysrc.items()):
+                def cell(k):
+                    d = blk["by_horizon"].get(k)
+                    if not d:
+                        return f"{'—':>14}"
+                    return f"{d['n']:>3}·{d['hit_rate']*100:>3.0f}%{d['skill_pp']:>+6.1f}"
+                d2 = blk["by_horizon"].get("2d") or blk["by_horizon"].get("3d") or {}
+                warn = " ⚠️孤例" if blk.get("multiple_comparison_warn") else ""
+                L.append(f"   {blk['name']:<20}{cell('2d')}{cell('3d')}   "
+                         f"{d2.get('verdict','—')}{warn}")
+            L.append(f"   格式 = n·命中率·技巧(命中−基线,pp);基线与 ②★ 同一个数,可同框比。")
+            L.append(f"   {rd.get('note','')}")
+        elif rd:
+            L.append(f"\n②📋 板块记分卡 — 台账已建,尚无到期样本"
+                     f"(2026-07-31 起记,最快 2 个交易日后出第一批 2d 读数)")
+        if rd.get("no_direction"):
+            from dashboard.readings import NAMES as _RN
+            L.append(f"   天然无方向、本台账测不了的板块:"
+                     f"{'、'.join(_RN.get(k, k) for k in rd['no_direction'])}"
+                     f" —— 它们只能用消融测试(拿掉看决策变不变),不在本台账范围。")
         av = (dj.get("paper_avoided") or {})
         if av.get("n_hold_days"):
             L.append(f"\n②$ 规避回撤(观望 {av['n_hold_days']} 天的 2× 反事实)— "

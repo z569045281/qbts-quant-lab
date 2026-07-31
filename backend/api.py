@@ -1473,7 +1473,11 @@ async def refresh_decision():
         try:
             lq = (extras.get("live_quote") or {}).get("quotes", {}).get("qbts") or {}
             px = lq.get("price") or snap.get("price")
-            journal_record(decision, float(px), snap.get("as_of", ""))
+            # 📋 板块读数台账:prompt 里有发言权、audit §1 却没记分卡的那些板块,
+            # 今天的表态跟决策存在同一条记录上(零决策权,见 readings.py 六条纪律)
+            from dashboard.readings import collect as collect_readings
+            journal_record(decision, float(px), snap.get("as_of", ""),
+                           readings=collect_readings(snap, extras))
         except Exception:
             pass
 

@@ -29,6 +29,8 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+from dashboard.readings import horizon_grades as readings_horizons
+
 logger = logging.getLogger(__name__)
 
 _JOURNAL = Path(__file__).parent.parent / "data" / "cache" / "decision_journal.jsonl"
@@ -121,7 +123,8 @@ def _save(records: list[dict]) -> None:
     tmp.replace(_JOURNAL)
 
 
-def record(decision: dict, price_at_decision: float, as_of: str) -> None:
+def record(decision: dict, price_at_decision: float, as_of: str,
+           readings: dict | None = None) -> None:
     """Append a fresh decision (idempotent: one per calendar date).
 
     Also runs the **intraday consistency guard**: the running list of actions
@@ -183,6 +186,10 @@ def record(decision: dict, price_at_decision: float, as_of: str) -> None:
         "stop":       tp.get("qbts_stop"),
         "target":     tp.get("qbts_target"),
         "summary":    (decision.get("summary") or "")[:160],
+        # 📋 板块读数台账(2026-07-31):prompt 里有发言权但没记分卡的那些板块,
+        # 今天的表态原样存下来,由 backfill_horizons 用同一套多视界口径评分。
+        # 零决策权 —— 规矩全在 readings.py 文件头六条纪律。
+        "readings":   readings or None,
         "status":     "pending",
         "result":     None,
         "intraday_actions":  actions,
@@ -396,6 +403,10 @@ def backfill_horizons(df_daily) -> int:
         if not fwd_h:
             continue
         blk = {"fwd_ret": fwd_h, "bold": bold_by_h}
+        # 板块读数用**同一份** fwd_ret 评分 —— 两套口径就没法跟 bold_call 同框比。
+        rd = readings_horizons(r.get("readings"), fwd_h)
+        if rd:
+            blk["readings"] = rd
         if r.get("horizons") == blk:
             continue
         r["horizons"] = blk
