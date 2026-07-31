@@ -935,7 +935,10 @@ async def dashboard_snapshot(force_refresh: bool = False):
 
     # ── Pull options + intraday + reddit signals (all cached internally) ────
     try:
-        opt_sig = await asyncio.to_thread(get_options_signal)
+        # spot 用快照里已清洗的收盘价,别让 options 自己去 yfinance 捞(坏 bar 会
+        # 从那条路绕回来 —— 2026-07-31 噪音审计)
+        opt_sig = await asyncio.to_thread(
+            get_options_signal, False, payload.get("price"))
     except Exception:
         opt_sig = None
     try:

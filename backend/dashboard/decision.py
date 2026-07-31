@@ -305,12 +305,30 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
         parts.append("## 最近10个交易日 OHLC\n" + "\n".join(rows))
 
     # ── 8 个经典策略 ──────────────────────────────────────────
-    strat_lines = []
+    # 元模型摘掉的源,prompt 这边也不能照抄给 LLM —— 否则元模型不算它了,LLM 还
+    # 在算,假共振只是换了个地方发生(2026-07-31 噪音审计)。摘除名单的定义与理由
+    # 全在 edge.py 文件头,这里只是执行同一份名单。
+    from dashboard.edge import _DEAD_SOURCE, _EVENT_DAY_MUTED, _REDUNDANT
+    _ev = snapshot.get("event_day") or {}
+    _on_event = bool(_ev.get("is_event_day") and _ev.get("technical_muted"))
+    strat_lines, strat_pruned = [], []
     for s in snapshot.get("strategies", []):
+        why = _REDUNDANT.get(s["name"]) or _DEAD_SOURCE.get(s["name"])
+        if why is None and _on_event and s["name"] in _EVENT_DAY_MUTED:
+            why = f"事件日熔断:{_EVENT_DAY_MUTED[s['name']]}"
+        if why is not None:
+            if s.get("signal", 0) != 0:
+                strat_pruned.append(f"  ✂️ {s['name']}（本可给 {s['label']}）已摘除：{why}")
+            continue
         if s.get("signal", 0) != 0 or s.get("confidence") != "low":
             strat_lines.append(f"  [{s['label']}/{s['confidence']}] {s['name']}: {s['rationale']}")
-    if strat_lines:
-        parts.append("## 经典策略信号（学术规则，仅供参考）\n" + "\n".join(strat_lines))
+    if strat_lines or strat_pruned:
+        blk = "## 经典策略信号（学术规则，仅供参考）\n" + "\n".join(strat_lines)
+        if strat_pruned:
+            blk += ("\n" + "\n".join(strat_pruned) +
+                    "\n  （被摘除的策略**不得**作为今天的证据引用，连"
+                    "「有一条策略也这么说」这种交叉验证都不行。）")
+        parts.append(blk)
 
     # ── 挖矿 ML 因子（已验证 OOS）────────────────────────────
     mined = extras.get("mined_factors") or []
@@ -413,7 +431,7 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
         # 陈旧度口径对齐 holdings.py:用主动持有人报告期(全体 max 会被月报共同基金
         # 洗白成"新鲜",与 rationale 里的推力衰减自相矛盾 —— AI 自检 07-20)
         rd = s.get("active_report_date") or s.get("report_date") or ""
-        stale = ""
+        stale, age = "", None
         if rd:
             try:
                 age = (datetime.now().date() - datetime.fromisoformat(rd).date()).days
@@ -421,20 +439,28 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                          f"{'数据已陈旧、推力已按陈旧度衰减(见上),作背景权重' if age > 75 else '相对新鲜'}。")
             except Exception:
                 pass
-        parts.append(f"## 13F 机构持仓\n  [{hold.get('label','?')}/{hold.get('confidence','?')}] {hold.get('rationale','')}\n"
-                     f"  机构持仓比例 {s.get('institution_pct','?')}，机构数 {s.get('institution_count','?')}，"
-                     f"主动管理人净变化 {s.get('active_avg_change','?')}{stale}")
+        # 陈旧 13F 不再进 prompt(2026-07-31 噪音审计)。holdings.py 早就把方向推力
+        # 静音了,但整段还照写 200 多字 —— 一个 120 天前的季度快照,对 2~3 天的持有期
+        # 结构上不可能有信息(与第二十轮判 SEC FTD「出版滞后 ≥2 周 = 结构性不可交易」
+        # 同一条理由)。写一行说明它今天为什么缺席,比留着让 LLM 顺手引用安全。
+        if age is not None and age > 120:
+            parts.append(f"## 13F 机构持仓\n  ⏳ 报告期 {rd[:10]}（距今 {age} 天）已超 120 天上限 → "
+                         f"本段今日不提供读数。季度频率 + 法定 45 天滞后,对 2~3 天持有期"
+                         f"无信息;**不得**用「机构在买/在卖」作为今天的任何理由。")
+        else:
+            parts.append(f"## 13F 机构持仓\n  [{hold.get('label','?')}/{hold.get('confidence','?')}] {hold.get('rationale','')}\n"
+                         f"  机构持仓比例 {s.get('institution_pct','?')}，机构数 {s.get('institution_count','?')}，"
+                         f"主动管理人净变化 {s.get('active_avg_change','?')}{stale}")
 
     # ── 盘中量能 ─────────────────────────────────────────────
     intr = snapshot.get("intraday")
     if intr:
         parts.append(f"## 盘中量能\n  {intr.get('rationale','')}")
 
-    # ── 散户情绪(Adanos Reddit buzz + sentiment)────────────────
-    st = snapshot.get("sentiment")
-    if st and st.get("sentiment_score") is not None:
-        parts.append(f"## 散户情绪（Reddit，来自 Adanos）\n  {st.get('note','')}\n"
-                     f"  （散户情绪是偏弱信号、常滞后甚至反向 —— 作情绪背景与拥挤度参考，别当方向依据）")
+    # ── 散户情绪(Adanos)——2026-07-31 噪音审计后摘除决策权 ─────────
+    # 出处已不可核:Reddit API 自 2026-06-05 起审批制并禁止 AI/ML 用途,Adanos 这层
+    # 二手代理拿的是什么口径没法验;2026-07-30 全网仅 38 条提及在撑一个 ±0.12 权重。
+    # 页面继续展示、台账继续记账,但不再进 prompt —— 一个不可核的数不该参与定价。
 
     # ── SMC 聪明钱结构分析 ───────────────────────────────────
     smc = snapshot.get("smc")
@@ -799,6 +825,9 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
         line = (f"## 量化元模型参考（log-odds 机械加权，仅作交叉验证）\n"
                 f"  {edge.get('label','?')} · P(up)={edge.get('p_up',0)*100:.0f}% · "
                 f"EV={edge.get('expected_return_pct',0)*100:+.1f}%")
+        for p in (edge.get("pruned") or []):
+            line += (f"\n  ✂️ 已摘除 {p.get('source')}（{p.get('rule')}，"
+                     f"本可贡献 {p.get('would_have_been'):+.2f}）：{p.get('why')}")
         # 用它自己的实盘校准记录给读数定性(AI 自检 07-16):n≥15 且 Wilson95% 上界
         # <50% = 显著劣于随机 → 顺向引用禁令。只改标注不改权重——权重重推等 8/15 审判。
         cal0 = extras.get("calibration") or {}

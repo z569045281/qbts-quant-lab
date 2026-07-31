@@ -35,13 +35,19 @@ _CACHE_TTL  = 3600       # 1 hour
 _MAX_EXPS   = 3          # use up to 3 near-term expirations
 
 
-def _fetch_options_summary(ticker: str = "QBTS") -> dict:
+def _fetch_options_summary(ticker: str = "QBTS", spot_hint: float | None = None) -> dict:
     t = yf.Ticker(ticker)
     exps = list(t.options or [])[:_MAX_EXPS]
     if not exps:
         return {}
 
-    spot = float(t.info.get("regularMarketPrice") or t.history(period="1d")["Close"].iloc[-1])
+    # spot 优先用调用方给的**已清洗**收盘价(2026-07-31)。事故:07-30 上游返回一根
+    # 违反 OHLC 不变式的坏 bar(C16.21,真实 17.97),fetcher 已剔除并用小时线重建,
+    # 但这里自己去 yfinance 又把那个坏数捞了回来 —— ±10% 的 ATM 窗口(14.59~17.83)
+    # 整个落在真实价格下方,atm_oi_share 算的是一批虚值 call。
+    # 清洗过的价格拿不到时才回退自取。
+    spot = float(spot_hint) if spot_hint and float(spot_hint) > 0 else float(
+        t.info.get("regularMarketPrice") or t.history(period="1d")["Close"].iloc[-1])
 
     call_oi_tot = put_oi_tot = 0.0
     call_vol_tot = put_vol_tot = 0.0
@@ -170,8 +176,12 @@ def _signal_from_summary(s: dict) -> dict:
     }
 
 
-def get_options_signal(force_refresh: bool = False) -> dict:
-    """Public entry — cached 1 hour. Returns signal dict for the meta-model."""
+def get_options_signal(force_refresh: bool = False,
+                       spot_hint: float | None = None) -> dict:
+    """Public entry — cached 1 hour. Returns signal dict for the meta-model.
+
+    `spot_hint` — 已清洗的收盘价(见 `_fetch_options_summary`)。
+    """
     if not force_refresh and _CACHE_PATH.exists():
         try:
             cached = json.loads(_CACHE_PATH.read_text())
@@ -181,7 +191,7 @@ def get_options_signal(force_refresh: bool = False) -> dict:
             pass
 
     try:
-        summary = _fetch_options_summary("QBTS")
+        summary = _fetch_options_summary("QBTS", spot_hint=spot_hint)
         payload = _signal_from_summary(summary)
     except Exception as e:
         logger.warning(f"Options fetch failed: {e}")

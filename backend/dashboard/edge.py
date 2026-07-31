@@ -54,7 +54,44 @@ _MINED_WEIGHT_PER_SHARPE = 0.8     # a Sharpe-1.5 mined factor contributes ~1.2 
 _CLASSIC_WEIGHT_BASE     = {"high": 0.40, "medium": 0.20, "low": 0.08}
 _NEWS_WEIGHT             = 0.15    # news barely moves p_up — usually already priced
 _REL_STRENGTH_WEIGHT     = 0.20    # leading/lagging the peer basket — a dynamic, price-responsive tell
-_SENTIMENT_WEIGHT        = 0.12    # retail Reddit sentiment (Adanos) — weak/laggy, small tilt only
+
+# ══ 噪音审计(2026-07-31,用户点单)—— 三张摘除名单 ══════════════════════
+# **不是按胜率砍的**。全部源现在 n=1~8,按命中率挑谁死正是系统预注册防的
+# 多重比较错误。下面每一条的理由都是**结构性**的,不看它最近赢没赢。
+
+# ① 同一个事实被读了两遍 → 制造假共振。log-odds 相加的前提是证据独立。
+_REDUNDANT: dict[str, str] = {
+    # 实证:2026-07-30 这天「相对强度 +0.143」与「Quantum Peer Lead/Lag +0.08」
+    # 吃的是同一组数(IONQ +11.8% / RGTI +12.4%),同向,合计 +0.223 —— 一个事实
+    # 顶了两票。第十八轮已判「量子篮子横截面落后追赶推广判死,正确内核=在册的
+    # QBTS-IONQ 配对」,这条经典策略就是那个被判死推广的残留。
+    "Quantum Peer Lead/Lag": "与『相对强度』同源(IONQ/RGTI 横截面);第十八轮已判死推广",
+    # 决策 prompt 里早就写了「经典策略 Short Flow 与空头动向段同一数据源同一
+    # 方向,勿当成两个独立确认」—— 但那只是给 LLM 看的一句话,元模型这边一直
+    # 在裸加。把警告落实到代码。
+    "Short Flow (Informed Shorts)": "与『空头动向』同一 FINRA 空量比,同向重复计权",
+}
+
+# ② 数据源本身失效 → 不是"信号弱",是"这个数已经没有出处了"。
+_DEAD_SOURCE: dict[str, str] = {
+    # Adanos 的散户情绪对外声称来自 Reddit,而 Reddit API 自 2026-06-05 起
+    # 审批制 + 明令禁止 AI/ML 用途(记忆 reddit-api-dead)。2026-07-30 当天
+    # 全网只有 38 条提及在撑一个 ±0.12 的权重,出处已不可核。
+    # 保留展示与记账,只摘决策权。
+    "散户情绪": "Reddit API 2026-06-05 起关闭;Adanos 二手代理出处不可核,当日仅 38 条提及",
+}
+
+# ③ 事件日:跳空 ≥8% 那天,**读当日这根 bar 的源**没有分辨力。
+# 这不是新判断,是系统自己在第二十八轮预注册过的:n=37 · t=+0.36 · p=0.72
+# (对照跳空 3~8% 档 t=−2.02 · p=0.045 有效)。event_day.py 拿这条约束了
+# 决策 LLM,却从没约束元模型 —— 2026-07-30 +11% 那天,元模型照样用那根 bar
+# 算出 Post-News Overreaction −0.20 并写进 prompt 当"交叉验证"。
+# 只摘输入就是当日 bar 的源;不碰机制项/期权/13F 这些跨日证据。
+_EVENT_DAY_MUTED: dict[str, str] = {
+    "Post-News Overreaction": "输入=当日涨跌幅",
+    "Gap-and-Trap":           "输入=当日跳空幅度",
+    "盘中量能":                "输入=当日 bar 内部量能",
+}
 
 
 def _build_contributions(
@@ -203,6 +240,34 @@ def _build_contributions(
     return contributions
 
 
+def _prune(contributions: list[Contribution],
+           snapshot: dict) -> tuple[list[Contribution], list[dict]]:
+    """摘除名单执行(2026-07-31)。返回 (留下的, 被摘的+理由)。
+
+    **只作用于 v2**(`compute_edge`)。v1 影子轨是冻结的历史重建,用来跟 v2 对照,
+    改它就没得比了 —— 所以 `compute_edge_v1` 继续吃未过滤的原始清单。
+    """
+    ev = snapshot.get("event_day") or {}
+    on_event_day = bool(ev.get("is_event_day") and ev.get("technical_muted"))
+
+    kept: list[Contribution] = []
+    dropped: list[dict] = []
+    for c in contributions:
+        why = _REDUNDANT.get(c.source) or _DEAD_SOURCE.get(c.source)
+        rule = "重复计权" if c.source in _REDUNDANT else (
+               "数据源失效" if c.source in _DEAD_SOURCE else None)
+        if why is None and on_event_day and c.source in _EVENT_DAY_MUTED:
+            why = (f"事件日熔断:{_EVENT_DAY_MUTED[c.source]} —— "
+                   f"跳空≥8% 档实测 n=37 t=+0.36 p=0.72 无分辨力")
+            rule = "事件日熔断"
+        if why is None:
+            kept.append(c)
+            continue
+        dropped.append({"source": c.source, "rule": rule, "why": why,
+                        "would_have_been": round(float(c.log_odds), 3)})
+    return kept, dropped
+
+
 def _p_up_ev_kelly(log_odds: float, snapshot: dict) -> tuple[float, float, float]:
     """Shared sigmoid → EV → Kelly math, identical in v1 and v2 (only the
     log_odds fed in differs)."""
@@ -279,6 +344,8 @@ def compute_edge(
     """
     contributions = _build_contributions(
         snapshot, today_signals, options_signal, intraday_signal, holdings_signal)
+    # 噪音审计的三张摘除名单(重复计权 / 数据源失效 / 事件日熔断)—— 见文件头。
+    contributions, dropped = _prune(contributions, snapshot)
 
     # ══ v2 聚合(2026-07-17 重设计;出身:v1 上线一个月 22 条 21% 命中的审判)══
     # v1 两个病根,都是结构性的:
@@ -339,4 +406,6 @@ def compute_edge(
         "log_odds_regime":      round(regime_lo, 4),
         "n_signals":            len(contributions),
         "contributions":        [c.to_dict() for c in contributions[:10]],
+        # 被摘掉的源要看得见 —— 静默地少算一个源,跟静默地多算一个源一样危险。
+        "pruned":               dropped,
     }
