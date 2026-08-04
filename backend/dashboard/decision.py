@@ -560,7 +560,7 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                 f"  扣扳机清单（AND 逻辑，全 ✓ 才进场）:\n{chk}\n"
                 + ("  交易计划:\n" + "\n".join(plan_lines) + "\n" if plan_lines else "")
                 + "  纪律: 只在【锁定方向】找机会；价格未回到折价/溢价区+触及次级别中继OB前为【预警/等待】，"
-                  "不可因零散看多/看空信号提前进场。15m CHoCH+VMC 点是最后的收盘确认扳机。"
+                  "不可因零散看多/看空信号提前进场。15m 同向 CHoCH 是最后的收盘确认扳机。"
             )
 
     # ── 成交量画像 / POC（价值区与磁吸位，直接用于设目标/止损）──────────
