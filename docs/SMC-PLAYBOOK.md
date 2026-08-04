@@ -16,7 +16,7 @@
 **② 降维中继状态机**:`WAIT → ARMED → TRIGGER`。
 ARMED = 价格进入 discount(bull)/premium(bear) 越过 fib-0.5 均衡点 **且** 触碰次级
 时间框(1h 重采样出的 4h,或 1h)的中继订单块。TRIGGER(AND 逻辑)= ARMED **且** 新鲜的
-15m 同向 **CHoCH** **且** 收盘确认的 **VMC dot**。
+15m 同向 **CHoCH**。
 
 **③ FVG**:entry = FVG∩OB 重叠(共振狙击点);TP1 = 前方最近未回补 FVG 的近端(止盈磁吸);
 TP2 = 区间极值。
@@ -31,17 +31,31 @@ TP2 = 区间极值。
 - **风险熔断 `rr_veto`**:RR < 2.0 → entry 无效 → 状态强制「观望」(`risk_note` 卡上显示琥珀色)。
 - TP1 从 **entry 边之外**起算,免得覆盖 entry 的 FVG 冒充目标触发假 veto。
 
-输出带 5 项 ✓/✗ 清单 + entry/stop/TP1/TP2/RR;UI 渲染为卡片顶部区块,`decision.py` 把它框成
+输出带 4 项 ✓/✗ 清单 + entry/stop/TP1/TP2/RR;UI 渲染为卡片顶部区块,`decision.py` 把它框成
 **整体评判标准**(覆盖零散信号)。
 
-**VMC 绿/红点是复刻**:`backend/dashboard/wavetrend.py`(LazyBear WaveTrend —— VMC/Cipher-B
-本质就是 WT 穿出超卖/超买)。VMC 本身是闭源 TradingView 脚本,把它当**忠实近似**,不是像素级一致。
+## 2026-08-04 用户点单:k 回 2 + 纪律只留 ①②③④
+
+- `_DAILY_SWING_K` **8 → 2**。07-29 那次 2→8 是给**旧结构引擎**打的止血带,病根已被
+  LuxAlgo 移植根治(mining.md 第三十三轮复核:k **不进方向锁**,只喂 sweeps /
+  dealing range / 中继 OB)。k=2 摆动点更密 → 这三处的粒度更细、离现价更近。
+- 清单**删掉原 ⑤「15m VMC 点(收盘确认)」**,只留 ①方向锁 ②折价/溢价 ③次级别中继 OB
+  ④15m 同向 CHoCH。**状态机同步松了 AND** —— TRIGGER 不再要求 VMC 点,否则会出现
+  「4/4 全绿却还是预警」。`dot_ok`/`dot_bars` 仍照算并随 `ltf15` 带出(留给 8/15 审判
+  回答"它到底加过分没有"),但**零否决权**。
+- ⚠️ 少一道 AND ⇒ **TRIGGER 会变多 ⇒ ntfy 推送会变多**,预期内。
+- 两处都改口径 ⇒ `SMC_EPOCH` 另分一代 **`k2-nodot-20260804`**,审判别和
+  `luxport-20260729` 的记录混一个池子。
+
+**VMC 绿/红点的复刻仍在**:`backend/dashboard/wavetrend.py`(LazyBear WaveTrend ——
+VMC/Cipher-B 本质就是 WT 穿出超卖/超买),游击战模块 (`guerrilla.py`) 还在用它。
+VMC 本身是闭源 TradingView 脚本,把它当**忠实近似**,不是像素级一致。
 
 ## 盘中刷新 + TRIGGER 推送
 
 `backend/dashboard/intraday_smc.py`,接在 `aws/lambda_handlers.py::quote_handler`。
 
-每日 09:00 的 publish 只算**一次** playbook —— 但它的 TRIGGER(15m CHoCH + VMC dot)是盘中
+每日 09:00 的 publish 只算**一次** playbook —— 但它的 TRIGGER(新鲜的 15m 同向 CHoCH)是盘中
 转瞬即逝的,一天一算永远抓不到。修法:**每分钟的 QuoteFunction** 在 `minute % 5 == 0`
 (pre/regular/post)重算**便宜版** playbook(缓存的日线/1h + **新鲜 15m**;无 LLM → ~$0),
 写进 `live_quote.data['smc']`,并在非重算分钟**结转**上一次结果以免闪烁。前端

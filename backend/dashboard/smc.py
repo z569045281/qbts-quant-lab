@@ -38,16 +38,22 @@ except ImportError:  # allow running as a loose module
 # 结构判定整体换成 LuxAlgo 忠实移植 `lux_structure()`(见其文档),这个 k 只喂
 # sweeps / dealing range / order block 那几处"有哪些摆动极值"的用途。
 #
-# 变更轨迹(同日两次,都记在 epoch 里):
+# 变更轨迹(前两次同日,都记在 epoch 里):
 #   ① k 由 2 → 8:压住"下跌途中破一个陈旧小高点就翻多"的症状
 #   ② 换引擎:根治 —— 旧实现遍历所有历史高点、破任意一个就翻多,而 LuxAlgo
 #      只认「当前那一个」pivot。07-27 实测:旧版破 $18.02 翻多,LuxAlgo 眼里
 #      当前 pivot high 是 $24.73,19.51 根本够不着,所以它不翻。
+#   ③ 2026-08-04 用户点单 k 回 2:①那次是给旧引擎打的止血带,而止血带的病根在
+#      ②里已经根治(mining.md 第三十三轮复核过:k 不进方向锁)。k=2 摆动点更密
+#      → sweeps / dealing range / 中继 OB 的粒度更细、离现价更近。
 #
 # ⚠️ SMC playbook 驱动 ntfy TRIGGER 且是 8/15 受审信号,`smc.epoch` 随快照带出,
 # 审判按代际分组统计,别把几代混在一起算胜率。
-_DAILY_SWING_K = 8
-SMC_EPOCH = "luxport-20260729"   # 口径代际标签(8/15 审判按它分组)
+_DAILY_SWING_K = 2
+# 口径代际标签(8/15 审判按它分组)。08-04 同时改了两处口径 —— k 8→2(入场区/止损
+# /RR 会变)+ 扳机清单去掉 ⑤VMC(TRIGGER 频率会升),所以必须另分一代,不能和
+# luxport-20260729 的记录混在一个池子里算胜率。
+SMC_EPOCH = "k2-nodot-20260804"
 
 # LTF(1h/15m)不动:日内本来就该用短摆动,而且它们不驱动方向锁。
 
@@ -221,8 +227,12 @@ def _frame_zones(df: pd.DataFrame | None, k: int = 2, tail: int = 320) -> tuple[
 
 
 def _ltf15_trigger(df_15m: pd.DataFrame | None, lock: str) -> dict | None:
-    """15m read for the final trigger: a fresh same-direction CHoCH + a
-    close-confirmed WaveTrend (VMC) dot. Returns None when 15m data is absent."""
+    """15m read for the final trigger: a fresh same-direction CHoCH.
+
+    The close-confirmed WaveTrend (VMC) dot is still computed and returned
+    (`dot_ok`/`dot_bars`) so the 8/15 audit can ask whether it added anything,
+    but since 2026-08-04 it no longer gates TRIGGER and no longer shows on the
+    checklist. Returns None when 15m data is absent."""
     if df_15m is None or len(df_15m) < 40:
         return None
     d15 = df_15m.tail(220)
@@ -296,8 +306,8 @@ def build_playbook(price: float, structure: dict, pos: float,
                                structure label (BOS/CHoCH). Bull lock → longs only.
       Module 2  Relay/降维   — on a pullback, drop to 4h/1h for a relay OB + the
                                fib-0.5 equilibrium; price in discount(premium) AND
-                               touching a sub-TF OB ⇒ ARMED. Then 15m CHoCH + VMC
-                               (WaveTrend) dot ⇒ TRIGGER (AND logic).
+                               touching a sub-TF OB ⇒ ARMED. Then a fresh 15m
+                               same-direction CHoCH ⇒ TRIGGER (AND logic).
       Module 3  FVG          — entry = FVG edge ∩ OB overlap (共振狙击点);
                                TP1 = nearest unfilled FVG edge ahead (止盈磁吸).
     """
@@ -361,7 +371,11 @@ def build_playbook(price: float, structure: dict, pos: float,
         state = "NO_LOCK"
     else:
         armed = in_zone and touching_relay
-        triggered = bool(armed and ltf15 and ltf15["choch_ok"] and ltf15["dot_ok"])
+        # 2026-08-04 用户点单:纪律只保留 ①②③④,删掉 ⑤VMC 点 —— 扳机 = 15m
+        # 同向 CHoCH,不再 AND 一个 WaveTrend 点。`dot_ok` 仍照算并随 ltf15 带出
+        # (审判时还想看它到底有没有加分),但**不再有否决权**。
+        # ⚠️ 少一道 AND = TRIGGER 会变多 = ntfy 推送会变多,这是预期内的。
+        triggered = bool(armed and ltf15 and ltf15["choch_ok"])
         state = "TRIGGER" if triggered else ("ARMED" if armed else "WAIT")
 
     # ── entry = precise confluence INSIDE the relay zone, drilled to 1h/4h
@@ -471,12 +485,13 @@ def build_playbook(price: float, structure: dict, pos: float,
     side_cn = "做空" if lock == "bear" else "做多"
     zone_label = "溢价区(≥50%)" if lock == "bear" else "折价区(≤50%)"
     dir_cn = "向下" if lock == "bear" else "向上"
-    dot_cn = "红点" if lock == "bear" else "绿点"
     relay_detail = (f"{nearest_relay['tf']} {'供给' if want_ob == 'supply' else '需求'}区 "
                     f"${nearest_relay['low']}–${nearest_relay['high']}"
                     if nearest_relay else "暂无次级别中继区")
-    wt = ltf15.get("wt") if ltf15 else None
     le15 = ltf15.get("last_event") if ltf15 else None
+    # 清单 = 纪律本身(AND 全 ✓ 才进场),所以它必须和状态机逐条对齐。
+    # 2026-08-04 起只有 ①②③④ —— 原 ⑤「15m VMC 点」按用户点单删除,状态机那边
+    # 也同步松了 AND(见上)。别只删显示不删闸门:那会出现「4/4 全绿却还是预警」。
     checklist = [
         {"key": "lock", "label": "① 日线方向锁定", "ok": lock != "none", "detail": lock_reason},
         {"key": "pullback", "label": f"② 价格回到{zone_label}", "ok": bool(in_zone),
@@ -488,11 +503,6 @@ def build_playbook(price: float, structure: dict, pos: float,
                     if (ltf15 and ltf15["choch_ok"])
                     else (f"近12根无{dir_cn} CHoCH（最近 {le15['dir']} {le15['kind']}，{ltf15['bars_since_event']} 根前）"
                           if le15 else ("无 15m 数据" if not ltf15 else "15m 暂无反转结构")))},
-        {"key": "vmc", "label": f"⑤ 15m VMC {dot_cn}（收盘确认）", "ok": bool(ltf15 and ltf15["dot_ok"]),
-         "detail": (f"VMC {dot_cn}已现（{ltf15['dot_bars']} 根前）· wt2={wt['wt2']}（{wt['zone']}）"
-                    if (ltf15 and ltf15["dot_ok"] and wt)
-                    else (f"近12根无{dot_cn} · wt1={wt['wt1']}/wt2={wt['wt2']}（{wt['zone']}）"
-                          if wt else ("无 15m 数据" if not ltf15 else "WaveTrend 未就绪")))},
     ]
     n_ok = sum(1 for c in checklist if c["ok"])
 
@@ -506,7 +516,7 @@ def build_playbook(price: float, structure: dict, pos: float,
         "rr_veto": rr_veto, "risk_note": risk_note,
         "relay_ob": nearest_relay, "relay_obs": relay[:3],
         "ltf15": ltf15,
-        "checklist": checklist, "conditions_met": f"{n_ok}/5",
+        "checklist": checklist, "conditions_met": f"{n_ok}/{len(checklist)}",
     }
 
 

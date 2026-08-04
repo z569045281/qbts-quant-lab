@@ -2,7 +2,7 @@
 Intraday SMC playbook refresh + TRIGGER push notification.
 
 The daily publish (09:00 ET) computes the full snapshot once — but the SMC
-playbook's TRIGGER state (15m CHoCH + VMC dot) is fleeting and intraday, so a
+playbook's TRIGGER state (a fresh 15m CHoCH) is fleeting and intraday, so a
 once-a-day compute can never catch it. This module recomputes JUST the cheap,
 deterministic SMC playbook (no LLM call) every few minutes inside the per-minute
 QuoteFunction, writes it into the `live_quote` row, and fires an ntfy.sh push
@@ -116,6 +116,8 @@ def maybe_notify_trigger(prev_state: str | None, smc_payload: dict) -> bool:
     # 变成 5.84 —— 以前是被 RR<2 熔断顺手挡住的,现在它能过闸了。**靠另一道闸的
     # 副作用来维持铁律,等于没有维持。** bear lock 仍然照常进卡片和决策 prompt
     # 当方向过滤器/风控背景,只是不推"去做空"这个动作。
+    # (2026-08-04 k 又改回 2,RR 熔断可能重新顺手挡住空头 —— 这道闸照样留着,
+    #  理由同上:铁律不能靠另一道闸的副作用。)
     if (pb.get("lock") == "bear") or (pb.get("side_cn") == "做空"):
         print("! SMC 空头扳机不推送(做空路径已判死,bear lock 只作过滤器)")
         return False
@@ -126,7 +128,7 @@ def maybe_notify_trigger(prev_state: str | None, smc_payload: dict) -> bool:
         f"入场 ${ez.get('low', '?')}–${ez.get('high', '?')}",
         f"止损 ${pb.get('stop')}　TP1 ${tp1}　RR {pb.get('rr')}",
         pb.get("lock_reason", ""),
-        "（15m CHoCH + VMC 点已收盘确认 · 验证期，软参考）",
+        "（15m 同向 CHoCH 已收盘确认 · 验证期，软参考）",
     ]
     return _ntfy("QBTS SMC TRIGGER", "\n".join(str(x) for x in lines if x))
 
