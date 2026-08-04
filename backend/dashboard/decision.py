@@ -146,6 +146,10 @@ D. 执行军规（第七轮实测）：QBTX 年拖累−24%/QBTZ−34%;持有≤
   "upcoming_catalysts": [
     {"date": "<YYYY-MM-DD 或 '未来N天'>", "event": "<事件>", "impact": "高"|"中"|"低", "note": "<一句话>"}
   ],
+  "watch_levels": [
+    {"price": <QBTS 价位（数字）>, "side": "above"|"below",
+     "action_cn": "<收盘越过这条线之后该做什么，一句话，含标的与仓位上限>"}
+  ],
   "invalidation": "<什么情况下本计划作废，含具体价位>",
   "invalidation_price": <使计划作废的 QBTS 关键价位（数字）。LONG 时=跌破即作废的价位；
                          SHORT 时=涨破即作废的价位；HOLD 时=两个触发位中更接近现价的那个>,
@@ -158,8 +162,27 @@ D. 执行军规（第七轮实测）：QBTX 年拖累−24%/QBTZ−34%;持有≤
     {"kind": "数据问题"|"改进建议", "note": "<一句话，点名具体字段/数字，见规则 15；没有就给空数组>"}
   ]
 }
-HOLD 时 trade_plan 里 etf_ticker 用 null，但仍给出"若突破 $X 买 QBTX / 跌破 $Y 买 QBTZ"
-的双向触发写进 entry_condition，让用户知道盘中该盯什么位。"""
+HOLD 时 trade_plan 里 etf_ticker 用 null，但仍给出"若突破 $X 买 QBTX"这类触发写进
+entry_condition，让用户知道盘中该盯什么位。
+
+【watch_levels —— 这一栏会驱动真实推送，写错会半夜叫醒用户】
+· 把 entry_condition / invalidation 里提到的**每一个 QBTS 关键价位**都结构化到这里，
+  1-3 条。`side` 指的是**收盘价越过它的方向**：站上写 "above"，跌破写 "below"。
+· `action_cn` 必须是**可执行**的一句话，含标的与仓位上限，例如
+  "小仓买 QBTX（≤8%），持有≤5天，财报前一天减半"。
+· 没有值得盯的价位就给空数组 []，**不要为了填而编一个**。
+· ⛔ **做空方向的价位不要写进 watch_levels。** 做空 QBTS 的全部已知路径已四次判死，
+  推送层会直接丢弃 side/action 指向做空或 QBTZ 的条目 —— 写了也不会推，只会让
+  这一栏与实际行为不一致。跌破位照常写，但 action_cn 只能是"离场/观望/减仓"这类。
+
+【⛔ 做空常驻禁令（不限于事件日）】
+做空 QBTS 的全部已知路径在第 7/9/13/23 轮四次判死并永久结案（红周末做空、特调止盈腿
+做空、暴涨次日日内空、暴涨日收盘买次日卖、▼日线耗尽）。因此：
+· `action` **不得**输出 SHORT_QBTZ；`etf_ticker` 不得为 QBTZ。
+· entry_condition / invalidation / position_advice 里**不得**出现"做空""战术空""买 QBTZ"
+  这类建议——跌破关键位的正确动作是**继续空手或减仓**，不是反手。
+· 唯一例外：用户**已经**持有 QBTZ 时，可以给"减仓/清仓"的离场建议。
+· 技术位被跌破**不是**新证据。要复活做空需要新的、独立验证过的看空信号（目前不存在）。"""
 
 
 _DIR_CN_D = {"bullish": "偏多", "bearish": "偏空", "neutral": "中性"}
@@ -958,6 +981,46 @@ def _conv_etf(level: float, qbts_now: float, etf_now: float, lev_sign: int) -> f
     return round(etf_now * (1.0 + lev_sign * 2.0 * chg), 2)
 
 
+_SHORT_WORDS = ("做空", "战术空", "空单", "QBTZ", "qbtz", "sell short", "short")
+
+
+def _clean_watch_levels(raw) -> list[dict]:
+    """`watch_levels` 是**唯一一栏会驱动真实推送的自由输出** —— 在这里把它管死。
+
+    (2026-08-04 建。出身:08-03 决策卡给的「收盘站上 $18.88 就买 QBTX」当晚真的
+    触发了,但那个价位只活在一段自由文本里,没有任何东西在它扣响时通知用户 ——
+    用户在墨尔本早上 6 点睡着,第二天自己看到涨了 10% 才买。)
+
+    三条闸,顺序不能换:
+      ① 结构合法 —— price 是正数、side ∈ {above, below},否则整条丢。
+      ② **做空条目一律丢弃**(不是改写,是丢)。做空 QBTS 全部已知路径第 7/9/13/23 轮
+         四次判死;prompt 里已明令不许写,这里是代码层兜底 —— 铁律不能靠模型自觉。
+         `intraday_smc` 拦 `lock == bear` 是同一条纪律的另一个出口。
+      ③ 去重 + 封顶 3 条 —— 推送渠道只有一个,不许一天塞满。
+    """
+    out: list[dict] = []
+    seen: set[tuple] = set()
+    for lv in (raw or []):
+        if not isinstance(lv, dict):
+            continue
+        px = _num(lv.get("price"))
+        side = lv.get("side")
+        act = str(lv.get("action_cn") or "").strip()
+        if px is None or px <= 0 or side not in ("above", "below") or not act:
+            continue
+        if any(w in act for w in _SHORT_WORDS):
+            logger.warning("watch_levels: 丢弃做空条目 %.2f/%s — %s", px, side, act[:60])
+            continue
+        key = (round(px, 2), side)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({"price": round(px, 2), "side": side, "action_cn": act[:160]})
+        if len(out) >= 3:
+            break
+    return out
+
+
 def _sanitize_decision(decision: dict, snapshot: dict, extras: dict | None) -> dict:
     """Harden the model's numbers before money rides on them.
 
@@ -972,6 +1035,7 @@ def _sanitize_decision(decision: dict, snapshot: dict, extras: dict | None) -> d
     tp = dict(decision.get("trade_plan") or {})
     conv = int(decision.get("conviction", 0) or 0)
     action = decision.get("action")
+    decision["watch_levels"] = _clean_watch_levels(decision.get("watch_levels"))
 
     # bold_call_5d 兜底:模型漏给/非法时从 p_up 推导(≥0.5→up),台账必须天天有表态
     if decision.get("bold_call_5d") not in ("up", "down"):
@@ -1055,8 +1119,8 @@ _DECISION_SCHEMA = {
     "additionalProperties": False,
     "required": ["action", "conviction", "p_up_5d", "bold_call_5d", "summary", "trade_plan",
                  "key_drivers", "risks", "upcoming_catalysts", "invalidation",
-                 "invalidation_price", "vivienne_note", "position_advice",
-                 "system_notes"],
+                 "invalidation_price", "watch_levels", "vivienne_note",
+                 "position_advice", "system_notes"],
     "properties": {
         "action": {"type": "string", "enum": ["LONG_QBTX", "SHORT_QBTZ", "HOLD"]},
         "conviction": {"type": "integer"},
@@ -1105,6 +1169,18 @@ _DECISION_SCHEMA = {
         },
         "invalidation": {"type": "string"},
         "invalidation_price": _NUM,
+        "watch_levels": {   # 收盘越线 → ntfy(decision_trigger.py 消费,做空条目会被丢弃)
+            "type": "array",
+            "items": {
+                "type": "object", "additionalProperties": False,
+                "required": ["price", "side", "action_cn"],
+                "properties": {
+                    "price": {"type": "number"},
+                    "side": {"type": "string", "enum": ["above", "below"]},
+                    "action_cn": {"type": "string"},
+                },
+            },
+        },
         "vivienne_note": {"type": "string"},
         "position_advice": {   # 💼 用户实盘持仓逐笔建议(无持仓段 = 空数组)
             "type": "array",

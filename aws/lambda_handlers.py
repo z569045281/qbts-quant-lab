@@ -131,6 +131,19 @@ def quote_handler(event, context):
         if prev_data.get("event_day"):
             payload["event_day"] = prev_data["event_day"]
 
+    # 🔔 决策卡触发线(2026-08-04):收盘后判一次,越线就响。补的是 08-03 那个洞 ——
+    # 决策卡当天写了「收盘站上 $18.88 就买 QBTX」,当晚真触发了却没人通知用户
+    # (收盘 = 墨尔本早上 6 点)。非收盘窗口一律 carry-forward,别把已推记录冲掉。
+    try:
+        from dashboard.decision_trigger import maybe_trigger_push
+        dt = maybe_trigger_push(prev_data.get("dec_trigger"), now_et, payload.get("quotes"))
+        if dt:
+            payload["dec_trigger"] = dt
+    except Exception as e:
+        print(f"! decision_trigger skipped: {type(e).__name__}: {e}")
+        if prev_data.get("dec_trigger"):
+            payload["dec_trigger"] = prev_data["dec_trigger"]
+
     # 千元挑战第二期($5000 云端全自动,Alpaca paper)。模块自己挑
     # minute%15==2 的盘中分钟干活(错开 %5 的 SMC 分钟防超时),其余分钟秒退;
     # 状态直接写 crypto_challenge 表,不走 live_quote。
