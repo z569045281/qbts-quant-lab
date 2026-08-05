@@ -30,6 +30,12 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 
+
+def _utc_now() -> str:
+    """upsert 时显式刷新 updated_at —— DEFAULT now() 只管 INSERT。"""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
 logger = logging.getLogger(__name__)
 
 TICKER = "SPCX"
@@ -543,7 +549,12 @@ def publish_spacex() -> dict:
             sb = create_client(url, key)
             safe = json.loads(json.dumps(payload, default=str),
                               parse_constant=lambda _c: None)
-            sb.table("spacex_state").upsert({"id": "current", "data": safe}).execute()
+              # 2026-08-05:显式带上 updated_at。upsert 只写 `data`,而 `updated_at` 的
+            # DEFAULT now() **只在 INSERT 时生效** —— 这一行 id="current" 从建表那天
+            # 起就没变过,导致任何拿 updated_at 判新鲜度的人(含 Claude 自己,08-05
+            # 排查 PublishFunction 时就被骗过)会看到一个 42 天没更新的假象,
+            # 而 data.generated_at 其实每天都在动。监控字段本身骗人比没有更糟。
+            sb.table("spacex_state").upsert({"id": "current", "data": safe, "updated_at": _utc_now()}).execute()
         except Exception as e:
             logger.warning(f"publish_spacex write failed: {e}")
     return payload

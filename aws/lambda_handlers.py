@@ -218,6 +218,18 @@ def quote_handler(event, context):
             "challenge": challenge_summary}
 
 
+# ── 分段计时(2026-08-05)───────────────────────────────────────────────
+# 起因:08-04 11:39 那次 `Status: timeout`(300s),而 CloudWatch **只捕获
+# WARNING 以上** —— `logger.info` 在云端根本不存在,于是 START 到 END 之间
+# 246 秒是一整块黑箱,只能靠 Supabase 里各表的 generated_at 反推。
+# 用 print(stdout 一定进 CloudWatch)打每段耗时,下次超时能直接读出是谁吃的。
+def _phase(t0, name: str) -> float:
+    import time
+    t = time.time()
+    print(f"⏱  {name}: {t - t0:.1f}s")
+    return t
+
+
 def _publish_decision_only() -> dict:
     """Slim publish: snapshot + decision + calibration → one dashboard_state row.
 
@@ -258,7 +270,9 @@ def _publish_decision_only() -> dict:
         except Exception as e:
             print(f"! earnings sync skipped: {e}")
 
+        import time as _t; _t0 = _t.time()
         snap = loop.run_until_complete(dashboard_snapshot(force_refresh=True))
+        _t0 = _phase(_t0, "snapshot")
 
         summary = None
         try:
@@ -281,6 +295,8 @@ def _publish_decision_only() -> dict:
         except Exception as e:
             print(f"! champions push skipped: {e}")
 
+        _t0 = _phase(_t0, "decision(含第二考场)")
+
         # refresh_decision() recorded today's call AFTER dashboard_snapshot
         # captured the journal — re-read so today's decision shows immediately.
         try:
@@ -301,18 +317,21 @@ def _publish_decision_only() -> dict:
 
         # Watchlist scan (diversified buy-setup scan → 🔭 自选扫描 tab). Best-effort:
         # a scan failure must never block the daily decision publish.
+        _t0 = _phase(_t0, "写 dashboard_state")
         scan_payload = dca_payload = sx_payload = None
         try:
             from dashboard import scan_store
             scan_payload = scan_store.publish_scan()
         except Exception as e:
             print(f"! watchlist scan skipped: {e}")
+        _t0 = _phase(_t0, "自选扫描")
         try:
             from dashboard import dca
             dca_payload = dca.publish_dca()
         except Exception as e:
             print(f"! DCA skipped: {e}")
         # 🚀 SpaceX (SPCX · DeepSeek-only) — best-effort, never blocks the QBTS publish
+        _t0 = _phase(_t0, "DCA")
         try:
             from dashboard import spacex
             sx_payload = spacex.publish_spacex()
@@ -320,6 +339,7 @@ def _publish_decision_only() -> dict:
             print(f"! SpaceX skipped: {e}")
         # 🔬 全站 AI 系统自检(规则层+Haiku,~$0.01)→ 回写 snapshot['site_check'],
         # 各页渲染自己的切片。best-effort,绝不挡 publish。
+        _t0 = _phase(_t0, "SpaceX")
         try:
             from dashboard.selfcheck import build_site_check
             chall = None
