@@ -131,6 +131,20 @@ def quote_handler(event, context):
         if prev_data.get("event_day"):
             payload["event_day"] = prev_data["event_day"]
 
+    # 🚨 财报落地即时推送(2026-08-05,用户点单)。QBTS 财报盘前 08:00 ET 发,
+    # 而决策卡 09:00 才跑 —— 中间那一小时价格跳最凶却没人通知。三个探针:
+    # EDGAR 8-K item 2.02(权威)/ 盘前跳 ≥5% / 新闻关键词。每个财报日只响一次。
+    try:
+        from dashboard.earnings_alert import maybe_earnings_alert
+        ea = maybe_earnings_alert(prev_data.get("earnings_alert"), now_et,
+                                  payload.get("quotes"), payload.get("catalyst"))
+        if ea:
+            payload["earnings_alert"] = ea
+    except Exception as e:
+        print(f"! earnings_alert skipped: {type(e).__name__}: {e}")
+        if prev_data.get("earnings_alert"):
+            payload["earnings_alert"] = prev_data["earnings_alert"]
+
     # 🔔 决策卡触发线(2026-08-04):收盘后判一次,越线就响。补的是 08-03 那个洞 ——
     # 决策卡当天写了「收盘站上 $18.88 就买 QBTX」,当晚真触发了却没人通知用户
     # (收盘 = 墨尔本早上 6 点)。非收盘窗口一律 carry-forward,别把已推记录冲掉。
