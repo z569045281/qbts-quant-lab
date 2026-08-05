@@ -15,7 +15,6 @@ pandas
 numpy
 pyarrow
 scipy
-vectorbt
 lightgbm
 anthropic
 supabase
