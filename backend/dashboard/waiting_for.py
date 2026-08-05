@@ -47,7 +47,8 @@ def build_waiting_card(df_d: pd.DataFrame, snapshot: dict) -> dict | None:
 
         triggers: list[dict] = []
 
-        # ① 特调抄底腿(十轮最强:后5天 +17.4%)
+        # ① 特调抄底腿(招牌 +17.4% 是 2 年泡沫窗口的均值;全历史 n=55 中位 −0.3%、
+        #    胜率 44%、姐妹 0/2 —— 第三十四轮。当加分项,别当单独进场理由)
         tj = today.get("tj_sig") or {}
         fast, slow = tj.get("fast"), tj.get("slow")
         fired = bool(tj.get("buy_base"))
