@@ -368,24 +368,30 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                          + "\n".join(rows))
 
     # ── 新闻 ─────────────────────────────────────────────────
-    news_items = (snapshot.get("news") or {}).get("items", [])[:8]
+    # 2026-08-05 瘦身(用户点单"仪表盘太臃肿"):本块原占提示词 13.6%。审计实测
+    # 36 个交易日里新闻/宏观/催化剂/地缘四块合计 49.8% 篇幅,而其中三块按
+    # readings.py 纪律③是**天然无方向**、测不出对错;实证最强的大盘红绿灯只占
+    # 1.6%。篇幅与实证价值完全倒挂 → 四块一律压成摘要。**只砍字数,不砍模块**:
+    # 板块照常计算、照常进前端、台账照常记账,只是喂给模型的那份变短。
+    # 详见 docs/AUDIT-AND-EDGE.md「2026-08-05 全板块回测审计」。
+    news_items = (snapshot.get("news") or {}).get("items", [])[:5]
     if news_items:
-        rows = []
-        for n in news_items:
-            ai = n.get("ai", {})
-            rows.append(f"  [{ai.get('sentiment','?')}/{ai.get('impact','?')}] "
-                        f"({n.get('published','')[:10]}) {n.get('title','')[:80]} — {ai.get('reasoning','')[:60]}")
-        parts.append("## 近期新闻（已 AI 初筛）\n" + "\n".join(rows))
+        rows = [f"  [{(n.get('ai') or {}).get('sentiment','?')}/"
+                f"{(n.get('ai') or {}).get('impact','?')}] "
+                f"({n.get('published','')[:10]}) {n.get('title','')[:70]}"
+                for n in news_items]
+        parts.append("## 近期新闻（已 AI 初筛，只列标题+情绪/影响档）\n" + "\n".join(rows))
 
     # ── 🌍 地缘政治/政策雷达（伊朗战局/川普政策/量子政策）────────
     # risk_level == "unknown" = Haiku 分级那一跳挂了,条目的 relevance/stance 全是
     # 兜底填的假值 —— 整块跳过,宁可模型看不到地缘,也别喂它一份编的分级。
     geo = snapshot.get("geopolitics")
     if geo and geo.get("risk_level") and geo["risk_level"] != "unknown":
-        rows = [f"  [{it.get('track_cn','?')}/{it.get('stance','?')}] "
-                f"{it.get('title','')[:80]} — {it.get('note_cn','')}"
+        # 瘦身:6 条带 note → 3 条只留标题(note_cn 是 LLM 写给人看的复述,
+        # 对模型是冗余)。整块 982 字 → 约 300 字。
+        rows = [f"  [{it.get('track_cn','?')}/{it.get('stance','?')}] {it.get('title','')[:70]}"
                 for it in (geo.get("items") or [])
-                if it.get("relevance") in ("high", "medium")][:6]
+                if it.get("relevance") == "high"][:3]
         # 交叉验证:新闻情绪(雷达)与市场定价(VIX/大盘)矛盾时明说,
         # 免得模型各信各的(AI 自检 07-12 报过两模块直接打架)
         ml_ = snapshot.get("market_light") or {}
@@ -400,10 +406,10 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                      "市场在担心雷达三条战线之外的东西(宏观/流动性),勿因地缘平静而放松。")
         parts.append(
             f"## 🌍 地缘政治/政策雷达 {geo.get('risk_cn','?')} — {geo.get('headline_cn','')}\n"
-            f"  {geo.get('summary_cn','')}\n"
             + ("\n".join(rows) + "\n" if rows else "")
-            + "  （QBTS 与伊朗战局/川普政策强联动 — 07-07 暴跌即谈判破裂所致。alert 级别下"
-              "技术面买点先让位:降信心/缩仓位,并把「局势再升级」写进失效条件。）"
+            + "  （alert 级下技术买点让位:降信心/缩仓,「局势再升级」写进失效条件。"
+              "⚠️ 第三十一轮实测它是后视镜:标🔴的日子前一天平均 −2.26%、标🟡的前一天 +7.58%，"
+              "当情境材料可以，当择时信号不行。）"
             + cross
         )
 
@@ -414,22 +420,23 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
     if cat and cat.get("impact_level") and cat["impact_level"] != "unknown":  # 同上,假分级不进提示词
         hot = [it for it in (cat.get("items") or []) if it.get("impact") == "high"]
         mid = [it for it in (cat.get("items") or []) if it.get("impact") == "medium"]
+        # 瘦身:hot 条目原来每条带一行 note_cn 复述(整块 1,198 字 = 12.8% 篇幅)。
+        # 催化剂按纪律③**天然无方向**,测不出对错 —— 留标题够模型知道"今天有事",
+        # 复述删掉。
         rows = [f"  ★ [{it.get('track_cn','?')}/{_DIR_CN_D.get(it.get('direction'),'?')}]"
                 + (f" {it['age_h']}h前" if it.get("age_h") is not None else "")
-                + f" {it.get('title','')[:80]}\n      → {it.get('note_cn','')}"
-                for it in hot[:4]]
-        rows += [f"  · [{it.get('track_cn','?')}] {it.get('title','')[:70]}"
-                 for it in mid[:3]]
+                + f" {it.get('title','')[:75]}"
+                for it in hot[:3]]
+        rows += [f"  · {it.get('title','')[:60]}" for it in mid[:2]]
         parts.append(
             f"## 📣 公司催化剂雷达 {cat.get('impact_cn','?')} — {cat.get('headline_cn','')}\n"
-            f"  {cat.get('summary_cn','')}\n"
             + ("\n".join(rows) + "\n" if rows else "")
-            + ("  【breaking 级】今日价格可能由这条消息主导,而不是由技术位主导。"
-               "技术面读数(超买/超卖/折价区)在事件驱动日的解释力显著下降 —— "
-               "写计划时必须先说清这条消息把什么定价进去了、还剩多少没定价。\n"
-               if cat.get("impact_level") == "breaking" else "")
-            + "  （零决策权的事件背景,不进 edge 权重;消息面情绪已由「新闻聚合」"
-              "单独计入,别把同一条消息数两遍。）"
+            # breaking 段原来整段重复了紧随其后的「事件日熔断」块(那块把同一条纪律
+            # 讲得更硬)。熔断已触发时不再重复讲一遍,只在没熔断时留一句短的。
+            + ("  【breaking 级】今日价格可能由这条消息主导而非技术位;先说清这条消息"
+               "把什么定价进去了、还剩多少没定价。\n"
+               if cat.get("impact_level") == "breaking" and not snapshot.get("event_day") else "")
+            + "  （零决策权的事件背景,不进 edge 权重;情绪已由「新闻聚合」单独计入,别数两遍。）"
         )
 
     # ── ⚠️ 事件日熔断(第二十八轮,2026-07-29)────────────────────
@@ -557,7 +564,13 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                 plan_lines.append(f"    盈亏比 ≈ {pb['rr']}")
             lock_cn = {"bull": "多头锁定", "bear": "空头锁定", "none": "无锁定"}[pb["lock"]]
             parts.append(
-                f"## SMC 顺势纪律 Playbook（这是本系统的【整体评判标准】，优先于零散信号）\n"
+                # 2026-08-05 降级(全板块审计):这块原来自称「整体评判标准，优先于
+                # 零散信号」—— 但实测 36 个交易日里它给出方向表态 **0 次**(action
+                # 一直是 wait/预警)。一个从没开过口的板块不该占最高话语权。
+                # docs/SMC-PLAYBOOK.md 早就写明「它是风控/纪律工具,不是收益引擎」,
+                # 提示词现在跟上。
+                f"## SMC 顺势纪律 Playbook（风控/纪律工具，不是收益引擎；"
+                f"实测 36 个交易日 0 次方向表态，不得单独作为进场理由）\n"
                 f"  全局状态: 【{lock_cn}】（{pb.get('lock_reason','')}）——{pb.get('bias_note','')}\n"
                 f"  当前阶段: 【{pb.get('state_cn','?')}】 建议动作={pb.get('action','wait')}"
                 f"（满足条件 {pb.get('conditions_met','?')}）\n"
@@ -763,15 +776,21 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
     macro = snapshot.get("macro")
     if macro and macro.get("events"):
         rows = []
-        for e in macro["events"]:
+        # 瘦身(2026-08-05):原来 14 天全列 = 1,211 字 = 12.9% 篇幅,而这一块自己的
+        # 实测结论就是「QBTS 在所有宏观日的影响系数 ≈1.0」。只留🔴重磅 + 未来 5 天内
+        # 的,其余的日期知道也没用(到时候自然会进这个窗口)。
+        _evs = [e for e in macro["events"]
+                if e.get("nuclear") or -24 <= (e.get("hours_until") or 999) <= 72][:5]
+        for e in (_evs or macro["events"][:3]):
             star = "🔴" if e.get("nuclear") else "·"
             if e.get("actual"):
                 fc = f"（✅已公布 实际 {e['actual']} vs 预测 {e['forecast'] or '—'} / 前值 {e['previous'] or '—'}）"
             elif e.get("forecast") and (e.get("hours_until") or 0) < 0:
                 # 已发布但实际值未回填(FF/FRED 滞后, 09:00 publish 常撞上 08:30 数据) —
                 # 07-14 模型把前值 0.5% 当成当日 CPI 公布值喊"爆表",实际 -0.4% 方向全反
-                fc = (f"（🕐已发布·实际值尚未回填 — 预测 {e['forecast']} / 前值 {e['previous']};"
-                      f"前值是上期数据,严禁当作今日公布值;未知实际值前不得据此定方向）")
+                # 瘦身:这段警告原来逐行重复(每行 ~70 字),改成行内短标记 🕐,
+                # 完整纪律在本块末尾只讲一次(见 pend_line)。
+                fc = f"（🕐待回填 预测 {e['forecast']} / 前值 {e['previous']}）"
             elif e.get("forecast"):
                 fc = f"（预测 {e['forecast']} / 前值 {e['previous']}）"
             else:
@@ -781,15 +800,16 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                         + (f"〔{co}〕" if co and e.get("nuclear") else ""))
         risk_line = f"  ⚠️ {macro['risk_note']}" if macro.get("risk_window") else f"  {macro.get('risk_note','')}"
         coef_line = (
-            "  （宏观日影响系数·第十五轮实测 2022-08~2026-07,事件日|ret|÷平日,*=显著:"
-            "非农/失业率 SPY×1.56*·QTUM×1.46* > CPI SPY×1.44 > FOMC SPY×1.31(余波常落在次日);"
-            "PPI/核心PCE/GDP/零售/JOLTS ≈×1.0 连大盘都不动。"
-            "关键:QBTS 单票在所有宏观日系数均≈1.0——6.3%/日固有波动淹没宏观脉冲,"
-            "别只因『数据日』缩 QBTS 仓;正确用法=把非农/CPI/FOMC 当【大盘方向的潜在翻转点】,"
-            "公布后看 SPY/QQQ/VIX 反应定基调,而非提前恐惧。）"
+            "  （第十五轮实测:**QBTS 在所有宏观日的影响系数均≈1.0**——6.3%/日的固有波动"
+            "淹没宏观脉冲,别只因『数据日』缩 QBTS 仓。只有非农/CPI/FOMC 值得当"
+            "【大盘方向的潜在翻转点】,且要等公布后看 SPY/QQQ/VIX 反应,不提前恐惧。）"
         )
-        parts.append("## 宏观经济日历（未来14天，🔴=重磅）\n" + "\n".join(rows)
-                     + "\n" + risk_line + "\n" + coef_line)
+        # 07-14 事故防线:模型把「前值」当成当日公布值喊爆表(实际方向全反)。
+        # 只在真有 🕐 行时才讲一次,没有就不占字数。
+        pend_line = ("\n  ⚠️ 带🕐的是已发布但实际值尚未回填:前值=上期数据,严禁当作今日"
+                     "公布值,未知实际值前不得据此定方向。" if any("🕐" in r for r in rows) else "")
+        parts.append("## 宏观经济日历（🔴=重磅，只列近 5 日 + 重磅）\n" + "\n".join(rows)
+                     + pend_line + "\n" + risk_line + "\n" + coef_line)
 
     # ── 📊 财报预期基准 ───────────────────────────────────────
     # 2026-08-05:决策 AI 自己在 system_notes 提的缺口(「只有日期没有预期基准,
