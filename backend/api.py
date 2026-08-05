@@ -1420,6 +1420,17 @@ async def refresh_decision():
     except Exception:
         pass
     try:
+        # 📊 财报预期基准(一致预期 + 历史当日振幅)。零决策权,只把"财报"
+        # 从一个日期变成一组数字 —— 见 earnings.py 出身注释。
+        # ⚠️ 刻意**不传** df_d:本仓缓存的日线只有 2 年,只够覆盖 8 次财报;
+        # 这里要的是全部 16 次,让模块自己拉 max 历史。(且此处 df_d 尚未载入,
+        # 传了会 NameError 被 except 吞掉 → 静默降级成"没有基准",正是本会话
+        # 反复栽的那个坑。)
+        from dashboard.earnings import analyze_earnings
+        extras["earnings_stats"] = await asyncio.to_thread(analyze_earnings)
+    except Exception as e:
+        logger.warning(f"earnings_stats failed: {e}")
+    try:
         from data.altdata import fetch_sec_dilution
         extras["dilution"] = await asyncio.to_thread(fetch_sec_dilution, "QBTS")
     except Exception:

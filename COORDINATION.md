@@ -230,3 +230,4 @@ Format (newest at top):
 [done] 2026-07-31 12:05 [opus] 数据源噪音审计 + 板块记分卡建账(用户点单"哪些是噪音就扔掉"): edge.py 事件日熔断+摘重复源/散户情绪 · decision.py 陈旧13F与散户情绪段 · options.py spot 用清洗价 · docs/SIGNALS.md 存档 · files: backend/dashboard/edge.py, decision.py, options.py, docs/SIGNALS.md, frontend/public/version.json
 [done] 2026-07-31 17:10 [opus] 同一条新闻重复推送修复: event_day 键与状态分离(live_quote blob 整块覆写导致去重键蒸发) · files: backend/dashboard/event_day.py, aws/lambda_handlers.py, docs/LESSONS.md
 [done] 2026-08-04 [opus] 决策卡触发线推送(用户点单:08-03 触发了没人通知): decision.py watch_levels schema+消毒+做空常驻禁令 · 新 decision_trigger.py · lambda 接线 · docs/DECISION.md · files: backend/dashboard/decision.py, backend/dashboard/decision_trigger.py, aws/lambda_handlers.py
+[done] 2026-08-05 [opus] 财报预期基准(决策 AI 自检提的缺口 + 用户点单): 新 earnings.py(一致预期+历史当日振幅+surprise 记录) · decision.py 换段 · api.py extras · files: backend/dashboard/earnings.py, backend/dashboard/decision.py, backend/api.py

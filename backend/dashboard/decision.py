@@ -787,21 +787,28 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
         parts.append("## 宏观经济日历（未来14天，🔴=重磅）\n" + "\n".join(rows)
                      + "\n" + risk_line + "\n" + coef_line)
 
-    # ── 财报日历 ─────────────────────────────────────────────
-    # 缺数据时显式说缺(AI 自检 07-20:段落静默消失 → 模型只能从新闻猜财报临近)
-    earnings = extras.get("earnings_dates") or []
-    future = [d for d in earnings if d >= datetime.now().strftime("%Y-%m-%d")][:2]
-    if future:
-        try:
-            days_to = (datetime.fromisoformat(future[0]).date() - datetime.now().date()).days
-            cd = f"（{days_to} 天后）"
-        except ValueError:
-            cd = ""
-        parts.append(f"## 财报日历（已确认日期）\n  下次财报: {', '.join(future)}{cd}"
-                     "——财报是 QBTS 单票最大的已知波动源,临近时其权重高于任何宏观日。")
+    # ── 📊 财报预期基准 ───────────────────────────────────────
+    # 2026-08-05:决策 AI 自己在 system_notes 提的缺口(「只有日期没有预期基准,
+    # 无法评估 surprise 空间」),用户点单落地。以前这里只有一行日期,模型只能
+    # 回一句"财报临近、谨慎"的废话。现在带一致预期 + 历史当日实测振幅。
+    # 缺数据时显式说缺(AI 自检 07-20:段落静默消失 → 模型只能从新闻猜)。
+    from dashboard.earnings import prompt_block as _earn_block
+    er = extras.get("earnings_stats")
+    if er is not None:
+        parts.append(_earn_block(er))
     else:
-        parts.append("## 财报日历\n  ⚠️ 财报日期未获取到（数据源失败或暂无排期）"
-                     "——若新闻提示财报临近,以新闻为准,并在 system_notes 标注此数据缺口。")
+        earnings = extras.get("earnings_dates") or []
+        future = [d for d in earnings if d >= datetime.now().strftime("%Y-%m-%d")][:2]
+        if future:
+            try:
+                days_to = (datetime.fromisoformat(future[0]).date() - datetime.now().date()).days
+                cd = f"（{days_to} 天后）"
+            except ValueError:
+                cd = ""
+            parts.append(f"## 财报日历（已确认日期）\n  下次财报: {', '.join(future)}{cd}"
+                         "——财报是 QBTS 单票最大的已知波动源,临近时其权重高于任何宏观日。")
+        else:
+            parts.append(_earn_block(None))
 
     # ── SEC 增发/稀释文件(供给冲击,价格信号看不见的事件面)──────
     dil = extras.get("dilution")
