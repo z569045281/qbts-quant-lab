@@ -232,7 +232,19 @@ export default function Dashboard() {
   // 否则会出现"页面显示 $24.43、但 SMC 卡用的是另一份价算的"、价格在区间内而对应勾
   // 却是灰色的自相矛盾(cross-source 老教训)。
   const smc = (liveCurrent && live?.smc) ? live.smc : (snap.smc ?? null);
-  const pbLive = !!(liveFresh && live?.smc);   // 「盘中实时」脉冲只在 <3min 时亮
+  // 「盘中实时」脉冲必须看 **SMC 自己的 asof**,不能看 live_quote 整行的时间戳。
+  // 2026-08-05 实测的坑:夜盘 session='overnight' 时 lambda_handlers 只把上一份
+  // SMC **原样结转**(只有 pre/regular/post 且 minute%5==0 才真重算),而价格每分钟
+  // 都在更新 → 整行 asof_epoch 一直新鲜 → 绿灯长亮 8 小时,显示的却是 19:55 ET
+  // 那份读数。用户因此以为「SMC 改了没生效」,实际是卡片压根没重算。
+  // 判据:SMC 每 5 分钟重算一次,给 2 倍余量 → 超过 11 分钟就不算实时。
+  const smcAgeMin = smc?.asof ? (Date.now() - new Date(smc.asof).getTime()) / 60000 : null;
+  const pbLive = smcAgeMin !== null && smcAgeMin < 11;
+  // 结转中(有读数但不是刚算的)→ 显示它到底是什么时候算的,别让人当成实时
+  const smcStaleLabel = (smcAgeMin !== null && smcAgeMin >= 11 && smc?.asof)
+    ? `结转 · ${new Date(smc.asof).toLocaleTimeString("en-US", {
+        timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hour12: false })} ET 读数`
+    : null;
   const choch = smc?.last_event?.kind === "CHoCH" ? smc.last_event : null;
   const pb = smc?.playbook ?? null;
   // LuxAlgo 原版面板：盘中 live 的 smc 也带它，与上面 smc 同源，别各取各的
@@ -1157,6 +1169,11 @@ export default function Dashboard() {
                 <span className="normal-case font-mono font-bold text-gray-900 text-sm">
                   ${(liveCurrent && liveQbts ? liveQbts.price : snap.price).toFixed(2)}
                   {pbLive && <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse align-middle" />}
+                  {smcStaleLabel && (
+                    <span className="ml-1.5 text-[10px] font-normal normal-case text-gray-400">
+                      {smcStaleLabel}
+                    </span>
+                  )}
                 </span>
               </span>
               <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
@@ -1197,6 +1214,12 @@ export default function Dashboard() {
                     {pbLive && (
                       <span className="ml-1.5 inline-flex items-center gap-1 text-[9px] font-bold text-emerald-600 normal-case">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />盘中实时
+                      </span>
+                    )}
+                    {smcStaleLabel && (
+                      <span className="ml-1.5 inline-flex items-center gap-1 text-[9px] font-bold text-gray-400 normal-case">
+                        <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />{smcStaleLabel}
+                        <span className="font-normal">（夜盘/休市不重算，只结转）</span>
                       </span>
                     )}
                   </span>

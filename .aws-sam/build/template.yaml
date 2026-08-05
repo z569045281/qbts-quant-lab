@@ -1,0 +1,183 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: "QBTS dashboard serverless jobs (Route A). Two Lambda functions from\
+  \ one container image: PublishFunction (on-demand button + daily schedule \u2192\
+  \ fresh decision into Supabase) and QuoteFunction (live quotes every minute during\
+  \ US market hours).\n"
+Parameters:
+  AnthropicApiKey:
+    Type: String
+    NoEcho: true
+    Description: "Anthropic API key \u2014 used by the Opus 4.8 decision call."
+  SupabaseUrl:
+    Type: String
+    Description: https://<project>.supabase.co
+  SupabaseSecretKey:
+    Type: String
+    NoEcho: true
+    Description: "Supabase secret/service key (write access \u2014 keep secret)."
+  FredApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: "FRED (St. Louis Fed) API key \u2014 backfills macro-calendar actual\
+      \ values. Optional: blank just leaves actuals empty (forecast/previous still\
+      \ show).\n"
+  AdanosApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: "Adanos API key (sk_live_\u2026) \u2014 retail Reddit buzz + sentiment\
+      \ for the decision/edge. Optional: blank just leaves the sentiment signal off.\n"
+  DeepSeekApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: "DeepSeek API key \u2014 V4 Pro shadow decision (Claude/DeepSeek\
+      \ toggle on the dashboard + bold-call shadow ledger, judged 8/15). Optional:\
+      \ blank = off.\n"
+  AllowOrigin:
+    Type: String
+    Default: '*'
+    Description: 'Browser origin allowed to call the publish Function URL, e.g. https://z569045281.github.io
+      . "*" works but lets anyone trigger it.
+
+      '
+  NtfyTopic:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: 'ntfy.sh topic for the SMC TRIGGER push. Blank = no push (intraday
+      playbook still refreshes + shows on the dashboard). Pick an unguessable name
+      and subscribe to it in the ntfy phone app.
+
+      '
+  NtfyUrl:
+    Type: String
+    Default: https://ntfy.sh
+    Description: ntfy server base URL (override only for a self-hosted instance).
+  AlpacaApiKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: "Alpaca PAPER API key \u2014 drives the challenge-2 auto-trader in\
+      \ QuoteFunction. Optional: blank just disables the challenge bot (everything\
+      \ else unaffected).\n"
+  AlpacaSecretKey:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: Alpaca PAPER API secret (pair of AlpacaApiKey).
+Globals:
+  Function:
+    Environment:
+      Variables:
+        ANTHROPIC_API_KEY:
+          Ref: AnthropicApiKey
+        SUPABASE_URL:
+          Ref: SupabaseUrl
+        SUPABASE_SECRET_KEY:
+          Ref: SupabaseSecretKey
+        FRED_API_KEY:
+          Ref: FredApiKey
+        ADANOS_API_KEY:
+          Ref: AdanosApiKey
+        DEEPSEEK_API_KEY:
+          Ref: DeepSeekApiKey
+        NTFY_TOPIC:
+          Ref: NtfyTopic
+        NTFY_URL:
+          Ref: NtfyUrl
+        ALPACA_API_KEY:
+          Ref: AlpacaApiKey
+        ALPACA_SECRET_KEY:
+          Ref: AlpacaSecretKey
+Resources:
+  PublishFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      DockerContext: /Users/aiden/github/makebig_money
+      DockerTag: qbts-publish
+      Dockerfile: aws/Dockerfile
+      SamResourceId: PublishFunction
+    Properties:
+      PackageType: Image
+      ImageConfig:
+        Command:
+        - lambda_handlers.publish_handler
+      MemorySize: 2048
+      Timeout: 600
+      FunctionUrlConfig:
+        AuthType: NONE
+        Cors:
+          AllowOrigins:
+          - Ref: AllowOrigin
+          AllowMethods:
+          - POST
+          AllowHeaders:
+          - content-type
+      Events:
+        DailyMarketOpen:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(0 9 ? * MON-FRI *)
+            ScheduleExpressionTimezone: America/New_York
+            Description: Auto-publish a fresh decision at market open.
+        SundayNightDecision:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(5 20 ? * SUN *)
+            ScheduleExpressionTimezone: America/New_York
+            Description: Monday's decision at US overnight-session open (Sun 20:05
+              ET).
+      ImageUri: publishfunction:qbts-publish
+  QuoteFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      DockerContext: /Users/aiden/github/makebig_money
+      DockerTag: qbts-quote
+      Dockerfile: aws/Dockerfile
+      SamResourceId: QuoteFunction
+    Properties:
+      PackageType: Image
+      ImageConfig:
+        Command:
+        - lambda_handlers.quote_handler
+      MemorySize: 1024
+      Timeout: 90
+      Events:
+        MarketHoursEveryMinute:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(* 4-19 ? * MON-FRI *)
+            ScheduleExpressionTimezone: America/New_York
+            Description: Push QBTS/QBTX/QBTZ quotes every minute (pre+regular+post).
+        SundayNightBtc:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(1/10 20-23 ? * SUN *)
+            ScheduleExpressionTimezone: America/New_York
+            Description: Weekend-BTC signal at US overnight-session open (Sun 20:00
+              ET).
+        OvernightEvening:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(* 20-23 ? * MON-THU *)
+            ScheduleExpressionTimezone: America/New_York
+            Description: "Overnight (Blue Ocean) live quotes \u2014 evening leg (Mon-Thu\
+              \ 20:00 ET)."
+        OvernightMorning:
+          Type: ScheduleV2
+          Properties:
+            ScheduleExpression: cron(* 0-3 ? * MON-FRI *)
+            ScheduleExpressionTimezone: America/New_York
+            Description: "Overnight (Blue Ocean) live quotes \u2014 early-morning\
+              \ leg (Mon-Fri 00:00-03:59 ET)."
+      ImageUri: quotefunction:qbts-quote
+Outputs:
+  PublishUrl:
+    Description: Set this as NEXT_PUBLIC_PUBLISH_URL in the frontend build.
+    Value:
+      Fn::GetAtt:
+      - PublishFunctionUrl
+      - FunctionUrl

@@ -354,6 +354,12 @@ export interface LuxPanel {
 }
 
 export interface SmcAnalysis {
+  /** 这份 SMC 读数**自己**是什么时候算出来的(`intraday_smc.compute_smc` 打的戳)。
+   *  ⚠️ 必须用它判「盘中实时」,不能用 live_quote 整行的 asof_epoch:夜盘/休市
+   *  (session='overnight')时 lambda 只把上一份 SMC 原样结转,而价格每分钟都在更新,
+   *  拿整行时间戳会让绿灯长亮 8 小时、显示的却是收盘那份读数(2026-08-05 实测到)。
+   *  日线快照里的 smc 没有这个字段,所以是可选的。 */
+  asof?:  string;
   signal: -1 | 0 | 1;
   label:  "BUY" | "SELL" | "HOLD";
   /** LuxAlgo internal(5) —— 方向锁用它 */
