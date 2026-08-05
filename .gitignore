@@ -28,6 +28,7 @@ backend/data/favorites.json
 *.jsonl
 
 # ── AWS SAM (Route A deploy) ────────────────────────
+.aws-sam/
 aws/.aws-sam/
 aws/samconfig.toml
 

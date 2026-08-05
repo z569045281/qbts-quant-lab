@@ -25,7 +25,6 @@ try:
     from alpaca.trading.requests import MarketOrderRequest, GetOrdersRequest
     from alpaca.trading.enums import OrderSide, TimeInForce, QueryOrderStatus
     from alpaca.data.historical import StockHistoricalDataClient
-    from alpaca.data.requests import StockLatestQuoteRequest
     _ALPACA_OK = True
 except ImportError:
     _ALPACA_OK = False
@@ -113,17 +112,6 @@ def get_position(tc, ticker: str = TICKER) -> Optional[PositionInfo]:
         )
     except Exception:
         return None
-
-
-def get_latest_price(dc, ticker: str = TICKER) -> float:
-    try:
-        resp = dc.get_stock_latest_quote(
-            StockLatestQuoteRequest(symbol_or_symbols=ticker)
-        )
-        q = resp[ticker]
-        return round((float(q.ask_price) + float(q.bid_price)) / 2, 4)
-    except Exception:
-        return 0.0
 
 
 # ── signal computation ───────────────────────────────────────────────────────

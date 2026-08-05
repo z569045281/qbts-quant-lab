@@ -855,14 +855,6 @@ export interface ChartData {
   split_time: number;
 }
 
-export interface FactorRow {
-  id:    string;
-  score: number | null;
-  data:  FactorEntry;
-  code:  string | null;
-  chart: ChartData | null;
-}
-
 const NO_DATA = "尚无发布数据 — 请先在本地运行 publish.py";
 
 /** True when Supabase is actually configured (deployed mode).
@@ -981,16 +973,6 @@ export async function getCalibration(): Promise<Calibration | null> {
     .maybeSingle();
   if (error) throw new Error(error.message);
   return (data?.calibration ?? null) as Calibration | null;
-}
-
-/** All published factors, best score first. */
-export async function getFactors(): Promise<FactorRow[]> {
-  const { data, error } = await supabase
-    .from("factors")
-    .select("id, score, data, code, chart")
-    .order("score", { ascending: false });
-  if (error) throw new Error(error.message);
-  return (data ?? []) as FactorRow[];
 }
 
 /* ── 🔭 自选扫描 (watchlist scan) ─────────────────────────────────────────── */

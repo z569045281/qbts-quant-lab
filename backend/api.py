@@ -636,14 +636,6 @@ def toggle_favorite(factor_id: str):
         return {"favorited": True}
 
 
-@app.get("/factors/{factor_id}/code")
-def get_factor_code(factor_id: str):
-    for e in leaderboard:
-        if e["id"] == factor_id:
-            return {"id": factor_id, "code": e["code"]}
-    raise HTTPException(status_code=404, detail="Factor not found")
-
-
 @app.get("/factors/{factor_id}/chart")
 async def get_factor_chart(factor_id: str):
     """Return OHLCV + buy/sell signal markers for charting."""
