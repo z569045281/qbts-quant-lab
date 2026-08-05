@@ -81,9 +81,7 @@ def _latest_px(sym: str) -> "float | None":
 
 
 # ── Supabase state ───────────────────────────────────────────────────────────
-def _sb():
-    from dashboard.scan_store import _supabase
-    return _supabase()
+from dashboard.db import supabase as _sb   # 全仓共用一个客户端
 
 
 def _load(sb) -> "dict | None":
@@ -106,7 +104,7 @@ def _log(st: dict, line: str) -> None:
 
 def _ntfy(title: str, body: str, **kw) -> None:
     try:
-        from dashboard.intraday_smc import _ntfy as push
+        from dashboard.notify import push
         push(title, body, **kw)
     except Exception as e:
         logger.warning(f"challenge2 ntfy failed: {e}")

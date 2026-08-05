@@ -57,26 +57,9 @@ _HORIZONS = (1, 2, 3, 5)
 # {id, data: <full record dict>}. record()/grade_pending()/load_recent() are
 # unchanged — they operate on the list returned by _load() and persist via _save().
 _TABLE = "decision_journal"
-_SB = None
-_SB_INIT = False
 
 
-def _supabase():
-    """Cached Supabase client, or None to fall back to the local file."""
-    global _SB, _SB_INIT
-    if _SB_INIT:
-        return _SB
-    _SB_INIT = True
-    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-    key = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
-    if url and key:
-        try:
-            from supabase import create_client
-            _SB = create_client(url, key)
-        except Exception as e:
-            logger.warning(f"journal: Supabase init failed, using file — {e}")
-            _SB = None
-    return _SB
+from dashboard.db import supabase as _supabase   # 全仓共用一个客户端
 
 
 def _load() -> list[dict]:

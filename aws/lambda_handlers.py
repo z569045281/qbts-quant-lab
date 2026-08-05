@@ -223,7 +223,7 @@ def quote_handler(event, context):
     # 从 07-29 起因标题编码每分钟静默失败,日志里刷了两天没人看见,07-30 夜盘
     # +10.2% 又漏推一次。日志不是监控:把最后一次成败带进 payload 让前端能报警。
     try:
-        from dashboard.intraday_smc import ntfy_health
+        from dashboard.notify import health as ntfy_health
         payload["ntfy_health"] = ntfy_health()
     except Exception as e:
         print(f"! ntfy_health skipped: {type(e).__name__}: {e}")

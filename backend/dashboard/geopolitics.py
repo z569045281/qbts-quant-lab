@@ -334,7 +334,7 @@ def maybe_geo_refresh(prev: dict | None, now_et: datetime) -> dict | None:
                     lines.append(f"  → {it['note_cn']}")
             if fresh.get("summary_cn"):
                 lines.append(fresh["summary_cn"])
-            from dashboard.intraday_smc import _ntfy
+            from dashboard.notify import push as _ntfy
             pri = "high" if (escalated and cur_level == "alert") else "default"
             if _ntfy("QBTS Geo Radar", "\n".join(lines), tags="globe_with_meridians", priority=pri):
                 alerted += [it["key"] for it in hot]

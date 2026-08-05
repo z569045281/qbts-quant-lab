@@ -108,7 +108,7 @@ def maybe_tiaojiu_push(prev: dict | None, now_et: datetime) -> dict | None:
 
     # 每日必推一条(心跳):无信号=低优先级不响铃;有信号=高优先级。
     # 哪天 22:05(墨尔本冬令时,16:05 ET)后没收到任何推送 = 系统挂了,来找我。
-    from dashboard.intraday_smc import _ntfy
+    from dashboard.notify import push as _ntfy
     # 追赶与特调可能同日触发,别让它被吞掉:同向(抄底)时加一行共振,反向(止盈)时
     # 明说两腿打架,让人自己判断,不替他消歧义。
     if sig["buy_base"]:

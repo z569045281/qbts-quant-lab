@@ -26,26 +26,9 @@ logger = logging.getLogger(__name__)
 
 _TABLE = "retrospective"
 _MODEL = "claude-opus-4-8"      # same brain as the decision; this is a once-a-month review
-_SB = None
-_SB_INIT = False
 
 
-def _supabase():
-    """Cached Supabase client (secret key — write-capable), or None."""
-    global _SB, _SB_INIT
-    if _SB_INIT:
-        return _SB
-    _SB_INIT = True
-    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-    key = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
-    if url and key:
-        try:
-            from supabase import create_client
-            _SB = create_client(url, key)
-        except Exception as e:
-            logger.warning(f"retrospective: Supabase init failed — {e}")
-            _SB = None
-    return _SB
+from dashboard.db import supabase as _supabase   # 全仓共用一个客户端
 
 
 def _gather(df_daily: pd.DataFrame) -> dict:

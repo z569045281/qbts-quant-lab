@@ -23,7 +23,6 @@ from __future__ import annotations
 import json
 import logging
 import math
-import os
 import time
 from collections import defaultdict
 from datetime import datetime
@@ -50,26 +49,9 @@ _SHRINKAGE_K  = 10     # Bayesian prior strength (10 = needs ~10 samples to full
 _PRED_TABLE    = "predictions"
 _WEIGHTS_TABLE = "source_weights"
 _WEIGHTS_ID    = "current"
-_SB = None
-_SB_INIT = False
 
 
-def _supabase():
-    """Cached Supabase client, or None to fall back to the local files."""
-    global _SB, _SB_INIT
-    if _SB_INIT:
-        return _SB
-    _SB_INIT = True
-    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-    key = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
-    if url and key:
-        try:
-            from supabase import create_client
-            _SB = create_client(url, key)
-        except Exception as e:
-            logger.warning(f"calibration: Supabase init failed, using files — {e}")
-            _SB = None
-    return _SB
+from dashboard.db import supabase as _supabase   # 全仓共用一个客户端
 
 
 def log_prediction(price: float, as_of: str, edge: dict) -> None:

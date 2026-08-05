@@ -174,31 +174,7 @@ def build(snapshot: dict, extras: dict | None = None) -> dict:
 
 # ── ntfy 推送(上升沿,纪律⑤)────────────────────────────────────────
 
-def _hdr(s: str) -> str:
-    """HTTP 头是 latin-1;中文标题按 RFC 2047 编码(与 intraday_smc 同一处理)。"""
-    try:
-        s.encode("latin-1")
-        return s
-    except UnicodeEncodeError:
-        import base64
-        return "=?UTF-8?B?" + base64.b64encode(s.encode("utf-8")).decode("ascii") + "?="
-
-
-def _ntfy(title: str, body: str) -> bool:
-    topic = os.getenv("NTFY_TOPIC")
-    if not topic:
-        return False
-    base = os.getenv("NTFY_URL", "https://ntfy.sh").rstrip("/")
-    try:
-        req = urllib.request.Request(
-            f"{base}/{topic}", data=body.encode("utf-8"), method="POST",
-            headers={"Title": _hdr(title), "Tags": "trophy", "Priority": "high",
-                     "Content-Type": "text/plain; charset=utf-8"})
-        urllib.request.urlopen(req, timeout=8)
-        return True
-    except Exception as e:
-        logger.warning("champions ntfy failed: %s: %s", type(e).__name__, e)
-        return False
+from dashboard.notify import push as _ntfy   # 全仓唯一一份推送
 
 
 def _prev_state() -> str | None:
@@ -246,4 +222,5 @@ def maybe_push(card: dict, prev_state: str | None) -> bool:
         mark = "✅" if m["stance"] == "up" else ("❌" if m["stance"] == "down" else "—")
         lines.append(f"{mark} {m['name']}（大波动日 {m['big_hit']}%/n={m['big_n']}）：{m['read'][:48]}")
     lines += ["", card.get("gate", {}).get("note", ""), "", UNPROVEN_NOTE]
-    return _ntfy("QBTS CHAMPIONS", "\n".join(x for x in lines if x is not None))
+    return _ntfy("QBTS CHAMPIONS", "\n".join(x for x in lines if x is not None),
+                 tags="trophy")

@@ -31,7 +31,6 @@ pre/regular/post。查下来这个闸门当时是对的:那段时间**根本没�
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
@@ -39,25 +38,9 @@ logger = logging.getLogger(__name__)
 _TABLE = "overnight_ticks"
 _KEEP_DAYS = 3          # 15m 扳机只回看 ~12 根,留 3 天足够
 _MIN_TICKS_PER_BAR = 5  # 一根 15m 至少要 5 个采样才算数(不足 1/3 覆盖 = 噪音)
-_SB = None
-_SB_INIT = False
 
 
-def _supabase():
-    global _SB, _SB_INIT
-    if _SB_INIT:
-        return _SB
-    _SB_INIT = True
-    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-    key = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
-    if url and key:
-        try:
-            from supabase import create_client
-            _SB = create_client(url, key)
-        except Exception as e:
-            logger.warning("overnight_bars: Supabase init failed — %s", e)
-            _SB = None
-    return _SB
+from dashboard.db import supabase as _supabase   # 全仓共用一个客户端
 
 
 def record_tick(ticker: str, price: float | None,

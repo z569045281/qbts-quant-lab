@@ -192,7 +192,7 @@ def maybe_event_day_push(prev: dict | None, now_et, quotes: dict | None,
              "→ 系统不劝进也不劝退,方向由你判断。\n"
              "→ 做空仍然不做(全部已知路径已判死)。")
     try:
-        from dashboard.intraday_smc import _ntfy
+        from dashboard.notify import push as _ntfy
         if _ntfy("QBTS ⚠️ 事件日", body, tags="rotating_light", priority="high"):
             ev["push_key"] = key
     except Exception as e:

@@ -57,7 +57,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -70,8 +69,6 @@ logger = logging.getLogger(__name__)
 _TICKERS = ["MU"]
 TICKER = _TICKERS[0]
 _TABLE = "second_journal"
-_SB = None
-_SB_INIT = False
 
 # 与 QBTS 表态逐字同义(纪律 4):强制二选一,没有中间选项。
 # ⚠️ 结构化输出的 schema **不支持** number/integer 的 minimum/maximum,也不支持
@@ -103,21 +100,7 @@ _SYSTEM = (
 )
 
 
-def _supabase():
-    global _SB, _SB_INIT
-    if _SB_INIT:
-        return _SB
-    _SB_INIT = True
-    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-    key = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
-    if url and key:
-        try:
-            from supabase import create_client
-            _SB = create_client(url, key)
-        except Exception as e:
-            logger.warning(f"second_ticker: Supabase init failed — {e}")
-            _SB = None
-    return _SB
+from dashboard.db import supabase as _supabase   # 全仓共用一个客户端
 
 
 def _load() -> list[dict]:

@@ -43,13 +43,7 @@ _POC_TOL = 0.05                    # Cond B: 连续两日 POC 重合容差
 _RR_MIN = 2.5                      # Cond C
 
 
-def _sb():
-    from supabase import create_client
-    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-    key = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
-    if not url or not key:
-        return None
-    return create_client(url, key)
+from dashboard.db import supabase as _sb   # 全仓共用一个客户端
 
 
 def _get(sb, sid: str) -> dict | None:
@@ -285,14 +279,4 @@ def _last_price(ticker: str) -> float | None:
         return None
 
 
-def _ntfy(title: str, body: str) -> None:
-    """复用 NTFY_TOPIC;标题保持 ASCII(HTTP header 是 latin-1),中文进 body。"""
-    topic = os.getenv("NTFY_TOPIC")
-    if not topic:
-        return
-    try:
-        import requests
-        requests.post(f"{os.getenv('NTFY_URL', 'https://ntfy.sh')}/{topic}",
-                      data=body.encode(), headers={"Title": title}, timeout=8)
-    except Exception:
-        pass
+from dashboard.notify import push as _ntfy   # 全仓唯一一份推送

@@ -107,7 +107,7 @@ def maybe_btc_weekend(prev: dict | None, now_et: datetime) -> dict | None:
             return None
 
     if not bw.get("pushed"):
-        from dashboard.intraday_smc import _ntfy
+        from dashboard.notify import push as _ntfy
         pct = bw["weekend_ret"] * 100
         if bw["green"]:
             ok = _ntfy(

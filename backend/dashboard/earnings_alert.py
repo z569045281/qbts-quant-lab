@@ -160,7 +160,7 @@ def maybe_earnings_alert(prev: dict | None, now_et, quotes: dict | None,
                  "→ 做空仍然不做(全部已知路径已判死)。")
 
     try:
-        from dashboard.intraday_smc import _ntfy
+        from dashboard.notify import push as _ntfy
         if _ntfy("QBTS 🚨 财报已落地", "\n".join(lines),
                  tags="rotating_light", priority="urgent"):
             st["pushed"] = True

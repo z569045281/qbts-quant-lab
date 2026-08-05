@@ -120,7 +120,7 @@ def maybe_trigger_push(prev: dict | None, now_et, quotes: dict | None) -> dict |
     if not newly:
         return {"date": today, "fired": fired, "close": round(px, 2)}
 
-    from dashboard.intraday_smc import _ntfy
+    from dashboard.notify import push as _ntfy
     for key, lv, act in newly:
         arrow = "站上" if lv["side"] == "above" else "跌破"
         body = (f"QBTS 收盘 ${px:.2f} —— {arrow}决策线 ${float(lv['price']):.2f}\n\n"

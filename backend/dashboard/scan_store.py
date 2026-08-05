@@ -59,25 +59,8 @@ def _stop_pct(vol_annual) -> float:
     daily = vol_annual / (252 ** 0.5)
     return min(max(_STOP_VOL_MULT * daily, _STOP_MIN), _STOP_MAX)
 
-_SB = None
-_SB_INIT = False
 
-
-def _supabase():
-    global _SB, _SB_INIT
-    if _SB_INIT:
-        return _SB
-    _SB_INIT = True
-    url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
-    key = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
-    if url and key:
-        try:
-            from supabase import create_client
-            _SB = create_client(url, key)
-        except Exception as e:
-            logger.warning(f"scan_store: Supabase init failed, using files — {e}")
-            _SB = None
-    return _SB
+from dashboard.db import supabase as _supabase   # 全仓共用一个客户端
 
 
 # ── single-row jsonb helpers ──────────────────────────────────────────────────

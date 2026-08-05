@@ -26,9 +26,7 @@ _ROW_ID = "user_positions"
 _FILE = Path(__file__).parent.parent / "data" / "cache" / "user_positions.json"
 
 
-def _sb():
-    from dashboard.scan_store import _supabase
-    return _supabase()
+from dashboard.db import supabase as _sb   # 全仓共用一个客户端
 
 
 def load_positions() -> list[dict]:
