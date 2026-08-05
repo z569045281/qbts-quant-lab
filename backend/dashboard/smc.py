@@ -53,7 +53,12 @@ _DAILY_SWING_K = 2
 # 口径代际标签(8/15 审判按它分组)。08-04 同时改了两处口径 —— k 8→2(入场区/止损
 # /RR 会变)+ 扳机清单去掉 ⑤VMC(TRIGGER 频率会升),所以必须另分一代,不能和
 # luxport-20260729 的记录混在一个池子里算胜率。
-SMC_EPOCH = "k2-nodot-20260804"
+#
+# 08-05 又分一代:dealing range 的下标坐标系 bug 修掉(见 analyze_smc 里 `_le_range`)。
+# 这不是"改规则",是**之前 7 天的读数本来就是错的** —— 区间位置/均衡线/tp2 全错,
+# 且 pos 被单向抬高制造过 2 次假 ARMED。把坏数据和好数据放同一个池子算胜率没意义,
+# 所以 k2-nodot-20260804 那一代到此为止,08-05 起进新代。
+SMC_EPOCH = "k2-rangefix-20260805"
 
 # LTF(1h/15m)不动:日内本来就该用短摆动,而且它们不驱动方向锁。
 
@@ -571,7 +576,19 @@ def analyze_smc(df: pd.DataFrame, live_price: float | None = None,
 
     # premium / discount within the DEALING RANGE anchored to the swing that
     # printed the last structure label (not the global hi/lo — that inflates 0.5).
-    rng_hi, rng_lo = _dealing_range(d, swing_highs, swing_lows, structure["last_event"], price)
+    #
+    # ⚠️ `last_event["i"]` 是**全量 df 的坐标**(run_lux 在 _full 上跑),而
+    # `_dealing_range` 索引的是 tail(120) 的 d —— 必须和上面 recent_events 一样平移。
+    # 2026-07-29 换 lux 引擎时漏了这一处,坏了 7 天:i=480 拿去索引 120 行,
+    # 两个分支同时走错(上沿取到"最新"摆动高而非破位前那个、下沿 `bi<n` 不成立
+    # 退化成全期最低),于是均衡线 $16.15(应 $20.38)、区间位置 100%(应 67%)、
+    # tp2 被钉死在全期最低 $12.75 整整 30 天。更要命的是 pos 被系统性抬高,而 bear
+    # lock 的 ② 号条件是 `pos >= 0.5` —— 门槛被单向放松,30 天回放出 2 次假 ARMED。
+    # 窗口外的事件(i < _off)传 None,让它退回 `_recent_swing_range()`。
+    _le_range = structure["last_event"]
+    _le_range = ({**_le_range, "i": _le_range["i"] - _off}
+                 if _le_range and _le_range["i"] >= _off else None)
+    rng_hi, rng_lo = _dealing_range(d, swing_highs, swing_lows, _le_range, price)
     pos = (price - rng_lo) / (rng_hi - rng_lo) if rng_hi > rng_lo else 0.5
     pos = max(0.0, min(1.0, pos))
     zone = "discount(折价区)" if pos < 0.4 else ("premium(溢价区)" if pos > 0.6 else "equilibrium(均衡区)")
@@ -736,6 +753,20 @@ if __name__ == "__main__":
     from data.fetcher import load_or_fetch, load_15m
     df_h, df_d = load_or_fetch()
     df_15m = load_15m()
+
+    # ── 回归守卫:dealing range 的坐标系(2026-07-29 串过一次,坏了 7 天)──
+    # 不变量:区间必须真的**框住**破位以来的行情。坐标系一串,下沿会退化成全期
+    # 最低、上沿会取到破位之后的高点,于是区间位置钉在 100%、tp2 钉在全期最低。
+    _s = analyze_smc(df_d, df_h=df_h)
+    _pb, _px = _s["playbook"], float(df_d["close"].iloc[-1])
+    _lo, _hi = _s["range"]["low"], _s["range"]["high"]
+    assert _lo < _hi, f"区间退化 {_lo}/{_hi}"
+    assert _lo >= float(df_d["low"].tail(120).min()), \
+        f"下沿 ${_lo} 跌到全期最低 —— 坐标系又串了(应是破位后的低点)"
+    assert _hi >= _px or _pb["range_position"] < 1.0, \
+        f"上沿 ${_hi} < 现价 ${_px} 却报 100% —— 区间没框住行情"
+    print(f"✅ dealing range 守卫通过:${_lo}–${_hi} 位置 {_pb['range_position']*100:.0f}%")
+
     import json
     print(json.dumps(analyze_smc(df_d, df_h=df_h, df_15m=df_15m),
                      ensure_ascii=False, indent=2, default=str))
