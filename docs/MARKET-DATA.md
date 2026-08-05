@@ -59,3 +59,44 @@ QBTX/QBTZ 盘中显示**隐含公允价 + 折溢价**(quote_pusher),决策的失
 
 出口:`snapshot['data_health'] = {ok, issues}` → 决策页黄条。**坏数据被拦下这件事本身
 必须可见**,否则页面照常正常,没人知道少了一天。
+
+---
+
+## 🌙 夜盘 15m bar(2026-08-05,用户点单"我不是有夜盘的数据嘛,也接入进去啊")
+
+**先记死路,别再试第二遍**——20:00–04:00 ET 这段**不存在任何可回溯的 bar 源**:
+
+| 源 | 结果 |
+|---|---|
+| yfinance 15m | 最后一根停在 **15:45 ET** |
+| Alpaca `feed=iex` 15Min bars | 同样停在 15:45 ET |
+| Alpaca `feed=sip` | `403 subscription does not permit querying recent SIP data`;且 SIP 本来也不覆盖 Blue Ocean 夜盘场 |
+| Alpaca `/bars?feed=overnight` | `400 invalid feed: overnight` |
+| Alpaca `/trades?feed=overnight`(历史) | `400 invalid feed: overnight` |
+
+`feed=overnight` **只对 `/quotes/latest` 和 `/trades/latest` 有效** —— 只能拿"当前这一笔",
+拿不到历史。这正是 `quote_pusher.fetch_overnight` 在用的东西。
+
+**所以唯一可行的做法**:QuoteFunction 每分钟本来就在拉夜盘 NBBO 中间价,
+把它**存下来自己聚合**成 15m。→ `sql/overnight_ticks_migration.sql` +
+`backend/dashboard/overnight_bars.py`。
+
+### ⚠️ 它是采样合成 bar,不是真 bar
+
+- **每分钟 1 个采样** → 分钟内的高低点丢失,**影线被削平**。基于影线的判据
+  (扫流动性 / 长下影)在夜盘不可信。
+- **NBBO 中间价**,不是成交价。夜盘价差实测 ~0.5%(QBTS bid 22.00 / ask 22.11),
+  中间价是最诚实的"当前标价",但不等于能成交的价。
+- **无成交量**(报价不带 size)。只有纯 OHLC 的模块能吃它;成交量画像 / 日内画像
+  必须继续用日盘数据。
+- 覆盖不足的 bar 直接丢弃(`_MIN_TICKS_PER_BAR = 5`,即一根 15m 至少 5 个采样)。
+
+读数里带 `synthetic_15m > 0` 标记。**合成 bar 上的 TRIGGER 默认不推 ntfy** ——
+15m CHoCH 现在是唯一扳机(⑤VMC 已删),在质量未知的 bar 上开枪等于半夜乱叫。
+先记账,够样本再决定放不放开(`intraday_smc.maybe_notify_trigger` 里删三行即可)。
+
+### 依赖建表
+
+表没建时全链路**静默降级**(record 返回 False / build 返回 None / attach 原样返回),
+不会炸,只是夜盘照旧不重算。要生效必须在 Supabase SQL Editor 跑一次
+`sql/overnight_ticks_migration.sql`。

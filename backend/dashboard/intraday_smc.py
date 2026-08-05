@@ -15,10 +15,13 @@ slowly intraday); only the 15m trigger TF is force-refreshed.
 
 from __future__ import annotations
 
+import logging
 import os
 import urllib.request
 from datetime import datetime, timezone
 from email.header import Header      # RFC 2047:非 ASCII 标题装进 HTTP 头(见 _hdr)
+
+logger = logging.getLogger(__name__)
 
 
 def compute_smc(live_price: float | None = None) -> dict | None:
@@ -33,10 +36,21 @@ def compute_smc(live_price: float | None = None) -> dict | None:
     from dashboard.smc import analyze_smc
     df_h, df_d = load_or_fetch()              # cached: lock/zones change slowly
     df_15m = load_15m(force_refresh=True)     # fresh: the trigger timeframe
+    # 🌙 夜盘(2026-08-05):yfinance / Alpaca iex 的 15m 都停在 15:45 ET,而用户
+    # 有券商夜盘权限。把 QuoteFunction 每分钟采的 NBBO 中间价聚合成的合成 15m bar
+    # 接到日盘序列后面 —— 只追加、绝不覆盖真 bar。**它是采样合成的**(分钟内高低点
+    # 丢失、无成交量),所以打 `synthetic` 标记一路带出去,推送层据此不开枪。
+    n_syn = 0
+    try:
+        from dashboard.overnight_bars import attach_overnight
+        df_15m, n_syn = attach_overnight(df_15m, "QBTS")
+    except Exception as e:
+        logger.warning("overnight bars skipped: %s", e)
     smc = analyze_smc(df_d, live_price, df_h, df_15m)
     if not smc.get("playbook"):
         return None
     smc["asof"] = datetime.now(timezone.utc).isoformat()
+    smc["synthetic_15m"] = n_syn            # >0 = 15m 扳机吃的是夜盘合成 bar
     return smc
 
 
@@ -105,6 +119,15 @@ def maybe_notify_trigger(prev_state: str | None, smc_payload: dict) -> bool:
     pb = (smc_payload or {}).get("playbook") or {}
     state = pb.get("state")
     if state != "TRIGGER" or prev_state == "TRIGGER":
+        return False
+
+    # 🌙 合成 bar 不开枪(2026-08-05 建夜盘 15m 时同步立的规矩)。夜盘那几根 bar 是
+    # 每分钟 1 个中间价采样聚合出来的:影线被削平、无成交量、价差 ~0.5%。在这种
+    # bar 上认出来的 15m CHoCH 质量未知,而它现在是**唯一**的扳机(⑤VMC 已删)。
+    # 按仓库一贯纪律:先记账、够样本再给开枪权 —— 卡片照常显示 TRIGGER 并标注
+    # 「夜盘合成 bar」,只是不半夜把人叫醒。要放开就删这三行。
+    if (smc_payload or {}).get("synthetic_15m"):
+        print(f"! 夜盘合成 bar 上的 TRIGGER 不推送(synthetic_15m={smc_payload['synthetic_15m']})")
         return False
 
     # ⛔ 空头腿不响铃(2026-07-29)。铁律:判死的策略不复活 —— 做空 QBTS 的**全部

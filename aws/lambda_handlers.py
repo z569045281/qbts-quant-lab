@@ -181,7 +181,24 @@ def quote_handler(event, context):
             print(f"guerrilla exits: {ger}")
     except Exception as e:
         print(f"! guerrilla skipped: {type(e).__name__}: {e}")
-    recompute = payload.get("session") in ("pre", "regular", "post") and now_et.minute % 5 == 0
+    # 🌙 夜盘采样(2026-08-05):20:00–04:00 ET 没有任何 15m bar 源(yfinance /
+    # Alpaca iex 都停在 15:45;Alpaca 的 overnight feed 只有 latest,没有历史)——
+    # 所以把我们每分钟本来就在拉的 NBBO 中间价存下来,自己聚合成 15m。
+    # 只在夜盘存:日盘有带成交量的真 bar,合成 bar 不配跟它抢。
+    if payload.get("session") == "overnight":
+        try:
+            from dashboard.overnight_bars import record_tick, prune
+            q = (payload.get("quotes") or {}).get("qbts") or {}
+            record_tick("QBTS", q.get("price"), q.get("ov_bid"), q.get("ov_ask"))
+            if now_et.hour == 3 and now_et.minute == 7:      # 每晚清一次,错开忙碌分钟
+                prune()
+        except Exception as e:
+            print(f"! overnight tick skipped: {type(e).__name__}: {e}")
+
+    # 夜盘也重算 SMC —— 有了合成 bar 之后,15m 扳机在夜盘不再是死的。
+    # (读数会带 synthetic_15m>0,推送层据此不开枪,见 intraday_smc。)
+    recompute = (payload.get("session") in ("pre", "regular", "post", "overnight")
+                 and now_et.minute % 5 == 0)
     if recompute:
         try:
             from dashboard.intraday_smc import compute_smc, maybe_notify_trigger
