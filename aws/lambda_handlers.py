@@ -271,6 +271,16 @@ def _publish_decision_only() -> dict:
         except Exception as e:               # decision is important but not fatal
             print(f"! decision skipped: {e}")
 
+
+        # 🏆 策略冠军推送(2026-08-05):上升沿才响,状态从上一份 dashboard_state 读回。
+        # 放在 snapshot 之后、写库之前 —— 此时"最后一行"还是上一次,正好当去重基准。
+        try:
+            from dashboard.champions import push_if_new
+            if push_if_new(snap.get("champions") or {}):
+                print("  ✓ champions ntfy pushed")
+        except Exception as e:
+            print(f"! champions push skipped: {e}")
+
         # refresh_decision() recorded today's call AFTER dashboard_snapshot
         # captured the journal — re-read so today's decision shows immediately.
         try:

@@ -133,6 +133,16 @@ def main() -> None:
             print(f"  ! calibration skipped: {e}")
             cal = None
 
+
+        # 🏆 策略冠军推送(2026-08-05):上升沿才响,状态从上一份 dashboard_state 读回。
+        # 放在 snapshot 之后、写库之前 —— 此时"最后一行"还是上一次,正好当去重基准。
+        try:
+            from dashboard.champions import push_if_new
+            if push_if_new(snap.get("champions") or {}):
+                print("  ✓ 策略冠军 ntfy 已推送")
+        except Exception as e:
+            print(f"  ! champions push skipped: {e}")
+
         # 4. Write the dashboard_state row -----------------------------------
         print("→ writing dashboard_state…")
         ins = sb.table("dashboard_state").insert(

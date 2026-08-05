@@ -1137,6 +1137,20 @@ async def dashboard_snapshot(force_refresh: bool = False):
         logger.warning(f"waiting_for failed: {e}")
         payload["waiting_for"] = None
 
+    # 🏆 策略冠军(2026-08-05 用户点单):08-05 全板块审计排出的大波动日前三名
+    # + 大盘闸门。**必须排在 volume_profile / intrabar_profile / geopolitics /
+    # market_light 之后** —— 它只从这些已算好的字段读回表态(走 readings.collect
+    # 的预注册规则),不自己重算,免得同一个数在两张卡上显示成两个值。
+    # 零决策权;实测这两个月 TRIGGER 0 次,原因写在 champions.py 文件头。
+    try:
+        from dashboard.champions import build as build_champions
+        # 冠军三名全部读 snapshot 顶层字段(volume_profile/intrabar_profile/
+        # geopolitics),不需要 extras —— 这里没有 extras 作用域,传 {} 是对的。
+        payload["champions"] = build_champions(payload, {})
+    except Exception as e:
+        logger.warning(f"champions failed: {e}")
+        payload["champions"] = None
+
     # 🌡️ 超买/超卖状态板(2026-07-30 用户点单)。**必须排在 nw_envelope / smc /
     # champs 之后** —— 它从这些已算好的字段读回读数,不自己重算,免得同一个数在两
     # 张卡上显示成两个值。零决策权,不进 edge/打分/推送。
@@ -1459,21 +1473,32 @@ async def refresh_decision():
         extras["calibration"] = await asyncio.to_thread(grade_predictions, df_d)
         # Grade past decisions FIRST so today's prompt includes fresh lessons
         await asyncio.to_thread(grade_pending, df_d)
-        # 🔬 第二考场(MU 表态测量轨,2026-07-30):独立一张表、零决策权于 QBTS ——
-        # **刻意放在 extras["journal"] 之前但不写进 extras**:两个考场互相看答案就
-        # 不独立了(second_ticker.py 纪律 3)。失败只记日志,不影响 QBTS 决策。
-        try:
-            from dashboard.second_ticker import run_daily as _second_daily
-            logger.info("second_ticker: %s", await asyncio.to_thread(_second_daily))
-        except Exception as e:
-            logger.warning(f"second_ticker failed: {e}")
         # 多视界字段(2026-07-30):grade_pending 只给**新评判**的记录写 horizons,而
         # pending 记录的 2/3 日视界今天就该有答案(5 日评分闸门不该压住短视界 ——
         # 用户实际持有期只有 2-3 天)。每次发布补一遍,幂等,不改任何已有值。
         await asyncio.to_thread(backfill_horizons, df_d)
         extras["journal"] = await asyncio.to_thread(journal_recent, 10)
-    except Exception:
-        pass
+    except Exception as e:
+        # 2026-08-05:这里原本是 `except Exception: pass` —— 一个**完全静默**的吞。
+        # 后果实测到了:第二考场 `/mu` 的日更本来挂在这个块里(排在 load_or_fetch /
+        # grade_predictions / grade_pending 三个重活之后),只要前面任一个抛错就被
+        # 整段跳过,而且**日志一个字都不留** → `second_journal` 空表 40 天,页面
+        # 一直"没动静",没有任何线索可查。同一条教训在 fetcher.py 写过:
+        # 「剔除本身是对的,但不能静默」。
+        logger.warning("refresh_decision: 校准/台账块失败(已跳过) — %s", e)
+
+    # 🔬 第二考场(MU 表态测量轨,2026-07-30):独立一张表、零决策权于 QBTS。
+    # **必须独立于上面那个块** —— 它是测量轨,不该被 QBTS 的校准/台账连坐;
+    # 而且它自己会取 MU 的行情,不依赖上面的 df_d(第一版把它塞在块里就是这么
+    # 一次都没跑成的)。失败只记日志,绝不影响 QBTS 决策(second_ticker.py 纪律 3)。
+    # ⚠️ 成功路径故意用 warning 级:Lambda 的日志只捕获 WARNING 以上,`logger.info`
+    # 在 CloudWatch 里根本不存在 —— 查这个 bug 时"日志里搜不到 second_ticker"
+    # 曾经既可能是成功也可能是没执行,无法区分。留个能看见的脚印。
+    try:
+        from dashboard.second_ticker import run_daily as _second_daily
+        logger.warning("second_ticker: %s", await asyncio.to_thread(_second_daily))
+    except Exception as e:
+        logger.warning("second_ticker failed: %s", e)
 
     decision, gen_at, fresh = await asyncio.to_thread(
         get_or_generate_decision, snap, True, extras

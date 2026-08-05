@@ -186,6 +186,7 @@ export interface Snapshot {
   } | null;
   journal?: DecisionJournal | null;
   waiting_for?: WaitingFor | null;   // 「今天在等什么」六扳机卡
+  champions?: Champions | null;      // 🏆 策略冠军(记分卡前三名 + 大盘闸门)
   oscillators?: Oscillators | null;  // 🌡️ 超买/超卖状态板(零决策权)
   second_ticker?: SecondTickerBoards | null;  // 🔬 第二考场(MU 表态测量轨)
 }
@@ -622,6 +623,40 @@ export interface WaitingFor {
   triggers: WaitingTrigger[];
   n_fired: number;
   summary: string;
+}
+
+/** 🏆 策略冠军(2026-08-05):08-05 全板块审计排出的大波动日前三名 + 大盘闸门。
+ *  零决策权 —— 它只是把 volume_profile / intrabar_profile / geopolitics 已有的
+ *  表态按记分卡排序显示。成绩字段是**历史读数快照**,不是实时算的。 */
+export interface ChampionMember {
+  key:        string;
+  name:       string;
+  stance:     "up" | "down" | "neutral" | null;
+  stance_cn:  string;
+  read:       string;
+  big_n:      number;    // 大波动日(|单日|>5%)的表态次数
+  big_hit:    number;    // 大波动日命中率 %
+  all_n:      number;
+  all_hit:    number;
+}
+export interface Champions {
+  state:      "TRIGGER" | "GATED" | "SHORT_MUTED" | "IDLE";
+  state_cn:   string;
+  action:     "long" | "watch" | "wait";
+  direction:  "up" | "down" | null;
+  n_voice:    number;
+  n_up:       number;
+  n_down:     number;
+  consensus:  string;
+  members:    ChampionMember[];
+  gate: {
+    light: "green" | "red" | "unknown";
+    cn: string; pass_long: boolean; note: string;
+    qqq_vs_50dma?: number | null; vix?: number | null; regime?: string | null;
+  };
+  unproven_note: string;
+  baseline_big:  number;
+  price:      number | null;
 }
 
 export interface MacroEvent {

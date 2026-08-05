@@ -335,6 +335,55 @@ export default function Dashboard() {
           ═════════════════════════════════════════════════════════════════════ */}
 
       <section className="space-y-2.5">
+      {/* ── 🏆 策略冠军(2026-08-05 用户点单,置顶)──────────────────────
+          08-05 全板块审计在 36 个交易日 / 16 个大波动日上给 15 个板块排了序,
+          这里只放前三名 + 大盘闸门。**它是排序显示卡,不是已验证信号**:
+          前两名 n 只有 7/8、Wilson 下界 ≈47%,打不过「无脑喊跌」的 56.2% 基线,
+          所以卡上常驻 UNPROVEN 提示,别让排名看起来像背书。
+          实测这两个月 TRIGGER 0 次(偏多表态 4 天、大盘绿灯 10 天,不重叠)——
+          原因写在 backend/dashboard/champions.py 文件头。 */}
+      {(() => {
+        const ch = snap.champions;
+        if (!ch) return null;
+        const tone =
+          ch.state === "TRIGGER" ? "border-emerald-400 bg-emerald-50"
+          : ch.state === "GATED" ? "border-amber-300 bg-amber-50"
+          : ch.state === "SHORT_MUTED" ? "border-red-200 bg-red-50/60"
+          : "border-[#EDEDF0] bg-[#FAFAFB]";
+        return (
+          <div className={`rounded-2xl border-2 ${tone} px-4 py-3`}>
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              <span className="text-[13px] font-bold text-[#1A1A1E]">🏆 策略冠军</span>
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/70 font-mono text-[#525461]">
+                共识 {ch.consensus}
+              </span>
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/70 font-medium">
+                {ch.gate.cn}
+              </span>
+              <span className="ml-auto text-[12px] font-semibold text-[#1A1A1E]">{ch.state_cn}</span>
+            </div>
+            <div className="space-y-1">
+              {ch.members.map((m) => (
+                <div key={m.key} className="flex items-start gap-2 text-[12px] leading-snug">
+                  <span className={
+                    m.stance === "up" ? "text-emerald-600 font-bold"
+                    : m.stance === "down" ? "text-red-600 font-bold" : "text-gray-300"}>
+                    {m.stance === "up" ? "▲" : m.stance === "down" ? "▼" : "○"}
+                  </span>
+                  <span className="font-medium text-[#1A1A1E] shrink-0">{m.name}</span>
+                  <span className="text-[10px] font-mono text-gray-400 shrink-0">
+                    大波动日 {m.big_hit}%·n={m.big_n}
+                  </span>
+                  <span className="text-gray-500 ml-auto text-right truncate">{m.read}</span>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2 text-[11px] text-[#525461] leading-snug">{ch.gate.note}</p>
+            <p className="mt-1 text-[11px] text-amber-700 leading-snug">{ch.unproven_note}</p>
+          </div>
+        );
+      })()}
+
       {/* ── 警报槽:平时一个像素都不占,出事才插队 ─────────────────────── */}
       {planBreached && d && (
         <div className="rounded-xl bg-red-600 text-white px-4 py-2.5 text-[13px] leading-snug flex items-start gap-2 shadow-md">

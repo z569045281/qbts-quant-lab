@@ -98,7 +98,10 @@ Resources:
       ImageConfig:
         Command: ["lambda_handlers.publish_handler"]
       MemorySize: 2048      # vectorbt/pandas + Opus call need headroom
-      Timeout: 300          # full pipeline + Opus 4.8 ~60–120s
+      # 2026-08-05 由 300 提到 600:实测最近 7 次调用 224/229/233/263/265/270/284 秒,
+      # 全部贴着 300 的天花板,而 08-04 11:39 那次直接 `Status: timeout`(300000ms)。
+      # 第二考场(MU)要拉自己那两年小时线 + 一次 LLM,再挤 300 秒必然被砍。
+      Timeout: 600          # full pipeline + Opus 4.8 + 第二考场
       FunctionUrlConfig:
         AuthType: NONE       # public URL; see README "Securing the button"
         Cors:
