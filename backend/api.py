@@ -6,6 +6,7 @@ import sys
 import asyncio
 import hashlib
 import json
+import logging
 import os
 import math
 import random
@@ -61,6 +62,15 @@ from execution.trader import (
     get_account, get_position, get_recent_orders,
     compute_latest_signal, execute_signal as _execute_signal,
 )
+
+# ⚠️ 这一行 2026-08-06 才补上,而 `logger.` 在本文件里已经用了 22 次。
+# 之前没炸,是因为那 21 处**全在 `except` 块里** —— 平时不执行,真出错时 NameError
+# 又被更外层的 except 吞掉。08-05 那次 /mu 修复把 `logger.warning` 挪到了
+# `refresh_decision` 的**成功路径**(second_ticker 那段,故意留 warning 级脚印),
+# 于是每跑必炸;而它的 except 里**也**是 logger.warning,兜底跟着炸 → 异常冲出
+# refresh_decision → `snap["decision"]` 从没被赋值 → 决策卡连续 5 次全空。
+# 教训:缺失的模块级 logger 只在 happy path 上才暴露,except-only 用法会一直掩盖它。
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="QBTS Factor Miner API")
 

@@ -21,3 +21,7 @@ supabase
 python-dotenv
 fastapi
 xlrd==2.0.2
+# yfinance 的 .calendar / .get_earnings_dates() 走 pd.read_html → 需要 lxml。
+# 本地是靠别的包传递装上的,镜像里没有 → earnings.py 从 08-05 上线起每跑必报
+# "`Import lxml` failed",一致预期和历史财报振幅一直是空的(赶上 08-06 QBTS 财报日)。
+lxml

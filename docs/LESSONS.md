@@ -431,3 +431,46 @@ ARMED 是 TRIGGER 的前置,也就是说这个 bug 让系统更容易走向开�
 3. **同屏字段互相矛盾是最强的 bug 信号**(记忆 `review-cross-source-consistency` 第二次
    复发)。逐字段查 null/格式查不出这类问题;把一起渲染的数放在一起读才查得出。
    用户这次就是这么发现的 —— 他没读代码,只是觉得那几个数摆在一起说不通。
+
+---
+
+## 只在 `except` 里用的 logger,是一颗定时炸弹(2026-08-06,决策卡连空 5 次)
+
+用户截图:「还没有 AI 决策 — 本地跑 `python publish.py`」。CloudWatch 里只有一行:
+
+```
+! decision skipped: name 'logger' is not defined
+```
+
+`backend/api.py` **从头到尾没有定义过 `logger`,却用了 22 次**。它能活到今天,是因为
+那 21 处**全在 `except` 块里** —— 平时不执行;真出错时抛的 `NameError` 又被更外层的
+`except` 吞掉,于是永远没人发现这个文件缺一行 `logger = logging.getLogger(__name__)`。
+
+08-05 修 `/mu` 那次,把 `logger.warning` 挪到了 `refresh_decision` 的**成功路径**
+(second_ticker 那段,故意留 warning 级脚印,因为 Lambda 只捕获 WARNING+):
+
+```python
+logger.warning("second_ticker: %s", await asyncio.to_thread(_second_daily))  # 每跑必炸
+except Exception as e:
+    logger.warning("second_ticker failed: %s", e)                            # 兜底跟着炸
+```
+
+两层同时用同一个不存在的名字 → 异常冲出 `refresh_decision` → `snap["decision"]`
+从没被赋值 → **决策卡连续 5 次全空**,而快照其它 43 个字段都好好的。
+
+教训:
+
+1. **`except`-only 的用法验证不了任何东西。** 一个名字只在错误路径上出现,就等于从没
+   被执行过。把它挪到 happy path 的那一刻才是第一次真正运行 —— 而那通常发生在生产。
+2. **兜底代码里不能用可能不存在的东西。** except 块的唯一职责是让程序活下去;它自己
+   抛异常,就把"局部失败"升级成了"整条链路失败"。
+3. **"某个字段是空的"要按事故查,不是按显示查。** 43 个字段里少了 1 个,页面只写
+   "还没有 AI 决策",看起来像没跑;实际是跑了、炸了、被吞了。查法是**先定位空值出现
+   的时间分界**(08-04 13:02 还有 → 08-05 03:59 起空),再拿那个时刻去比对部署记录 ——
+   这次正是靠这条把「是不是我 06:01 那次部署搞的」两小时之差撇清的。
+
+同一批日志里还捞到第二个哑了一整天的模块:`earnings.py` 每跑必报
+``Import lxml` failed`` —— yfinance 的 `.calendar` / `.get_earnings_dates()` 走
+`pd.read_html`,需要 lxml,而 Lambda 镜像没装。**本地有(靠别的包传递装上),所以本地
+永远测不出来。** 凡是"本地好好的、云端哑了"的模块,先查镜像的 requirements 是不是
+少了个传递依赖,别急着怀疑逻辑。
