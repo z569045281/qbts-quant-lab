@@ -230,7 +230,7 @@ def _fmt_brief(b: dict) -> str:
         le = smc.get("last_event") or {}
         rp = smc.get("range_position")
         L.append(f"\n## SMC 结构")
-        L.append(f"  日线趋势【{smc.get('trend', '?')}】 / 大背景 swing【{smc.get('swing_trend', '?')}】")
+        L.append(f"  日线趋势【{smc.get('trend', '?')}】")
         if le:
             L.append(f"  最近结构事件 {le.get('kind', '—')} @ ${le.get('level', '—')}"
                      f"({le.get('date', '—')})")

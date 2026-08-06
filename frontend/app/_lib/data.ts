@@ -313,46 +313,6 @@ export interface SecondTickerBoards {
   boards:  Record<string, SecondBoard>;
 }
 
-/* ── LuxAlgo 原版面板 ──────────────────────────────────────────────────────
- * `SMC.docx`(LuxAlgo「Smart Money Concepts」Pine v5)的忠实移植输出，**零决策权**。
- * 存在的理由：用户对着 TradingView 上的 LuxAlgo 看盘，仪表盘得说同一套读数。
- * 注意它和上面 SmcAnalysis 的 range / 区域**定义不同**，数值本来就不一样。 */
-export interface LuxStructureSide {
-  trend: "bullish" | "bearish" | "neutral";
-  last_event: { date: string; kind: "BOS" | "CHoCH"; dir: "bullish" | "bearish"; level: number } | null;
-  pivot_high: number | null;
-  pivot_low:  number | null;
-}
-export interface LuxZone { type: string; low: number; high: number; date: string; break_date?: string }
-export interface LuxPanel {
-  source: string;
-  internal: LuxStructureSide;
-  swing:    LuxStructureSide;
-  candle_bias: "bullish" | "bearish" | "neutral";
-  trailing: {
-    top: number | null; bottom: number | null;
-    top_date: string | null; bottom_date: string | null;
-    top_label: string; bottom_label: string;
-  };
-  zones: { premium: [number, number]; equilibrium: [number, number];
-           discount: [number, number]; position: number } | null;
-  zone_cn: string | null;
-  internal_ob: LuxZone[];
-  swing_ob:    LuxZone[];
-  fvg:         LuxZone[];
-  fvg_total:   number;
-  equal_hl: { kind: "EQH" | "EQL"; level: number; prev_level: number;
-              from_date: string | null; date: string }[];
-  swing_points: { tag: "HH" | "HL" | "LH" | "LL"; price: number; date: string }[];
-  mtf: Record<string, number | string>;
-  alerts: string[];
-  atr200: number | null;
-  defaults_on:  string[];
-  defaults_off: string[];
-  fvg_note:   string;
-  range_note: string;
-}
-
 export interface SmcAnalysis {
   /** 这份 SMC 读数**自己**是什么时候算出来的(`intraday_smc.compute_smc` 打的戳)。
    *  ⚠️ 必须用它判「盘中实时」,不能用 live_quote 整行的 asof_epoch:夜盘/休市
@@ -362,15 +322,9 @@ export interface SmcAnalysis {
   asof?:  string;
   signal: -1 | 0 | 1;
   label:  "BUY" | "SELL" | "HOLD";
-  /** LuxAlgo internal(5) —— 方向锁用它 */
+  /** 方向锁。2026-08-06 起结构引擎是灵敏版 analyze_structure：破掉任一未被破的
+   *  历史摆动高点即翻多（早期信号，误报率换灵敏度），且翻多快、翻回空慢。 */
   trend:  "bullish" | "bearish" | "neutral";
-  /** LuxAlgo swing(50) —— 大级别背景。图上「Strong/Weak Low」标签由它决定；
-   *  与 trend 背离是常态，以前只暴露一个才让人误以为是 bug（2026-07-29）。 */
-  swing_trend?: "bullish" | "bearish" | "neutral";
-  trend_divergence?: boolean;
-  strong_low_label?: string;
-  swing_pivot?:    { high: number | null; low: number | null };
-  internal_pivot?: { high: number | null; low: number | null };
   epoch?: string;
   last_event: { date: string; kind: "BOS" | "CHoCH"; dir: "bullish" | "bearish"; level: number } | null;
   zone:   string;
@@ -384,8 +338,6 @@ export interface SmcAnalysis {
   ltf?: { trend: "bullish" | "bearish" | "neutral"; last_event: SmcAnalysis["last_event"] } | null;
   confluence?: "aligned" | "conflict" | "neutral";
   playbook?: SmcPlaybook | null;
-  /** LuxAlgo 原版面板（只读复刻，不参与打分） */
-  lux?: LuxPanel | null;
 }
 
 /* ── volume profile / POC ────────────────────────────────────────────────── */

@@ -515,17 +515,12 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                  f"（高周期定方向，低周期定入场时机）") if ltf else ""
         parts.append(
             f"## SMC 聪明钱结构（订单块/FVG/流动性）\n"
-            f"  结构趋势: {smc['trend']}（LuxAlgo internal/5，方向锁用它）  {le_s}\n"
-            # 两级结构常年背离,而且以前只暴露一个 —— 用户 2026-07-29 就是因此以为
-            # 「多头锁定」是 bug。现在两级都摊开,并明说哪个说了算。
-            + (f"  大级别背景: swing/50 = {smc['swing_trend']}"
-               f"（当前未破 pivot 高 ${(smc.get('swing_pivot') or {}).get('high','?')} / "
-               f"低 ${(smc.get('swing_pivot') or {}).get('low','?')}）"
-               + ("  ⚠️ 与方向锁**背离** —— 小级别的反转尚未得到大级别确认，"
-                  "写计划时把它当「逆大势的战术单」对待，仓位与持有期都要更保守。\n"
-                  if smc.get("trend_divergence") else "\n")
-               if smc.get("swing_trend") else "")
-            +
+            f"  结构趋势: {smc['trend']}（方向锁用它）  {le_s}\n"
+            # 2026-08-06 用户点单撤回 LuxAlgo,回到灵敏版结构引擎。它**翻多早、翻空
+            # 慢**(翻空需收盘跌破未破的摆动低点,而反弹会抬高近期低点),所以
+            # `trend=bullish` 更多是「小级别可能已转多」的早期提示,不是「大势已多」。
+            "  ⚠️ 结构引擎口径: 破掉任一未被破的历史摆动高点即翻多 —— 早期信号,"
+            "灵敏度换的是误报率;且它翻多快、翻回空慢，别拿 bearish 消失当转空凭据。\n"
             f"  价格位置: {smc.get('zone','?')}（区间 ${smc.get('range',{}).get('low','?')}–"
             f"${smc.get('range',{}).get('high','?')} 的 {smc.get('range_position',0)*100:.0f}%）\n"
             + ("  关键区域:\n" + "\n".join(zone_lines) + "\n" if zone_lines else "")

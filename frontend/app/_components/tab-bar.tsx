@@ -17,7 +17,7 @@ export type TabKey = "today" | "structure" | "events" | "record" | "system";
 
 export const TABS: { key: TabKey; label: string; hint: string }[] = [
   { key: "today",     label: "今日决策", hint: "持仓 · 关键驱动 · 在等什么 · 要闻" },
-  { key: "structure", label: "结构",     hint: "SMC · LuxAlgo 原版面板 · 成交量画像" },
+  { key: "structure", label: "结构",     hint: "SMC · 成交量画像 · 日内画像" },
   { key: "events",    label: "事件",     hint: "宏观日历 · 地缘雷达 · 公司催化剂" },
   { key: "record",    label: "战绩",     hint: "决策台账 · 策略陪跑 · 深坑报警器" },
   { key: "system",    label: "系统",     hint: "AI 自检 · 全站体检 · 控制台" },
