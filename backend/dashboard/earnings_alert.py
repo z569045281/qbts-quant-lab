@@ -40,18 +40,27 @@ _KEYWORDS = ("earnings", "quarterly results", "q1 ", "q2 ", "q3 ", "q4 ",
              "reports third quarter", "reports fourth quarter", "财报", "业绩")
 
 
-def _earnings_today(now_et) -> bool:
-    """今天是不是财报日。一天只查一次(结果缓存在 carry 状态里)。"""
+def _earnings_today(now_et) -> bool | None:
+    """今天是不是财报日。**True/False = 问到了;None = 没问到,调用方该重试。**
+
+    ⚠️ 这三态是有代价换来的(2026-08-06):原来失败也返回 False,而调用方按
+    `if "is_er_day" not in st` 缓存 —— **一次失败就把"今天不是财报日"钉死一整天,
+    再也不重试**。而这个调用走 `yf.Ticker().calendar`,正是 08-05~08-06 因镜像缺
+    lxml 而每跑必挂的那一个:真到了财报日,推送会安静地一声不响。
+    "查不到" ≠ "不是",别把它们编码成同一个值(同 event_day 那次的教训)。
+    """
     try:
         import yfinance as yf
         cal = yf.Ticker(_TICKER).calendar or {}
-        ed = cal.get("Earnings Date")
-        if isinstance(ed, (list, tuple)):
-            ed = ed[0] if ed else None
-        return bool(ed) and str(ed)[:10] == now_et.date().isoformat()
     except Exception as e:
-        logger.warning("earnings_alert: 财报日期查询失败: %s", e)
-        return False
+        logger.warning("earnings_alert: 财报日期查询失败(将重试): %s", e)
+        return None
+    ed = cal.get("Earnings Date")
+    if isinstance(ed, (list, tuple)):
+        ed = ed[0] if ed else None
+    if not ed:
+        return None                       # 空日历也算没问到,不是"确定不是财报日"
+    return str(ed)[:10] == now_et.date().isoformat()
 
 
 def _find_8k(now_et) -> dict | None:
@@ -109,8 +118,9 @@ def maybe_earnings_alert(prev: dict | None, now_et, quotes: dict | None,
     if st.get("pushed"):
         return st                        # 今天已经响过
 
-    # 是不是财报日 —— 一天只问一次 yfinance,答案缓存在状态里
-    if "is_er_day" not in st:
+    # 是不是财报日 —— 问到答案(True/False)就缓存一整天;**没问到(None)下一跳重试**。
+    # `st.get(...) is None` 同时覆盖"还没查过"和"查了但失败",两种都该再问一次。
+    if st.get("is_er_day") is None:
         st["is_er_day"] = _earnings_today(now_et)
     if not st["is_er_day"]:
         return st
@@ -169,3 +179,53 @@ def maybe_earnings_alert(prev: dict | None, now_et, quotes: dict | None,
     except Exception as e:
         logger.warning("earnings_alert ntfy failed: %s", e)
     return st
+
+
+if __name__ == "__main__":
+    # 自检:锁住 2026-08-06 那个失效模式 —— 查询失败必须**重试**,不能被当成
+    # "今天不是财报日"钉死一整天(镜像缺 lxml 时 calendar 每跑必挂,真到财报日会哑火)。
+    import sys
+    from datetime import datetime
+    from pathlib import Path
+    from zoneinfo import ZoneInfo
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+
+    now = datetime(2026, 8, 6, 8, 1, tzinfo=ZoneInfo("America/New_York"))  # 财报日窗口内
+    calls = []
+
+    def _fake(result):
+        def f(_now):
+            calls.append(result)
+            return result
+        return f
+
+    _real = _earnings_today
+    try:
+        # ① 查询失败(None)→ 状态不该钉死,下一跳必须再问一次
+        globals()["_earnings_today"] = _fake(None)
+        st = maybe_earnings_alert(None, now, {"qbts": {"price": 22.0}}, None)
+        assert st.get("is_er_day") is None, f"失败被缓存成 {st.get('is_er_day')} —— 会哑一整天"
+        st = maybe_earnings_alert(st, now, {"qbts": {"price": 22.0}}, None)
+        assert len(calls) == 2, f"失败后没有重试(只问了 {len(calls)} 次)"
+
+        # ② 确定不是财报日(False)→ 必须缓存,不该每分钟骚扰 yfinance
+        calls.clear()
+        globals()["_earnings_today"] = _fake(False)
+        st = maybe_earnings_alert(None, now, {"qbts": {"price": 22.0}}, None)
+        st = maybe_earnings_alert(st, now, {"qbts": {"price": 22.0}}, None)
+        assert len(calls) == 1, f"确定的 False 该缓存,却问了 {len(calls)} 次"
+
+        # ③ 已推过 → 保住 pushed 标记,且**不再问 yfinance、不二次响铃**
+        calls.clear()
+        globals()["_earnings_today"] = _fake(True)
+        done = {"date": now.date().isoformat(), "is_er_day": True, "pushed": True}
+        got = maybe_earnings_alert(done, now, {"qbts": {"price": 22.0}}, None)
+        assert got.get("pushed") is True, "已推标记丢了 —— 会重复响铃"
+        assert not calls, "已推过还去问 yfinance,说明没有短路"
+
+        # ④ 窗口外 → 原样 carry-forward prev,不许把已推记录冲掉
+        out = datetime(2026, 8, 6, 3, 0, tzinfo=ZoneInfo("America/New_York"))
+        assert maybe_earnings_alert(done, out, {"qbts": {"price": 22.0}}, None) is done
+    finally:
+        globals()["_earnings_today"] = _real
+    print("earnings_alert self-check OK")
