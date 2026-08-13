@@ -47,10 +47,38 @@ def _hdr(s: str) -> str:
         return Header(s, "utf-8").encode()
 
 
+_LOG_TABLE = "ntfy_log"
+
+
+def _log(title: str, body: str, tags: str, priority: str, sent: bool) -> None:
+    """把每一条推送存进 `ntfy_log`(2026-08-13 用户点单:「以后每一个都存下来」)。
+
+    为什么值得存:ntfy.sh 免费版**只保留最近十几条**(查刷屏那次拉 `since=all`
+    也只回来 5 条),历史一过就没了。而推送是这套系统唯一的对外输出 —— 想回答
+    「哪条提醒真的带来了机会」「噪音占几成」,必须有自己的账本。
+
+    ⚠️ 台账**绝不能反过来影响推送**:写库整段包在 try 里,失败只打印。
+    表没建时静默降级(与 overnight_ticks 同一约定)。
+    """
+    try:
+        from dashboard.db import supabase
+        sb = supabase()
+        if sb is None:
+            return
+        sb.table(_LOG_TABLE).insert({
+            "ts": _now_iso(), "title": title, "body": body[:4000],
+            "tags": tags, "priority": priority, "sent": sent,
+        }).execute()
+    except Exception as e:
+        print(f"! ntfy_log skipped: {type(e).__name__}: {e}")
+
+
 def push(title: str, body: str, tags: str = "rotating_light",
          priority: str = "high") -> bool:
     """POST to ntfy.sh (no auth needed). 中文/emoji 标题会自动按 RFC 2047 编码
-    (见 `_hdr`);正文一律 UTF-8。没配 NTFY_TOPIC 就 no-op 返回 False。"""
+    (见 `_hdr`);正文一律 UTF-8。没配 NTFY_TOPIC 就 no-op 返回 False。
+
+    每条推送(**含失败的**)都记进 `ntfy_log`;台账失败不影响推送本身。"""
     topic = os.getenv("NTFY_TOPIC")
     if not topic:
         return False
@@ -62,12 +90,14 @@ def push(title: str, body: str, tags: str = "rotating_light",
                      "Content-Type": "text/plain; charset=utf-8"})
         urllib.request.urlopen(req, timeout=8)
         _LAST_PUSH.update(ok_at=_now_iso(), err_at=None, err=None, title=title)
+        _log(title, body, tags, priority, True)
         return True
     except Exception as e:
         # ⚠️ Request(...) 的构造本身就可能抛(头编码)——所以它也在 try 里面。
         print(f"! ntfy push failed: {type(e).__name__}: {e}")
         _LAST_PUSH.update(err_at=_now_iso(), err=f"{type(e).__name__}: {e}"[:160],
                           title=title)
+        _log(title, body, tags, priority, False)   # 失败的也记 —— 查哑火要靠它
         return False
 
 

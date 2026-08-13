@@ -80,6 +80,20 @@ _UNKNOWN_CN    = "⚪️ 分级不可用"
 _PUSH_COOLDOWN_SAME = 3 * 3600   # 同级别的持续报道:距上次推送 ≥3h 才再推
 _PUSH_COOLDOWN_DOWN = 1 * 3600   # 降级(缓和):≥1h,防 alert↔watch 横跳刷屏
 
+# 🆕 2026-08-13 用户点单「治本」:**同一条线(track)的冷却**。
+#
+# 起因:08-13 十一小时里推了 4 条,全是「🟡 观察」,全是美伊谈判/霍尔木兹海峡
+# 这同一件事 —— 03:08 / 07:08 / 10:38 / 14:08。查下来**去重和频控都在按设计工作**:
+# 每条都是不同的 RSS 条目(`alerted` 认的是单条 key),间隔也都超过 3h 冷却。
+# 病根是**去重粒度错了**:它认「这条新闻推没推过」,不认「这件事讲没讲过」。
+# 一个主题一天有四篇不同报道,对系统就是四条新消息,对人就是同一件事讲四遍。
+#
+# 治本 = 把粒度从「单条新闻」提到「track」。同一条线在冷却期内只响一次,
+# 后续同 track 的条目静默登记进 alerted,卡片照常更新。
+# ⚠️ **升级(escalated)不受此限** —— 局势真从观察变升温时必须立刻响,
+# 否则这个补丁会把最该收到的那一条也吃掉。
+_PUSH_COOLDOWN_TRACK = 12 * 3600
+
 
 def _item_key(title: str) -> str:
     return hashlib.md5(title.lower().strip()[:80].encode("utf-8")).hexdigest()[:10]
@@ -155,8 +169,8 @@ _ANALYSIS_PROMPT = """你是给 QBTS(D-Wave Quantum,高贝塔量子股)做地缘
 
 只输出 JSON(无 markdown 围栏):
 {"risk_level": "...", "headline_cn": "...", "summary_cn": "...",
- "items": [{"relevance": "...", "stance": "...", "note_cn": "..."}, ...]}
-items 数组与输入同序同长。"""
+ "items": [{"i": 1, "relevance": "...", "stance": "...", "note_cn": "..."}, ...]}
+**每条必须带 `i` = 输入里那条的编号**(从 1 开始),一条都不能漏、不能改序。"""
 
 
 def _analyze(items: list[dict]) -> dict:
@@ -216,12 +230,22 @@ def get_geo_snapshot(force_refresh: bool = False) -> dict | None:
     try:
         ai = _analyze(items)
         ratings = ai.get("items") or []
-        for it, r in zip(items, ratings):
+        # ⚠️ 按**回显的编号 i** 对齐,不按位置(2026-08-13)。原来是
+        # `zip(items, ratings)` 纯按位置配对,而「同序同长」只写在 prompt 里、
+        # 代码零校验 —— Haiku 少返一条/并一条/换个序,后面全部错位一格而无人知晓。
+        # 08-13 那条推送实测错位 3 格:第 11 条的标题配上了第 14 条的解读,
+        # 而 `relevance` 跟着错位 → **推送选中的条目本身就是错的**。
+        by_i = {}
+        for r in ratings:
+            try:
+                by_i[int(r["i"]) - 1] = r
+            except (KeyError, TypeError, ValueError):
+                continue
+        for idx, it in enumerate(items):
+            r = by_i.get(idx) or {}          # 没回显到的一律降级,不猜
             it["relevance"] = r.get("relevance", "low")
             it["stance"]    = r.get("stance", "neutral")
             it["note_cn"]   = str(r.get("note_cn", ""))[:60]
-        for it in items[len(ratings):]:
-            it.update({"relevance": "low", "stance": "neutral", "note_cn": ""})
         level = ai.get("risk_level") if ai.get("risk_level") in _RISK_CN else "watch"
         payload = {
             "as_of":       datetime.now(timezone.utc).isoformat(),
@@ -299,11 +323,15 @@ def maybe_geo_refresh(prev: dict | None, now_et: datetime) -> dict | None:
         # flip(否则 unknown→alert 会被算成「升级」,凭空推一条)。
         fresh["alerted"]        = list((prev or {}).get("alerted") or [])
         fresh["last_push_ts"]   = float((prev or {}).get("last_push_ts") or 0)
+        # ⚠️ 主题冷却也必须原样带走。live_quote 是整块覆写的,这里漏一个键
+        # 就等于把冷却清零 → 下一跳同一条线立刻重响(2026-07-31 事件日同一个坑)。
+        fresh["pushed_tracks"]  = dict((prev or {}).get("pushed_tracks") or {})
         fresh["last_good_level"] = _last_good(prev)
         return fresh
 
     alerted = list((prev or {}).get("alerted") or [])
     last_push = float((prev or {}).get("last_push_ts") or 0)
+    pushed_tracks = dict((prev or {}).get("pushed_tracks") or {})
     now_ts = time.time()
     hot = [it for it in fresh.get("items", [])
            if it.get("relevance") == "high" and it["key"] not in alerted]
@@ -312,6 +340,14 @@ def maybe_geo_refresh(prev: dict | None, now_et: datetime) -> dict | None:
     level_flip = bool(prev) and prev_level and prev_level != cur_level
     escalated = level_flip and \
         _LEVEL_RANK.get(cur_level, 0) > _LEVEL_RANK.get(prev_level, 0)
+
+    # 主题级去重(见 _PUSH_COOLDOWN_TRACK)。升级时不过滤 —— 那一条必须响。
+    if not escalated:
+        muted = [it for it in hot
+                 if now_ts - float(pushed_tracks.get(it.get("track"), 0)) < _PUSH_COOLDOWN_TRACK]
+        if muted:
+            alerted += [it["key"] for it in muted]   # 静默登记,卡片照常显示
+            hot = [it for it in hot if it not in muted]
 
     if prev is None:
         # 首次运行不推(避免部署即轰炸),只登记现有高影响条目
@@ -339,10 +375,13 @@ def maybe_geo_refresh(prev: dict | None, now_et: datetime) -> dict | None:
             if _ntfy("QBTS Geo Radar", "\n".join(lines), tags="globe_with_meridians", priority=pri):
                 alerted += [it["key"] for it in hot]
                 last_push = now_ts
+                for it in hot:                       # 记下这条线刚响过
+                    pushed_tracks[it.get("track") or "?"] = now_ts
 
     # 只保留仍在雷达上的 key + 最近 100 个,防无限增长
     fresh["alerted"] = alerted[-100:]
     fresh["last_push_ts"] = last_push
+    fresh["pushed_tracks"] = pushed_tracks
     fresh["last_good_level"] = cur_level
     return fresh
 
@@ -359,3 +398,39 @@ if __name__ == "__main__":
             print(f"  [{it['track_cn']}/{it['relevance']}/{it['stance']}] {it['title'][:70]}")
             if it.get("note_cn"):
                 print(f"    → {it['note_cn']}")
+
+
+if __name__ == "__main__":
+    # 自检:锁住 2026-08-13 那两个失效模式(用户 11 小时收到 4 条同主题推送)。
+    import time as _t
+
+    # ① 主题冷却:同一 track 在冷却期内不该再进 hot,但必须静默登记进 alerted
+    now = _t.time()
+    prev = {"alerted": [], "pushed_tracks": {"iran": now - 3600},   # 伊朗 1 小时前刚推过
+            "last_push_ts": now - 4 * 3600, "risk_level": "watch",
+            "last_good_level": "watch"}
+    hot = [{"key": "k1", "track": "iran"}, {"key": "k2", "track": "quantum"}]
+    pushed = dict(prev["pushed_tracks"])
+    muted = [it for it in hot
+             if now - float(pushed.get(it["track"], 0)) < _PUSH_COOLDOWN_TRACK]
+    kept = [it for it in hot if it not in muted]
+    assert [it["key"] for it in muted] == ["k1"], f"伊朗该被静音,实际 {muted}"
+    assert [it["key"] for it in kept] == ["k2"], f"量子该留下,实际 {kept}"
+
+    # ② 按 i 对齐:LLM 漏返一条时,缺的那条降级为 low,**其余不许错位**
+    items = [{"title": f"t{n}"} for n in range(4)]
+    ratings = [{"i": 1, "relevance": "high", "note_cn": "第一条"},
+               {"i": 4, "relevance": "high", "note_cn": "第四条"}]   # 2、3 缺失
+    by_i = {}
+    for r in ratings:
+        try:
+            by_i[int(r["i"]) - 1] = r
+        except (KeyError, TypeError, ValueError):
+            continue
+    got = [(by_i.get(i) or {}).get("note_cn", "") for i in range(4)]
+    assert got == ["第一条", "", "", "第四条"], f"错位了: {got}"
+    # 同样的输入用旧的 zip 逻辑会把「第四条」贴到第 2 条上 —— 正是 08-13 那个 bug
+    old = [r.get("note_cn") for _, r in zip(items, ratings)] + ["", ""]
+    assert old[1] == "第四条", "旧逻辑的错位没复现,断言写错了"
+
+    print("geopolitics self-check OK(主题冷却 + 按 i 对齐,均已锁住)")

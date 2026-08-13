@@ -255,8 +255,8 @@ _ANALYSIS_PROMPT = """你是给 QBTS(D-Wave Quantum,高贝塔量子股,通过 2�
 
 只输出 JSON(无 markdown 围栏):
 {"impact_level": "...", "headline_cn": "...", "summary_cn": "...",
- "items": [{"impact": "...", "direction": "...", "note_cn": "..."}, ...]}
-items 数组与输入同序同长。"""
+ "items": [{"i": 1, "impact": "...", "direction": "...", "note_cn": "..."}, ...]}
+**每条必须带 `i` = 输入里那条的编号**(从 1 开始),一条都不能漏、不能改序。"""
 
 
 def _analyze(items: list[dict]) -> dict:
@@ -313,12 +313,20 @@ def get_catalyst_snapshot(force_refresh: bool = False) -> dict | None:
     try:
         ai = _analyze(items)
         ratings = ai.get("items") or []
-        for it, r in zip(items, ratings):
+        # ⚠️ 按**回显的编号 i** 对齐,不按位置(2026-08-13)。与 geopolitics 同一个
+        # bug、同一个修法:按位置 zip 时 Haiku 少返/并条/换序就整体错位一格,
+        # 而 `impact` 错位会直接决定推送选中哪条新闻 —— 错的不只是显示。
+        by_i = {}
+        for r in ratings:
+            try:
+                by_i[int(r["i"]) - 1] = r
+            except (KeyError, TypeError, ValueError):
+                continue
+        for idx, it in enumerate(items):
+            r = by_i.get(idx) or {}          # 没回显到的一律降级,不猜
             it["impact"]    = r.get("impact", "low")
             it["direction"] = r.get("direction", "neutral")
             it["note_cn"]   = str(r.get("note_cn", ""))[:60]
-        for it in items[len(ratings):]:
-            it.update({"impact": "low", "direction": "neutral", "note_cn": ""})
         level = ai.get("impact_level") if ai.get("impact_level") in _IMPACT_CN else "watch"
         payload = {
             "as_of":        datetime.now(timezone.utc).isoformat(),
