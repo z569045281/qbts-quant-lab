@@ -28,6 +28,29 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
+def _stamp() -> str:
+    """推送落款:美东 + 墨尔本双时区(2026-08-18 用户点单「带个时间」)。
+
+    为什么两个时区都要:事件按**美东**发生(盘前/盘中/收盘都是 ET 口径),
+    而用户在**墨尔本**看手机。只给一个,他每次都得在脑子里换算一次;
+    换算错了就会把昨天的消息当成刚发生的。
+
+    还有个更实际的理由:推送**堆在通知栏里是没有时间的**(手机只显示"送达
+    时间",而 Lambda 重试/延迟会让两者差好几分钟)。落款是唯一能回答
+    「这条消息说的是几点的事」的东西 —— 尤其在同一件事反复出现的时候。
+
+    zoneinfo 缺 tzdata 时(精简容器)退回 UTC,绝不让落款把整条推送炸掉。
+    """
+    try:
+        from zoneinfo import ZoneInfo
+        now = datetime.now(timezone.utc)
+        et = now.astimezone(ZoneInfo("America/New_York"))
+        mel = now.astimezone(ZoneInfo("Australia/Melbourne"))
+        return (f"🕒 {et:%m-%d %H:%M} ET / {mel:%m-%d %H:%M} 墨尔本")
+    except Exception:
+        return f"🕒 {datetime.now(timezone.utc):%m-%d %H:%M} UTC"
+
+
 def _hdr(s: str) -> str:
     """把标题编成 HTTP 头能装的形式。
 
@@ -74,14 +97,17 @@ def _log(title: str, body: str, tags: str, priority: str, sent: bool) -> None:
 
 
 def push(title: str, body: str, tags: str = "rotating_light",
-         priority: str = "high") -> bool:
+         priority: str = "high", stamp: bool = True) -> bool:
     """POST to ntfy.sh (no auth needed). 中文/emoji 标题会自动按 RFC 2047 编码
     (见 `_hdr`);正文一律 UTF-8。没配 NTFY_TOPIC 就 no-op 返回 False。
 
+    `stamp=True`(默认)在正文末尾加一行 ET/墨尔本双时区落款(见 `_stamp`)。
     每条推送(**含失败的**)都记进 `ntfy_log`;台账失败不影响推送本身。"""
     topic = os.getenv("NTFY_TOPIC")
     if not topic:
         return False
+    if stamp:
+        body = f"{body}\n\n{_stamp()}"
     base = os.getenv("NTFY_URL", "https://ntfy.sh").rstrip("/")
     try:
         req = urllib.request.Request(
@@ -114,4 +140,9 @@ if __name__ == "__main__":
     os.environ.pop("NTFY_TOPIC", None)
     assert push("t", "b") is False, "没配 topic 必须 no-op,不许抛"
     assert health()["ok_at"] is None and health()["err_at"] is None, "no-op 不该记账"
-    print("notify.py self-check OK")
+
+    # 落款:必须两个时区都在、且绝不抛(容器缺 tzdata 时退回 UTC)
+    st = _stamp()
+    assert st.startswith("🕒"), st
+    assert ("ET" in st and "墨尔本" in st) or "UTC" in st, st
+    print("notify.py self-check OK —— 落款示例:", st)

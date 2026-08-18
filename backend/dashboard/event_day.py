@@ -25,8 +25,87 @@
 from __future__ import annotations
 
 import logging
+import re
+import time
 
 logger = logging.getLogger(__name__)
+
+# ── 故事级去重(2026-08-18,用户报「同一个犯罪检测事件推了好几次」)──────────
+# 病理:去重键是 `{today}#{原因条数}` —— **只带日期,不带「是哪件事」**,过了
+# 午夜 ET 就重置。而催化剂雷达会在好几天里反复把同一条新闻判成 breaking
+# (不同媒体改写标题),于是同一件事一天推一次。实测这条 Verafin 新闻推了三次:
+#   07-31 「D-Wave与纳斯达克Verafin达成量子计算应用开发协议,用于金融犯罪检测」
+#   08-04 「D-Wave与纳斯达克Verafin达成合作,量子技术应用于金融犯罪检测」
+#   08-18 「D-Wave获Nasdaq Verafin选用量子技术检测金融犯罪」
+# 三次措辞全不同 → **按标题字符串去重也拦不住**,必须按"是哪件事"去重。
+# 与 2026-08-13 geopolitics 的 track 冷却是同一个病、同一种修法(当时只修了
+# 地缘,event_day 漏了)。
+#
+# 判同一件事的两条腿(命中任一即算同一件事):
+#   ① **专名锚点** —— 标题里的稀有拉丁词(verafin / skywater …),剔掉每条
+#      QBTS 新闻都有的通用词。专名是改写中最稳定的部分,实测三条 Verafin
+#      全靠它锚住,而财报/川普/AT&T/IonQ 四条互不误伤。
+#   ② 中文 3-gram Jaccard ≥ 0.35 —— 没有专名的标题(纯中文)才用得上;
+#      阈值取高,宁可漏拦也不误杀真新闻。
+_STORY_STOP = {
+    "dwave", "wave", "qbts", "ionq", "rgti", "qubt", "nasdaq", "quantum",
+    "inc", "corp", "ltd", "the", "and", "for", "with", "from", "that", "this",
+    "computing", "systems", "technologies", "announces", "announced",
+}
+_STORY_COOLDOWN = 30 * 86400   # 同一件事 30 天内不再响铃
+_STORY_KEEP = 24               # 最多记住 24 个故事(约一季度的 breaking 量)
+_JACCARD_SAME = 0.35
+
+
+def _story_entities(head: str) -> set[str]:
+    """标题里的专名候选(≥4 位拉丁词,剔通用词)。"""
+    return {w for w in re.findall(r"[a-z][a-z0-9]{3,}", (head or "").lower())
+            if w not in _STORY_STOP}
+
+
+def _story_grams(head: str) -> set[str]:
+    """中文 3-gram + 长拉丁词,给没有专名的标题兜底。"""
+    s = re.sub(r"[^0-9a-z一-鿿]+", " ", (head or "").lower())
+    out: set[str] = set()
+    for w in s.split():
+        if re.fullmatch(r"[0-9a-z]+", w):
+            if len(w) >= 4:
+                out.add(w)
+        else:
+            out.update(w[i:i + 3] for i in range(max(0, len(w) - 2)))
+    return out
+
+
+def _same_story(a: str, b: str) -> bool:
+    """两条标题讲的是不是同一件事。"""
+    if not a or not b:
+        return False
+    if _story_entities(a) & _story_entities(b):
+        return True
+    ga, gb = _story_grams(a), _story_grams(b)
+    if not (ga and gb):
+        return False
+    return len(ga & gb) / len(ga | gb) >= _JACCARD_SAME
+
+
+def _story_muted(head: str, pushed: list, now_ts: float) -> str | None:
+    """这条标题在冷却期内讲过没有 → 返回讲过的那条标题(用于日志),否则 None。"""
+    for rec in pushed or []:
+        try:
+            if (now_ts - float(rec.get("ts", 0)) < _STORY_COOLDOWN
+                    and _same_story(head, rec.get("head", ""))):
+                return rec.get("head", "")
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _story_remember(head: str, pushed: list, now_ts: float) -> list:
+    """记下"这件事已经响过铃",并按时间裁剪。"""
+    out = [r for r in (pushed or [])
+           if now_ts - float(r.get("ts", 0) or 0) < _STORY_COOLDOWN]
+    out.append({"ts": now_ts, "head": (head or "")[:120]})
+    return out[-_STORY_KEEP:]
 
 # 技术面失效阈值。上行档由 n=37 实测(t=+0.36,p=0.72);下行档 n=10 只做过描述性
 # 观察(p=0.38),证据弱得多 —— 对称套用是保守选择:熔断只会让系统少说话,不会让
@@ -148,6 +227,10 @@ def maybe_event_day_push(prev: dict | None, now_et, quotes: dict | None,
     """
     today = now_et.date().isoformat()
     prev_key = str((prev or {}).get("push_key") or "")
+    # 故事台账**必须跨日活着** —— 它记的是"这件事讲过没有",跟今天是哪天无关。
+    # (原先整个 state 在午夜被丢掉,正是同一条新闻能天天重推的原因之一。)
+    pushed_stories = list((prev or {}).get("pushed_stories") or [])
+    now_ts = time.time()
 
     ev = from_quote(quotes, catalyst)
     if not ev:
@@ -164,7 +247,11 @@ def maybe_event_day_push(prev: dict | None, now_et, quotes: dict | None,
         # 就老实说 False,不冒充在熔断(与第三十轮「分级挂了就说不知道」同一条纪律)。
         if prev_key.startswith(today):
             return {"push_key": prev_key, "is_event_day": False,
+                    "pushed_stories": pushed_stories,
                     "carry_note": "本分钟判不出事件日(上游读数缺失);今日已推过,不重复响铃"}
+        # 今天还没推过,但故事台账要带走(它是跨日的)
+        if pushed_stories:
+            return {"is_event_day": False, "pushed_stories": pushed_stories}
         return None
     key = f"{today}#{len(ev['reasons'])}"
     # 原因**变多**才值得再响一次(比如跳空之外又来了 breaking 新闻);原因变少
@@ -176,9 +263,24 @@ def maybe_event_day_push(prev: dict | None, now_et, quotes: dict | None,
             prev_n = int(prev_key.rsplit("#", 1)[1])
         except ValueError:
             prev_n = 0
+    ev["pushed_stories"] = pushed_stories
     if prev_n >= len(ev["reasons"]):
         ev["push_key"] = prev_key      # 保留最高档,别被降档冲掉
         return ev                      # 已推过,只做 carry-forward
+
+    # ── 故事级冷却(2026-08-18)——「同一件事讲过了」就不再响铃 ────────────
+    # ⚠️ **跳空 ≥8% 不受此限**:价格真的在动是当天的新事实,哪怕消息是旧的
+    #    (与 geopolitics 的"升级立推"同一条纪律 —— 补丁不许吃掉最该收到的那条)。
+    head_now = ev.get("catalyst_headline") or ""
+    gap_reason = any("极端档" in r for r in ev["reasons"])
+    if not gap_reason and head_now:
+        dup = _story_muted(head_now, pushed_stories, now_ts)
+        if dup is not None:
+            logger.info("event_day: 同一件事已响过铃,静默 — 现「%s」/ 曾「%s」",
+                        head_now[:40], dup[:40])
+            ev["push_key"] = f"{today}#{len(ev['reasons'])}"   # 占住今天,别再判
+            ev["muted_reason"] = f"同一件事 {_STORY_COOLDOWN // 86400} 天内已推过"
+            return ev
 
     px = ev.get("price")
     head = ev.get("catalyst_headline")
@@ -195,6 +297,9 @@ def maybe_event_day_push(prev: dict | None, now_et, quotes: dict | None,
         from dashboard.notify import push as _ntfy
         if _ntfy("QBTS ⚠️ 事件日", body, tags="rotating_light", priority="high"):
             ev["push_key"] = key
+            if head_now:
+                ev["pushed_stories"] = _story_remember(head_now, pushed_stories,
+                                                       now_ts)
     except Exception as e:
         logger.warning(f"event_day ntfy failed: {e}")
     return ev
@@ -221,3 +326,44 @@ def prompt_block(ev: dict | None) -> str:
         "④ **不得**因为「涨太多了」或「跳空太大了」建议做空 —— 做空 QBTS 的全部已知\n"
         "   路径均已判死,本轮复盘又新判死两条(暴涨次日日内空 / 暴涨日收盘买次日卖)。\n"
     )
+
+
+if __name__ == "__main__":
+    # ── 自检:故事级去重是这次唯一有分支的新逻辑,拿**真实事故数据**验 ──────
+    # 三条都是 catalyst_radar 实际判成 breaking 并各推过一次的标题(07-31/08-04/08-18)
+    A = ["D-Wave与纳斯达克Verafin达成量子计算应用开发协议,用于金融犯罪检测",
+         "D-Wave与纳斯达克Verafin达成合作,量子技术应用于金融犯罪检测",
+         "D-Wave获Nasdaq Verafin选用量子技术检测金融犯罪"]
+    OTHER = ["D-Wave Q2财报:预订额暴增1120%,营收利润双降,股价应声下跌。",
+             "特朗普政府投入20亿美元量子计划,QBTS等5股受益,换取股权",
+             "IonQ完成18亿收购SkyWater芯片代工厂",
+             "D-Wave与AT&T签署240倍量子算力扩容协议"]
+    for i in range(len(A)):
+        for j in range(i + 1, len(A)):
+            assert _same_story(A[i], A[j]), f"三条 Verafin 必须判为同一件事: {i},{j}"
+    for a in A:
+        for b in OTHER:
+            assert not _same_story(a, b), f"误伤:{a[:20]} vs {b[:20]}"
+    for i in range(len(OTHER)):
+        for j in range(i + 1, len(OTHER)):
+            assert not _same_story(OTHER[i], OTHER[j]), f"误伤 OTHER {i},{j}"
+    assert not _same_story("", "x") and not _same_story("x", "")
+
+    # 冷却台账:讲过的静默,没讲过的放行,过了 30 天重新放行
+    now = time.time()
+    led = _story_remember(A[0], [], now)
+    assert _story_muted(A[2], led, now) is not None, "同一件事必须被静默"
+    assert _story_muted(OTHER[0], led, now) is None, "别的事必须放行"
+    old = _story_remember(A[0], [], now - _STORY_COOLDOWN - 1)
+    assert _story_muted(A[2], old, now) is None, "过了冷却必须重新放行"
+    # 裁剪:不能无限长
+    big = []
+    for k in range(_STORY_KEEP + 10):
+        big = _story_remember(f"story{k}xyz", big, now)
+    assert len(big) == _STORY_KEEP, len(big)
+
+    # 跳空 ≥8% 绝不能被故事冷却吃掉(纪律:补丁不许吃掉最该收到的那条)
+    ev = from_quote({"qbts": {"change_pct": 0.12, "prev_close_trusted": True}},
+                    {"impact_level": "breaking", "headline_cn": A[0]})
+    assert ev and any("极端档" in r for r in ev["reasons"]), ev
+    print("event_day.py self-check OK(故事去重 + 跳空豁免)")
