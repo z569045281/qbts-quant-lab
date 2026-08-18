@@ -358,6 +358,53 @@ def _horizon_grades(r: dict, p0: float, closes, after) -> tuple[dict, dict]:
     return fwd_h, bold_by_h
 
 
+def backfill_fwd5(df_daily) -> int:
+    """给**已判过分但缺 `result.fwd5_ret`** 的老记录补上这个字段(2026-08-18)。
+
+    为什么需要:`grade_pending` 只处理 `status == "pending"` 的记录。2026-06-16→
+    07-05 那批是在 `fwd5_ret` 进 result schema **之前**判的分,判完就锁成
+    `graded` —— 于是 16 条记录**永远补不回来**,`_p_up_diagnostic` 的池子被
+    死死钉在 n=29(45 已判 − 16 缺 = 29),差 1 条永远够不着 n≥30 的判决门槛。
+    "只处理 pending" 是个隐式假设,schema 一变它就变成静默的数据黑洞。
+
+    ⚠️ 纪律:**只补 `fwd5_ret` 这一个缺失字段,绝不重算/覆盖任何已有值**,
+    `status` / `correct` / `outcome` / `ret_pct` 一律不碰 —— 那些是判决依据,
+    回填工具没有改判权。幂等:已有值直接跳过。
+
+    ⚠️ 口径披露:本函数 2026-08-18(8/15 审判日)才写,而 `_p_up_diagnostic`
+    的判决线是 2026-07-30 预注册的,**线在前、数据在后**,补数据不算改标准。
+    """
+    closes = df_daily["close"]
+    dates = pd.DatetimeIndex(df_daily.index).normalize()
+    records = _load()
+    touched = 0
+    for r in records:
+        res = r.get("result")
+        if not isinstance(res, dict) or res.get("fwd5_ret") is not None:
+            continue
+        try:
+            d0 = pd.Timestamp(r["date"]).normalize()
+            p0 = float(r["price"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        after = dates[dates > d0]
+        if len(after) < _GRADE_AFTER_BARS or not p0:
+            continue
+        res["fwd5_ret"] = round(
+            (float(closes.loc[after[_GRADE_AFTER_BARS - 1]]) - p0) / p0, 4)
+        # 表态的 5 日对错同步补(同一份 fwd5,不新造口径)
+        for fld, out in (("bold_call_5d", "bold_correct"),
+                         ("ds_bold_call", "ds_correct"),
+                         ("v1inv_bold_call", "v1inv_correct")):
+            c = r.get(fld)
+            if c in ("up", "down") and res.get(out) is None:
+                res[out] = (c == "up") == (res["fwd5_ret"] > 0)
+        touched += 1
+    if touched:
+        _save(records)
+    return touched
+
+
 def backfill_horizons(df_daily) -> int:
     """维护每条记录顶层的 `horizons`(2026-07-30 新增),**pending / graded 一视同仁**。
 

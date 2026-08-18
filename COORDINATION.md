@@ -263,3 +263,5 @@ Format (newest at top):
 [done] 2026-08-05 [opus] 财报预期基准(决策 AI 自检提的缺口 + 用户点单): 新 earnings.py(一致预期+历史当日振幅+surprise 记录) · decision.py 换段 · api.py extras · files: backend/dashboard/earnings.py, backend/dashboard/decision.py, backend/api.py
 [done] 2026-08-05 [opus] 财报落地即时推送(用户点单): 新 earnings_alert.py(EDGAR 8-K 2.02 / 盘前跳≥5% / 新闻关键词 三探针) + lambda 接线 · files: backend/dashboard/earnings_alert.py, aws/lambda_handlers.py, docs/DECISION.md
 [done] 2026-08-05 [opus] 第三十七轮:板块宽度(breadth)是否比在册「QTUM昨日绿」多给信息(用户点单「板块方向很重要,能不能回测」) · 只读回测 + 可能追加 mining.md · files: mining.md
+[done] 2026-08-18 15:45 [opus] 8/15 审判日执行(用户点单「8/15号了,你懂的」): 跑 audit.py 出判决 + 独立段落检验(30条表态=6段独立立场) · 只读,零代码改动 · 判决=0转正0剔除,edge.py 权重一行不动 · files: (无写入,报告在 backend/data/cache/audit_report.json)
+[done] 2026-08-18 16:05 [opus] 8/15 审判日三连补(用户「全做」): ①audit.py 判决线加条件④独立段n_seg(Wilson假设独立试验,bold_call 高度自相关:30条=6段立场) ②净值纸面马判决线首次落地(此前只是占位串"净值陪跑·8/15判决"):日超额t检验+在场率产品闸25% ③journal.backfill_fwd5 修数据黑洞(16条graded记录永远补不上fwd5→p_up池钉死n=29,现45) · 顺带 audit.py 补 logger 定义(与 api.py 同款事故预防) · files: backend/dashboard/audit.py, backend/dashboard/journal.py, docs/AUDIT-AND-EDGE.md

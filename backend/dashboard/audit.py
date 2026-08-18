@@ -67,6 +67,7 @@ journal.py 的 `_lean` 当时已按 action 分流修好,audit.py 这份读者被
 from __future__ import annotations
 
 import json
+import logging
 import math
 from datetime import datetime, timezone
 from pathlib import Path
@@ -78,6 +79,8 @@ from dotenv import load_dotenv
 # 审判就成了审假账。必须在导入它们之前把环境变量备好。
 load_dotenv()
 
+logger = logging.getLogger(__name__)   # 2026-08-18:本模块此前一个 logger 都没定义,
+                                       # 与 api.py「22 次调用 0 次定义」同款事故预防。
 _OUT = Path(__file__).parent.parent / "data" / "cache" / "audit_report.json"
 
 _N_MIN = 30           # 判决门槛(预注册)
@@ -91,9 +94,28 @@ _Z = 1.96             # Wilson 95%
 #   ② Wilson95% 下界 > 该视界的**同期基线命中率**(= 常喊多数边的命中率),不是 > 0.5
 #   ③ 该视界的技巧值(命中 − 基线)在**四个视界里为正**且不是唯一为正的孤例
 #      —— 单视界孤高 = 多重比较产物(4 个视界任选其一,n=30 下假阳性不低)
+#   ④ **独立段 n_seg ≥ _N_MIN**(2026-08-18 补,见下)
 # 判死:Wilson95% 上界 < 基线 → 该视界表态无信息,报告明示。
 # 视界间只做**展示排序**,不自动改任何权重/prompt;换 prompt 视界需用户单独拍板。
-_HORIZON_RULE = ("判活须三条全过:n≥30 · Wilson下界>同期基线(非0.5) · "
+#
+# ── 条件④ 独立段(2026-08-18 8/15 审判日补,理由=统计机器被误用,非结果不满意)──
+# Wilson 二项区间假设 n 次**独立**伯努利试验。而 `bold_call` 是**高度自相关**的:
+# 首次审判实测 30 条表态的序列是 `down×5 up×1 down×9 up×4 down×3 up×8` ——
+# **只有 6 段独立立场,平均一段扛 5 天**。把一个立场记 30 遍再喂进 Wilson,
+# 等于把置信区间按 sqrt(5) 倍虚假收窄。典型病例:2026-07-20→07-29 连喊 9 天
+# "down",那段 5 日收益是 +16.7%/+24.1%/+22.5% —— 那不是判错 9 次,是**一个
+# 立场错了一次被记了 9 遍**。
+#
+# 这是本仓第四次栽在同一个坑上(重叠窗口 t 值两次、SMC 方向锁 28 段一次),
+# 前三次都是事后才发现,这次写进判决线。
+#
+# **口径**:`n_seg` = 表态序列按日期排序后的**连击段数**(runs)。判决的 n≥30
+# 闸门对 n 与 n_seg **两个都要过**。段内对错按该段 fwd 均值定(段是一个判断)。
+#
+# ⚠️ 加这条**收紧**了判决线,而且是在"当前无任何视界够格晋升"时加的 ——
+# 它今天不改变任何一条判决(0 转正 0 剔除),所以不存在"看着结果调标准"。
+# 换句话说:能加它的最干净的时点就是今天。
+_HORIZON_RULE = ("判活须四条全过:n≥30 · 独立段n_seg≥30 · Wilson下界>同期基线(非0.5) · "
                  "技巧值为正且非四视界中的孤例(防多重比较)")
 
 
@@ -154,11 +176,145 @@ def _expectancy_r(rs: list[float]) -> dict | None:
             "avg_loss_r": round(sum(losses) / len(losses), 3) if losses else None}
 
 
+def _stance_segments(seq: list) -> list[tuple[int, int]]:
+    """把按日期排好的表态序列压成连击段,返回 [(起始下标, 段长), ...]。
+
+    判决线条件④ 的实现(见 _HORIZON_RULE 上方长注释)。连喊 9 天 down 是
+    **一个**立场,不是 9 个独立样本。
+    """
+    out: list[tuple[int, int]] = []
+    for i, c in enumerate(seq):
+        if i and c == seq[i - 1]:
+            out[-1] = (out[-1][0], out[-1][1] + 1)
+        else:
+            out.append((i, 1))
+    return out
+
+
+# ── 净值纸面马判决线(2026-08-18 8/15 审判日写死)────────────────────────
+# 背景:`analyze_champs` 的净值马从建账起,judgement 一直是硬编码占位串
+# "净值陪跑·8/15 判决" —— **规则从来没实现过**,到期日当天没有东西可执行。
+# 又一例"承诺过、没落地"(同 epoch 分池 07-13 承诺 / 07-31 才落地)。
+#
+# 难点:净值曲线在单一窗口上 **n=1**,点估计("跑输 11.5pp")没有任何统计效力。
+# 所以判决拆成两条**互不代替**的线:
+#
+# ① 统计线(决定留/删)—— 口径**沿用 mining.md 既有判活线,不新造标准**:
+#    把净值曲线还原成日收益,与**同窗买入持有**日收益配对求超额,
+#      · 超额均值 > 0 且 |t| ≥ 2  → ✅ 留
+#      · 超额均值 < 0 且 |t| ≥ 2  → ❌ 删
+#      · 其余                      → 中性·继续陪跑
+#    交易日 < _N_MIN(30) 一律"样本不足",不看数字。
+#
+# ② 产品闸(在场率,只报警不自动删)—— 依据 docs/AUDIT-AND-EDGE.md §⑤①
+#    预注册的反省:"今后任何新马必须同时报在场率/年开枪数,低于线的一律不进
+#    产品(只进研究档案)"。那条反省**没写数**,这里补:
+#      线 = 25%。推导:这批马共用 QQQ>50日线 闸门,08-05 审计实测该窗口 QQQ
+#      有 45% 的日子在线下 → 共用闸门本身的在场天花板 ≈ 55%。一匹马**自己的
+#      附加过滤器最多只允许再砍掉一半**,低于 55%/2 ≈ 27.5%(取整 25%)时,
+#      它测的主要是自己的缺席而不是任何 edge。
+#    ⚠️ **诚实披露**:这个 25% 是 2026-08-18 我**看过五匹马的在场率之后**定的
+#      (17/17/23/30/48%)。所以它**只输出建议、不自动执行剔除** —— 真要按它
+#      砍马,须用户单独拍板。统计线①不受此影响(它的口径早于今天)。
+_HORSE_MIN_DAYS = 30        # 统计线的最小交易日
+_HORSE_MIN_T = 2.0          # |t| 门槛(沿用 mining.md)
+_HORSE_MIN_EXPOSURE = 0.25  # 产品闸(只报警,见上)
+
+
+def _horse_nav_history() -> dict[str, list[tuple[str, float, float]]]:
+    """从 dashboard_state 快照重建每匹净值马的 (日期, nav, exposure) 序列。
+
+    净值马的 state 只存**当前** nav/exposure,没有曲线 —— 但每日快照里存了,
+    所以历史可以还原(同日多份取最后一份)。拿不到就返回空,判决降级为样本不足。
+    """
+    try:
+        from dashboard.db import supabase
+        sb = supabase()
+        if sb is None:
+            return {}
+        rows = (sb.table("dashboard_state").select("published_at,snapshot")
+                .order("id").execute().data) or []
+    except Exception as e:
+        logger.warning("audit: 快照历史拉取失败,净值马判决降级 — %s", e)
+        return {}
+    byday: dict[str, dict] = {}
+    for r in rows:
+        sn = r.get("snapshot") or {}
+        ch = sn.get("champs") or {}
+        if not ch:
+            continue
+        day = str(sn.get("as_of") or r.get("published_at") or "")[:10]
+        if day:
+            byday[day] = ch                      # 同日取最后一份
+    out: dict[str, list] = {}
+    for day in sorted(byday):
+        for k, blk in (byday[day] or {}).items():
+            if isinstance(blk, dict) and blk.get("nav") is not None:
+                out.setdefault(k, []).append(
+                    (day, float(blk["nav"]), float(blk.get("exposure") or 0.0)))
+    return out
+
+
+def _horse_verdict(blk: dict, hist: list, df_d) -> dict:
+    """一匹净值马的 8/15 判决(线见 _HORSE_MIN_* 上方注释)。"""
+    out: dict = {"nav": blk.get("nav"),
+                 "ret_pct": round((blk.get("nav") or 0) / 1000 - 1, 4),
+                 "start_date": blk.get("start_date")}
+    if hist:
+        days = [d for d, _, _ in hist]
+        on = sum(1 for _, _, e in hist if e > 0)
+        out["n_days"] = len(hist)
+        out["exposure_rate"] = round(on / len(hist), 3)
+        out["days_in"] = on
+    else:
+        out["n_days"] = 0
+    if out["n_days"] < _HORSE_MIN_DAYS:
+        out["verdict"] = f"样本不足·继续陪跑(交易日 {out['n_days']}/{_HORSE_MIN_DAYS})"
+        return out
+    # 同窗买入持有:用马自己的日期区间从日线现算
+    try:
+        c = df_d.rename(columns=str.lower)["close"].astype(float)
+        idx = [str(x.date())[:10] for x in c.index]
+        pos = {d: i for i, d in enumerate(idx)}
+        navs, bhs = [], []
+        for d, nav, _ in hist:
+            if d in pos:
+                navs.append(nav)
+                bhs.append(float(c.iloc[pos[d]]))
+        if len(navs) < _HORSE_MIN_DAYS:
+            out["verdict"] = f"样本不足·继续陪跑(可对齐日 {len(navs)}/{_HORSE_MIN_DAYS})"
+            return out
+        ex = [(navs[i] / navs[i - 1] - 1) - (bhs[i] / bhs[i - 1] - 1)
+              for i in range(1, len(navs))
+              if navs[i - 1] and bhs[i - 1]]
+    except Exception as e:
+        out["verdict"] = f"样本不足·继续陪跑(对齐失败 {type(e).__name__})"
+        return out
+    n = len(ex)
+    m = sum(ex) / n
+    var = sum((x - m) ** 2 for x in ex) / (n - 1) if n > 1 else 0.0
+    t = m / math.sqrt(var / n) if var > 0 else 0.0
+    out.update(n_excess=n, excess_mean_bp=round(m * 1e4, 1), t=round(t, 2))
+    if m > 0 and abs(t) >= _HORSE_MIN_T:
+        out["verdict"] = "✅ 留(日超额显著为正)"
+    elif m < 0 and abs(t) >= _HORSE_MIN_T:
+        out["verdict"] = "❌ 删(日超额显著为负)"
+    else:
+        out["verdict"] = "中性·继续陪跑(超额不显著)"
+    er = out.get("exposure_rate")
+    if er is not None and er < _HORSE_MIN_EXPOSURE:
+        out["exposure_flag"] = (f"⚠️ 在场率 {er:.0%} < {_HORSE_MIN_EXPOSURE:.0%} "
+                                f"产品闸 → 建议移出产品只留研究档案(须用户拍板)")
+    return out
+
+
 def _horizon_audit(recs: list[dict], df_d) -> dict:
     """方向表态 × 1/2/3/5 日视界(新判决主体)。基线 = 常喊多数边的命中率。"""
     from dashboard.journal import _HORIZONS
 
     out: dict = {"rule": _HORIZON_RULE, "by_horizon": {}}
+    # 条件④ 要按**时间顺序**数连击段 —— recs 的入参顺序不保证有序,这里显式排。
+    recs = sorted(recs, key=lambda r: str(r.get("date") or ""))
     for h in _HORIZONS:
         key = f"{h}d"
         # 读记录**顶层** horizons(不是 result)—— 这样 2 日表态不必等 5 日评分闸门,
@@ -176,10 +332,32 @@ def _horizon_audit(recs: list[dict], df_d) -> dict:
         down_share = sum(1 for f in allf if f < 0) / len(allf)
         base = max(down_share, 1 - down_share)
         hits = sum(1 for c, f in rows if (c == "up") == (f > 0))
+        # ── 条件④:独立段(见 _HORIZON_RULE 上方长注释)──────────────────
+        # 一段连击 = 一个立场 = 一个样本。段内对错按该段 fwd **均值**定向。
+        segs = _stance_segments([c for c, _ in rows])
+        seg_hits = 0
+        for i0, ln in segs:
+            chunk = rows[i0:i0 + ln]
+            m = sum(f for _, f in chunk) / len(chunk)
+            if (chunk[0][0] == "up") == (m > 0):
+                seg_hits += 1
+        n_seg = len(segs)
         v = _verdict(hits, len(rows), breakeven=base)
+        v["n_seg"] = n_seg
+        v["seg_hits"] = seg_hits
+        v["seg_hit_rate"] = round(seg_hits / n_seg, 3) if n_seg else None
+        v["seg_ci95"] = [round(x, 3) for x in _wilson(seg_hits, n_seg)]
+        v["mean_run_len"] = round(len(rows) / n_seg, 1) if n_seg else None
+        # 判决闸门:n 与 n_seg **都要** ≥ _N_MIN。n_seg 不够 → 强制降级为样本不足,
+        # 无论 Wilson 怎么好看(它此时是被自相关虚假收窄的)。
+        if n_seg < _N_MIN and not v["verdict"].startswith("样本不足"):
+            v["verdict_by_days"] = v["verdict"]      # 留证:按天数本来会判什么
+            v["verdict"] = f"样本不足·继续测量(独立段仅{n_seg},天数{len(rows)}是自相关灌水)"
+            v["recommended_mult"] = None
         v["baseline"] = round(base, 3)
         v["baseline_side"] = "down" if down_share >= 0.5 else "up"
         v["skill_pp"] = round((hits / len(rows) - base) * 100, 1)
+        v["seg_skill_pp"] = round((seg_hits / n_seg - base) * 100, 1) if n_seg else None
         v["n_baseline_days"] = len(allf)
         v["mean_fwd_pct"] = round(sum(f for _, f in rows) / len(rows) * 100, 2)
         out["by_horizon"][key] = v
@@ -318,6 +496,10 @@ def run_audit() -> dict:
         # 老记录补多视界字段(2026-07-30 新增;幂等,不改任何已有值)—— 必须在
         # load_recent 之前,否则本次报告读到的还是没有 fwd_ret_by_h 的旧快照。
         try:
+            # fwd5 必须在 horizons 之前补 —— ②☠ p_up 立案读的是 result.fwd5_ret
+            n_f5 = jr.backfill_fwd5(df_d)
+            if n_f5:
+                report["backfilled_fwd5_records"] = n_f5
             n_bf = jr.backfill_horizons(df_d)
             if n_bf:
                 report["backfilled_horizon_records"] = n_bf
@@ -423,6 +605,7 @@ def run_audit() -> dict:
     # ── ③ 纸面马竞速(冠军陪跑/特调/BTC 等,mining.md 的活体样本)─────────
     try:
         champs = analyze_champs(df_d) or {}
+        hist = _horse_nav_history()          # 净值曲线从快照还原(state 只存当前值)
         horses = {}
         for key, blk in champs.items():
             if not isinstance(blk, dict):
@@ -431,9 +614,8 @@ def run_audit() -> dict:
                 horses[key] = {**_verdict(blk.get("n_win") or 0, blk["n_closed"]),
                                "realized": blk.get("realized")}
             elif blk.get("nav") is not None:             # 净值型马($1000 起跑)
-                h = {"nav": blk["nav"],
-                     "ret_pct": round(blk["nav"] / 1000 - 1, 4),
-                     "verdict": "净值陪跑·8/15 判决"}
+                # 2026-08-18:判决线终于落地(此前一直是占位串"净值陪跑·8/15 判决")
+                h = _horse_verdict(blk, hist.get(key) or [], df_d)
                 # 同窗买入持有对照(口径补充,判决仍在 8/15):优先用马自己
                 # 记的 bh_ret_pct,没有就按 start_date 从日线现算
                 bh = blk.get("bh_ret_pct")
@@ -576,16 +758,35 @@ def format_report(report: dict) -> str:
         by = hz.get("by_horizon") or {}
         if by:
             L.append(f"\n②★ 【判决主体】方向表态 × 视界 — {hz.get('rule','')}")
-            L.append(f"   {'视界':<6}{'n':>4}  {'命中':>6} {'Wilson95%':<12}"
+            L.append(f"   {'视界':<6}{'天数':>4}{'独立段':>6}  {'命中':>6} {'Wilson95%':<12}"
                      f"{'基线':>6}{'技巧':>8}  判决")
             for k, d in by.items():
                 star = " ←你的持有期" if k in ("2d", "3d") else ""
-                L.append(f"   {k:<6}{d['n']:>4}  {d['hit_rate']*100:>5.0f}% "
+                L.append(f"   {k:<6}{d['n']:>4}{d.get('n_seg', 0):>6}  "
+                         f"{d['hit_rate']*100:>5.0f}% "
                          f"[{d['ci95'][0]*100:>3.0f},{d['ci95'][1]*100:>3.0f}]  "
                          f"{d['baseline']*100:>5.0f}%{d['skill_pp']:>+7.1f}pp  "
                          f"{d['verdict']}{star}")
             L.append(f"   基线 = 该视界无脑常喊「{next(iter(by.values())).get('baseline_side','?')}」"
                      f"的命中率;技巧 = 命中 − 基线。**跟基线比,不跟 50% 比。**")
+            # ── 条件④ 独立段(2026-08-18 补)——把自相关灌水摊开给人看 ──────
+            d0 = next(iter(by.values()))
+            if d0.get("n_seg"):
+                L.append(f"   ⚠️ 独立段 = 表态连击压缩后的立场数(平均一段扛 "
+                         f"{d0.get('mean_run_len')} 天)。Wilson 假设独立试验,"
+                         f"把一个立场记 N 遍 = 区间虚假收窄 √N 倍。")
+                L.append(f"   {'视界':<6}{'独立段n':>8}{'段命中':>8} {'段Wilson95%':<14}{'段技巧':>8}")
+                for k, d in by.items():
+                    if not d.get("n_seg"):
+                        continue
+                    L.append(f"   {k:<6}{d['n_seg']:>8}{d['seg_hit_rate']*100:>7.0f}% "
+                             f"[{d['seg_ci95'][0]*100:>3.0f},{d['seg_ci95'][1]*100:>3.0f}]   "
+                             f"{d['seg_skill_pp']:>+7.1f}pp")
+                by_days = [f"{k}={d['verdict_by_days']}" for k, d in by.items()
+                           if d.get("verdict_by_days")]
+                if by_days:
+                    L.append(f"   (若只按天数不看独立段,本会判:{'; '.join(by_days)} "
+                             f"—— 条件④ 拦下)")
             if hz.get("multiple_comparison_warn"):
                 L.append(f"   ⚠️ 只有 {hz.get('positive_horizons')} 一个视界技巧为正 = "
                          f"多重比较高危,按预注册条件③**不得晋升**")
@@ -641,8 +842,19 @@ def format_report(report: dict) -> str:
                     vs = d.get("vs_bh_pp") or 0
                     extra = (f" | 买入持有{bh*100:+.1f}% → "
                              f"{'跑赢' if vs >= 0 else '跑输'}{abs(vs):.1f}pp")
+                stat = ""
+                if d.get("t") is not None:
+                    stat = (f" | 日超额{d['excess_mean_bp']:+.0f}bp t={d['t']:+.2f}"
+                            f"(n={d.get('n_excess')})")
+                er = d.get("exposure_rate")
+                exp = f" | 在场率{er*100:.0f}%" if er is not None else ""
                 L.append(f"   {k:<14s} 净值${d['nav']:.0f} ({d['ret_pct']*100:+.1f}%)"
-                         f"{extra} {d['verdict']}")
+                         f"{extra}{stat}{exp} {d['verdict']}")
+                if d.get("exposure_flag"):
+                    L.append(f"                  {d['exposure_flag']}")
+        L.append(f"   判决线(2026-08-18 写死): 交易日≥{_HORSE_MIN_DAYS} 且 "
+                 f"日超额 |t|≥{_HORSE_MIN_T} → 正显著留/负显著删,其余中性;"
+                 f"在场率<{_HORSE_MIN_EXPOSURE:.0%} 只报警不自动删(线是看过数字后定的,须用户拍板)")
     sp = report["sections"].get("scan_paper", {})
     if sp.get("by_epoch"):
         L.append(f"\n④ 自选扫描纸面(按 epoch 分池)— 合计 n={sp.get('n_total')} "
@@ -666,4 +878,23 @@ def format_report(report: dict) -> str:
 if __name__ == "__main__":
     import sys
     sys.path.insert(0, str(Path(__file__).parent.parent))
+
+    # ── 自检:判决线条件④(独立段)是这次唯一有分支的新逻辑,必须跑得起来 ──
+    assert _stance_segments([]) == []
+    assert _stance_segments(["up"]) == [(0, 1)]
+    # 首次审判实测的真实序列:down×5 up×1 down×9 up×4 down×3 up×8 = 6 段
+    real = (["down"] * 5 + ["up"] * 1 + ["down"] * 9
+            + ["up"] * 4 + ["down"] * 3 + ["up"] * 8)
+    segs = _stance_segments(real)
+    assert len(segs) == 6, segs
+    assert [ln for _, ln in segs] == [5, 1, 9, 4, 3, 8], segs
+    assert sum(ln for _, ln in segs) == len(real), "段长必须无损覆盖原序列"
+    # 全部交替 = 每天一个独立立场(不该被压缩)
+    assert len(_stance_segments(["up", "down"] * 15)) == 30
+    # 全部同向 = 一个立场(30 天灌水成 1)
+    assert len(_stance_segments(["up"] * 30)) == 1
+    print("audit.py self-check OK (独立段)")
+
+    if "--selfcheck" in sys.argv:
+        sys.exit(0)
     print(format_report(run_audit()))
