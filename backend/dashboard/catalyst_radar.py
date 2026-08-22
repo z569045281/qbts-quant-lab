@@ -453,8 +453,9 @@ def maybe_catalyst_refresh(prev: dict | None, now_et: datetime) -> dict | None:
             if fresh.get("summary_cn"):
                 lines.append(fresh["summary_cn"])
             lines.append("(消息面雷达·零决策权,不构成交易信号)")
-            from dashboard.notify import push as _ntfy
-            pri = "high" if cur_level == "breaking" else "default"
+            from dashboard.notify import push as _ntfy, P_NEWS, P_AMBIENT
+            # 🔴 breaking 才值得抢通知栏;🟡 有消息 属于背景,静默(2026-08-22)
+            pri = P_NEWS if cur_level == "breaking" else P_AMBIENT
             # 标题保持 ASCII —— HTTP header 是 latin-1,中文放 UTF-8 正文
             if _ntfy("QBTS Catalyst Radar", "\n".join(lines),
                      tags="loudspeaker", priority=pri):

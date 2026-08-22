@@ -94,7 +94,9 @@ def maybe_notify_trigger(prev_state: str | None, smc_payload: dict) -> bool:
         pb.get("lock_reason", ""),
         "（15m 同向 CHoCH 已收盘确认 · 验证期，软参考）",
     ]
-    return _ntfy("QBTS SMC TRIGGER", "\n".join(str(x) for x in lines if x))
+    from dashboard.notify import P_ACTION
+    return _ntfy("QBTS SMC TRIGGER", "\n".join(str(x) for x in lines if x),
+                 priority=P_ACTION)
 
 
 if __name__ == "__main__":

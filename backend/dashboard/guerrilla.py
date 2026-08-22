@@ -206,7 +206,8 @@ def maybe_guerrilla_signal(now_et) -> dict | None:
     })
     _ntfy(f"ER signal {_TICKER}",
           f"极度超卖游击战开枪:{_TICKER} VMC={sig['wt1']} 进场 ${sig['entry']} "
-          f"止损 ${sig['stop']} 目标 ${sig['target']} RR {sig['rr']}(纸面$1000,观察模块)")
+          f"止损 ${sig['stop']} 目标 ${sig['target']} RR {sig['rr']}(纸面$1000,观察模块)",
+          priority=P_ACTION)
     logger.info(f"guerrilla: OPEN {_TICKER} {sig}")
     return {"fired": True, **sig}
 
@@ -279,4 +280,4 @@ def _last_price(ticker: str) -> float | None:
         return None
 
 
-from dashboard.notify import push as _ntfy   # 全仓唯一一份推送
+from dashboard.notify import push as _ntfy, P_ACTION   # 全仓唯一一份推送

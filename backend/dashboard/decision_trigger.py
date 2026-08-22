@@ -120,7 +120,7 @@ def maybe_trigger_push(prev: dict | None, now_et, quotes: dict | None) -> dict |
     if not newly:
         return {"date": today, "fired": fired, "close": round(px, 2)}
 
-    from dashboard.notify import push as _ntfy
+    from dashboard.notify import push as _ntfy, P_ACTION
     for key, lv, act in newly:
         arrow = "站上" if lv["side"] == "above" else "跌破"
         body = (f"QBTS 收盘 ${px:.2f} —— {arrow}决策线 ${float(lv['price']):.2f}\n\n"
@@ -128,7 +128,7 @@ def maybe_trigger_push(prev: dict | None, now_et, quotes: dict | None) -> dict |
                 f"依据:{as_of or '?'} 的决策卡 watch_levels(收盘口径,盘中穿越不算)。\n"
                 f"⚠️ 这是闹钟不是新信号:动作照决策卡执行,仓位上限与减仓时点别改。")
         if _ntfy(f"QBTS 🔔 {arrow} ${float(lv['price']):.2f}", body,
-                 tags="bell", priority="high"):
+                 tags="bell", priority=P_ACTION):
             fired.append(key)
 
     return {"date": today, "fired": fired, "close": round(px, 2)}

@@ -294,8 +294,8 @@ def maybe_event_day_push(prev: dict | None, now_et, quotes: dict | None,
              "→ 系统不劝进也不劝退,方向由你判断。\n"
              "→ 做空仍然不做(全部已知路径已判死)。")
     try:
-        from dashboard.notify import push as _ntfy
-        if _ntfy("QBTS ⚠️ 事件日", body, tags="rotating_light", priority="high"):
+        from dashboard.notify import push as _ntfy, P_ACTION
+        if _ntfy("QBTS ⚠️ 事件日", body, tags="rotating_light", priority=P_ACTION):
             ev["push_key"] = key
             if head_now:
                 ev["pushed_stories"] = _story_remember(head_now, pushed_stories,

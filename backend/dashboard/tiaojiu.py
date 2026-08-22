@@ -108,7 +108,7 @@ def maybe_tiaojiu_push(prev: dict | None, now_et: datetime) -> dict | None:
 
     # 每日必推一条(心跳):无信号=低优先级不响铃;有信号=高优先级。
     # 哪天 22:05(墨尔本冬令时,16:05 ET)后没收到任何推送 = 系统挂了,来找我。
-    from dashboard.notify import push as _ntfy
+    from dashboard.notify import push as _ntfy, P_ACTION
     # 追赶与特调可能同日触发,别让它被吞掉:同向(抄底)时加一行共振,反向(止盈)时
     # 明说两腿打架,让人自己判断,不替他消歧义。
     if sig["buy_base"]:
@@ -117,14 +117,14 @@ def maybe_tiaojiu_push(prev: dict | None, now_et: datetime) -> dict | None:
             f"收盘 ${px:.2f}({chg:+.1%}) · 快%R {sig['fast']} 上穿-80,慢%R {sig['slow']} 仍弱\n"
             f"回测:触发后5天平均 +17.4%(基线+5.2%),n=15\n"
             + (f"⚡ 同行落后追赶同日触发(后5天+11.7%)—— 两条一级正腿共振\n" if catchup else "")
-            + f"(验证期信号,小仓;≤5天可用QBTX)"), tags="dart", priority="high")
+            + f"(验证期信号,小仓;≤5天可用QBTX)"), tags="dart", priority=P_ACTION)
     elif sig["sell_trim"]:
         out["pushed"] = _ntfy("QBTS TeDiao TRIM signal", (
             f"特调·止盈减仓 触发(今日收盘确认)\n"
             f"收盘 ${px:.2f}({chg:+.1%}) · 快%R {sig['fast']} 跌穿-20,慢%R {sig['slow']} 仍高\n"
             f"回测:触发后20天平均 −10.0%(基线+24.9%),n=15 —— 历史标顶信号\n"
             + (f"⚠️ 同行落后追赶同日也触发(多头腿)—— 两腿方向相反,不共振\n" if catchup else "")
-            + f"(持仓者考虑减半;验证期信号)"), tags="scissors", priority="high")
+            + f"(持仓者考虑减半;验证期信号)"), tags="scissors", priority=P_ACTION)
     elif catchup:
         # 特调没触发但追赶触发 —— 这条腿单独值一次响铃(历史后5天 +11.7%,最硬正腿)
         out["pushed"] = _ntfy("QBTS peer catchup signal", (
@@ -132,7 +132,7 @@ def maybe_tiaojiu_push(prev: dict | None, now_et: datetime) -> dict | None:
             f"收盘 ${px:.2f}({chg:+.1%}) · {catch_line}\n"
             f"回测:触发后5天 +11.7%(基线+5.2%)—— 全系统最硬正腿\n"
             f"(口径:同行均涨>3% 且 QBTS 落后 IONQ >1pp;验证期信号,小仓)"),
-            tags="dart", priority="high")
+            tags="dart", priority=P_ACTION)
     else:
         extra = f"\n{catch_line} → 追赶未触发" if catch_line else ""
         out["pushed"] = _ntfy("QBTS daily check OK", (

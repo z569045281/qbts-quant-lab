@@ -94,6 +94,27 @@ _PUSH_COOLDOWN_DOWN = 1 * 3600   # 降级(缓和):≥1h,防 alert↔watch 横跳
 # 否则这个补丁会把最该收到的那一条也吃掉。
 _PUSH_COOLDOWN_TRACK = 12 * 3600
 
+# ── 翻转熔断(2026-08-22,用户点单)────────────────────────────────────────
+# 上面那个「升级豁免」当时的理由是对的,但 `ntfy_log` 建账后第一次数出真账:
+# 四天 31 条推送里 **16 条(52%)是地缘雷达**,平均一天 4 条 —— 冷却没拦住。
+# 病根正是那个豁免口:伊朗局势在 🟡 观察 ↔ 🔴 升温 之间来回翻,**每次向上翻都算
+# "升级" → 每次都豁免 → 每次都响**;实测 08-19 一天之内翻了四次,四次全推。
+#
+# **一件事一天翻四次,那就不是升级,是抖动。** 抖动没有信息,只有噪音。
+# 熔断:24h 窗口内翻转 > _FLIP_MAX 次 → 判抖动,**当次升级不再豁免主题冷却**。
+# 卡片 / prompt / alerted 登记一律照常 —— 熔断只关掉「响铃」这一件事。
+_FLIP_MAX = 2          # 24h 内允许的翻转次数,超过判抖动
+_FLIP_WINDOW = 24 * 3600
+
+
+def _flip_log(prev: dict | None, level_flip: bool, now_ts: float) -> list[float]:
+    """维护 24h 翻转时间戳列表(窗口外自动裁掉,最多留 20 个)。"""
+    log = [float(t) for t in ((prev or {}).get("flip_log") or [])
+           if now_ts - float(t) < _FLIP_WINDOW]
+    if level_flip:
+        log.append(now_ts)
+    return log[-20:]
+
 
 def _item_key(title: str) -> str:
     return hashlib.md5(title.lower().strip()[:80].encode("utf-8")).hexdigest()[:10]
@@ -326,6 +347,8 @@ def maybe_geo_refresh(prev: dict | None, now_et: datetime) -> dict | None:
         # ⚠️ 主题冷却也必须原样带走。live_quote 是整块覆写的,这里漏一个键
         # 就等于把冷却清零 → 下一跳同一条线立刻重响(2026-07-31 事件日同一个坑)。
         fresh["pushed_tracks"]  = dict((prev or {}).get("pushed_tracks") or {})
+        # 翻转台账同理:漏带 = 熔断计数清零 → 抖动重新畅通无阻(同一个坑第三次)
+        fresh["flip_log"]       = list((prev or {}).get("flip_log") or [])
         fresh["last_good_level"] = _last_good(prev)
         return fresh
 
@@ -340,6 +363,14 @@ def maybe_geo_refresh(prev: dict | None, now_et: datetime) -> dict | None:
     level_flip = bool(prev) and prev_level and prev_level != cur_level
     escalated = level_flip and \
         _LEVEL_RANK.get(cur_level, 0) > _LEVEL_RANK.get(prev_level, 0)
+
+    # 翻转熔断(见 _FLIP_MAX):抖动中的「升级」不算升级,收回它的豁免权
+    flip_log = _flip_log(prev, level_flip, now_ts)
+    fresh["flip_log"] = flip_log
+    if escalated and len(flip_log) > _FLIP_MAX:
+        escalated = False
+        fresh["flip_muted"] = (f"24h 内翻转 {len(flip_log)} 次 > {_FLIP_MAX},"
+                               f"判定抖动 —— 本次升级不豁免冷却")
 
     # 主题级去重(见 _PUSH_COOLDOWN_TRACK)。升级时不过滤 —— 那一条必须响。
     if not escalated:
@@ -370,8 +401,12 @@ def maybe_geo_refresh(prev: dict | None, now_et: datetime) -> dict | None:
                     lines.append(f"  → {it['note_cn']}")
             if fresh.get("summary_cn"):
                 lines.append(fresh["summary_cn"])
-            from dashboard.notify import push as _ntfy
-            pri = "high" if (escalated and cur_level == "alert") else "default"
+            from dashboard.notify import push as _ntfy, P_AMBIENT
+            # 2026-08-22:一律 low。依据是 8/15 审判 ②📋 —— 地缘雷达 n=2 命中 0%、
+            # 技巧 −53pp,第三十一轮已定性「后视镜」。**没有实证分辨力的东西不该在
+            # 半夜把人吵醒**;它占了全部推送的 52%,正是把买点埋掉的那个东西。
+            # 卡片/prompt 照常更新,只是不再抢通知栏。
+            pri = P_AMBIENT
             if _ntfy("QBTS Geo Radar", "\n".join(lines), tags="globe_with_meridians", priority=pri):
                 alerted += [it["key"] for it in hot]
                 last_push = now_ts
@@ -433,4 +468,20 @@ if __name__ == "__main__":
     old = [r.get("note_cn") for _, r in zip(items, ratings)] + ["", ""]
     assert old[1] == "第四条", "旧逻辑的错位没复现,断言写错了"
 
-    print("geopolitics self-check OK(主题冷却 + 按 i 对齐,均已锁住)")
+    # 翻转熔断(2026-08-22):用 08-19 实况 —— 一天之内 🟡↔🔴 翻了四次
+    now = time.time()
+    assert _flip_log(None, False, now) == []
+    log = []
+    for _ in range(4):
+        log = _flip_log({"flip_log": log}, True, now)
+    assert len(log) == 4, log
+    assert len(log) > _FLIP_MAX, "四次翻转必须超过熔断线"
+    # 窗口外的自动裁掉
+    stale = _flip_log({"flip_log": [now - _FLIP_WINDOW - 1] * 5}, False, now)
+    assert stale == [], stale
+    # 没翻转时不记账(别把静止误记成抖动)
+    assert _flip_log({"flip_log": [now]}, False, now) == [now]
+    # 两次翻转仍在线内 → 不熔断
+    two = _flip_log({"flip_log": [now - 100]}, True, now)
+    assert len(two) == 2 and len(two) <= _FLIP_MAX, two
+    print("geopolitics self-check OK(主题冷却 + 按 i 对齐 + 翻转熔断,均已锁住)")
