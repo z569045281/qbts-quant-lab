@@ -420,6 +420,90 @@ def _readings_audit(recs: list[dict]) -> dict:
     return out
 
 
+# ── 信心刻度台账(2026-08-22,用户点单「先 A+B」)──────────────────────────
+# **为什么建**:用户问「为什么这个系统天天让我观望」。查下来 91% 的 HOLD 几乎全部
+# 来自 `_sanitize_decision` 那道 `conviction ≤4 → 强制 HOLD`,而 conviction 的实测
+# 分布是 **56 次里 46 次(82%)正好是 4,上限从没超过 6** —— 0-10 的量表塌成一个点,
+# 且那个点恰好卡在闸门下面一格。**一个从不变化的数字不携带信息**,它让那道闸门
+# 变成无条件生效。同日给提示词加了 conviction 锚定表(B),本台账负责验证它有没有用。
+#
+# ⚠️ 纪律:零决策权,与板块记分卡同待遇。**不因为读数难看就去调那道闸门** ——
+# 闸门严不严是另一个问题(见 docs/REVIEW-2026-07 §2),本台账只回答两件事:
+#   ① 刻度散不散(退化诊断) ② 高信心是不是真的更准(分辨力)
+#
+# **预注册判决线(2026-08-22 写死,看到结果之前定;审判日不得更改)**:
+#   [退化线] 众数占比 > 60%(n≥30)→ 判定「刻度退化」,该数字不得被解读为判断强度。
+#            —— B 上线前的基线是 **82%**,B 有没有用就看这个数往下走没有。
+#   [分辨力线] 高信心档(≥5)与低信心档(≤4)**各自** n≥30,且高档 Wilson95% 下界
+#            > 低档 Wilson95% 上界(两区间不重叠)→ ✅ 信心有分辨力,闸门有依据。
+#            两档命中率差 ≤0 且各自 n≥30 → ❌ 信心无分辨力,**建议把闸门的判据
+#            从 conviction 换成别的东西**(换成什么须用户单独拍板,本工具不建议)。
+#   其余 → 继续测量。
+# 评分口径**复用判决主体的 `bold_call` 5 日命中**,不新造第二套。
+_CONV_GATE = 4          # decision._sanitize_decision 的闸门(≤4 → 强制 HOLD)
+_CONV_DEGEN = 0.60      # 众数占比超过它 = 刻度退化
+_CONV_BASELINE_MODE = 0.82   # 2026-08-22 B 上线前的众数占比,留证对照
+
+
+def _conviction_audit(recs: list[dict]) -> dict:
+    """信心刻度:散不散 + 高信心是不是真的更准(线见上方注释)。"""
+    convs, rows = [], []
+    for r in recs:
+        try:
+            cv = int(r.get("conviction") or 0)
+        except (TypeError, ValueError):
+            continue
+        if cv <= 0:
+            continue
+        convs.append(cv)
+        ok = ((r.get("horizons") or {}).get("bold", {})
+              .get("fable", {}) or {}).get("5d")
+        if ok is not None:
+            rows.append((cv, bool(ok)))
+    if not convs:
+        return {"n": 0, "verdict": "无数据"}
+    dist = {c: convs.count(c) for c in sorted(set(convs))}
+    mode_share = max(dist.values()) / len(convs)
+    out = {"n": len(convs), "dist": dist,
+           "mode": max(dist, key=dist.get), "mode_share": round(mode_share, 3),
+           "mean": round(sum(convs) / len(convs), 2),
+           "max": max(convs), "min": min(convs),
+           "baseline_mode_share": _CONV_BASELINE_MODE,
+           "gate": _CONV_GATE,
+           "n_gated": sum(1 for c in convs if c <= _CONV_GATE),
+           "n_graded": len(rows)}
+    out["gated_share"] = round(out["n_gated"] / len(convs), 3)
+    # ① 退化诊断
+    if len(convs) < _N_MIN:
+        out["scale_verdict"] = "样本不足·继续测量"
+    elif mode_share > _CONV_DEGEN:
+        out["scale_verdict"] = (f"❌ 刻度退化(众数 {out['mode']} 占 {mode_share:.0%} "
+                                f"> {_CONV_DEGEN:.0%})—— 该数字不得被解读为判断强度")
+    else:
+        out["scale_verdict"] = f"✅ 刻度已散开(众数占比 {mode_share:.0%})"
+    # ② 分辨力
+    lo = [ok for cv, ok in rows if cv <= _CONV_GATE]
+    hi = [ok for cv, ok in rows if cv > _CONV_GATE]
+    out["n_lo"], out["n_hi"] = len(lo), len(hi)
+    if lo:
+        out["hit_lo"] = round(sum(lo) / len(lo), 3)
+        out["ci_lo"] = [round(x, 3) for x in _wilson(sum(lo), len(lo))]
+    if hi:
+        out["hit_hi"] = round(sum(hi) / len(hi), 3)
+        out["ci_hi"] = [round(x, 3) for x in _wilson(sum(hi), len(hi))]
+    if len(lo) < _N_MIN or len(hi) < _N_MIN:
+        out["power_verdict"] = (f"样本不足·继续测量(低档 {len(lo)}/{_N_MIN} · "
+                                f"高档 {len(hi)}/{_N_MIN})")
+    elif out["ci_hi"][0] > out["ci_lo"][1]:
+        out["power_verdict"] = "✅ 信心有分辨力 —— 闸门有依据"
+    elif out["hit_hi"] <= out["hit_lo"]:
+        out["power_verdict"] = ("❌ 信心无分辨力 → 建议把闸门判据从 conviction "
+                                "换成别的(换成什么须用户单独拍板)")
+    else:
+        out["power_verdict"] = "中性·继续测量(方向对但区间重叠)"
+    return out
+
+
 def _p_up_diagnostic(recs: list[dict]) -> dict:
     """p_up 反预测立案(用户 2026-07-30 拍板,REVIEW-2026-07 §7 P1)。
 
@@ -589,6 +673,7 @@ def run_audit() -> dict:
         # ── 判决主体:方向表态 × 多视界(预注册修订 2026-07-30 A+B)────────────
         report["sections"]["decision_journal"]["horizons"] = _horizon_audit(recs, df_d)
         report["sections"]["decision_journal"]["p_up_diagnostic"] = _p_up_diagnostic(recs)
+        report["sections"]["decision_journal"]["conviction"] = _conviction_audit(recs)
         # 📋 板块记分卡(2026-07-31 建账):prompt 里有发言权、§1 却没记分卡的那些
         report["sections"]["decision_journal"]["readings"] = _readings_audit(recs)
         # 影子考场:Fable vs DeepSeek vs v1反向影子(2026-07-21,用户拍板) 的
@@ -790,6 +875,24 @@ def format_report(report: dict) -> str:
             if hz.get("multiple_comparison_warn"):
                 L.append(f"   ⚠️ 只有 {hz.get('positive_horizons')} 一个视界技巧为正 = "
                          f"多重比较高危,按预注册条件③**不得晋升**")
+        # ── ②🎚 信心刻度(2026-08-22 建账)────────────────────────────
+        cv = dj.get("conviction") or {}
+        if cv.get("n"):
+            L.append(f"\n②🎚 信心刻度 — 91% 观望里大部分来自「conviction ≤{cv['gate']} "
+                     f"→ 强制 HOLD」这道闸,所以这个数字散不散决定了闸门是不是无条件生效")
+            bar = " ".join(f"{k}:{v}" for k, v in (cv.get("dist") or {}).items())
+            L.append(f"   分布 n={cv['n']}  {bar}   均值 {cv.get('mean')} "
+                     f"上限 {cv.get('max')} 下限 {cv.get('min')}")
+            L.append(f"   众数 {cv.get('mode')} 占 {cv.get('mode_share',0)*100:.0f}% "
+                     f"(2026-08-22 锚定表上线前基线 {cv.get('baseline_mode_share',0)*100:.0f}%)"
+                     f" · 被闸门挡下 {cv.get('gated_share',0)*100:.0f}%")
+            L.append(f"   ① 刻度: {cv.get('scale_verdict','')}")
+            det = ""
+            if cv.get("hit_lo") is not None and cv.get("hit_hi") is not None:
+                det = (f"  [低档≤{cv['gate']} {cv['hit_lo']*100:.0f}% n={cv['n_lo']} · "
+                       f"高档>{cv['gate']} {cv['hit_hi']*100:.0f}% n={cv['n_hi']}]")
+            L.append(f"   ② 分辨力: {cv.get('power_verdict','')}{det}")
+            L.append(f"   零决策权;跨线之前不得据此改动那道闸门(改判据须用户拍板)")
         pu = dj.get("p_up_diagnostic") or {}
         if pu.get("corr") is not None:
             L.append(f"\n②☠ p_up 反预测立案 — corr(p_up, fwd5)={pu['corr']:+.3f} "
@@ -893,7 +996,26 @@ if __name__ == "__main__":
     assert len(_stance_segments(["up", "down"] * 15)) == 30
     # 全部同向 = 一个立场(30 天灌水成 1)
     assert len(_stance_segments(["up"] * 30)) == 1
-    print("audit.py self-check OK (独立段)")
+    # 信心台账(2026-08-22):两条预注册线各造一个样本验一遍
+    degen = _conviction_audit([{"conviction": 4} for _ in range(40)])
+    assert degen["mode_share"] == 1.0 and degen["scale_verdict"].startswith("❌"), degen
+    spread = _conviction_audit([{"conviction": c} for c in
+                                ([3] * 10 + [4] * 10 + [5] * 10 + [6] * 10)])
+    assert spread["scale_verdict"].startswith("✅"), spread
+    assert _conviction_audit([{"conviction": 4}] * 10)["scale_verdict"].startswith("样本不足")
+    # 分辨力:高档全对/低档全错,且两档都够 n → 必须判「有分辨力」
+    def _rec(cv, ok):
+        return {"conviction": cv, "horizons": {"bold": {"fable": {"5d": ok}}}}
+    disc = _conviction_audit([_rec(6, True) for _ in range(31)]
+                             + [_rec(4, False) for _ in range(31)])
+    assert disc["power_verdict"].startswith("✅"), disc
+    flat = _conviction_audit([_rec(6, False) for _ in range(31)]
+                             + [_rec(4, True) for _ in range(31)])
+    assert flat["power_verdict"].startswith("❌"), flat
+    assert _conviction_audit([_rec(6, True)] * 5 + [_rec(4, False)] * 40
+                             )["power_verdict"].startswith("样本不足")
+    assert _conviction_audit([])["n"] == 0
+    print("audit.py self-check OK (独立段 + 信心刻度)")
 
     if "--selfcheck" in sys.argv:
         sys.exit(0)

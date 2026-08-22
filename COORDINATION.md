@@ -270,3 +270,4 @@ Format (newest at top):
 [done] 2026-08-18 17:20 [opus] 事件日重复推送治本(用户报「同一个犯罪检测事件推了好几次」): event_day 去重键只带日期不带「是哪件事」→ 同一条 Verafin 新闻 07-31/08-04/08-18 推三次 · 加故事级指纹(专名锚点+3gram Jaccard)+30天冷却,跳空≥8%不受限 · 另:notify.push 全局给推送带时间戳(用户点单) · files: backend/dashboard/event_day.py, backend/dashboard/notify.py
 [done] 2026-08-18 18:00 [opus] 第四十轮:跨板块资金流轮动策略(用户点单「资金往哪走就买哪，有离场踪迹就卖」) · 先查档案:十七轮RRG象限/十八轮横截面追赶均已判死,但那两轮测的是「用轮动择时QBTS」,本轮测「直接交易板块ETF」= 档案空档,可测 · 纯研究只读,可能追加 mining.md · files: mining.md
 [done] 2026-08-22 [opus] 第四十一轮:08-21 量子板块 +8.5% 大涨的可捕捉性(用户点单「能不能抓住这样的机会」) · 驱动=$100M联邦拨款提案的板块群体交易,非公司消息(QBTS自己的DOCOMO 8-K在08-18零定价) · 测「连跌3天后买入」+ 收益集中度 · 纯研究只读 · files: mining.md
+[done] 2026-08-22 [opus] 信心刻度退化诊断+修(用户选 A+B):实测 56 条决策 conviction 82% 卡在 4、上限从没超 6 → 91% 观望几乎全来自「≤4 强制 HOLD」这一道闸,而非 p_up(我先前归因错误已纠正) · A=audit.py 加信心分辨力台账(预注册线) · B=decision.py 提示词加信心锚定表(只定义刻度,不动任何闸门/铁律) · files: backend/dashboard/decision.py, backend/dashboard/audit.py, docs/DECISION.md
