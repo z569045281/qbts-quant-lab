@@ -678,6 +678,21 @@ export interface Decision {
   model?:             string;    // which model actually produced this decision (fable-5 or fallback)
   system_notes?:      { kind: "数据问题" | "改进建议"; note: string }[];  // AI 每日自检:数据问题/改进建议(给维护者)
   position_advice?:   PositionAdvice[];  // 💼 用户实盘持仓的逐笔操作建议
+  /* 敞口刻度(2026-08-24,mining 第四十二轮):代码算的,不是模型给的。
+     只答「拿多大」,不答「往哪买」—— HOLD 日照样有刻度。
+     分母 = max(20日已实现波动, ATM隐含波动);期权源缺失时 degraded=true 并退回 rv20。*/
+  exposure?: {
+    pct:  number;               // 0.20–1.00,投机仓的百分比(投机仓 ≤ 总资产 10%)
+    band: string;               // 满档 / 偏重 / 半仓 / 轻仓 / 底仓
+    band_note?:  string;
+    degraded?:   boolean;       // true = 期权源缺失,已退回纯已实现波动率
+    denominator?: number | null;
+    denominator_source?: string | null;
+    rv20?:   number | null;
+    atm_iv?: number | null;
+    note?:       string;
+    discipline?: string;
+  } | null;
   shadow?:            boolean;   // true = 影子决策(零决策权,仅对照)
   shadow_ds?:         Decision;  // DeepSeek V4 Pro 影子决策(卡上可切换;8/15 同框宣判)
   shadow_v1_inverse?: {          // 2026-07-21:原始21%命中元模型整体反向的零决策权影子(纯机械,不可切换查看,只做每日徽章)

@@ -24,6 +24,7 @@ import logging
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import yfinance as yf
 
@@ -87,6 +88,74 @@ def _fetch_options_summary(ticker: str = "QBTS", spot_hint: float | None = None)
         "atm_oi_share": round(atm_oi / max(total_oi, 1), 3),
         "n_expirations": len(exps),
     }
+
+
+_IV_DTE_LO, _IV_DTE_HI = 10, 75      # 回测口径 15-60,放宽两端以容忍到期日稀疏
+_IV_MNY = 0.10                        # |K/S − 1| ≤ 10% 视为 ATM
+_IV_MAX_EXPS = 6                      # 只为 IV 多扫几个到期日,**不动上面的信号聚合**
+
+
+def _atm_iv(ticker: str = "QBTS", spot_hint: float | None = None) -> dict:
+    """
+    实时 ATM 隐含波动率(2026-08-24,mining 第四十二轮产出)。
+
+    **为什么单独扫一遍而不是并进 `_fetch_options_summary`**:那个函数只取最近
+    `_MAX_EXPS=3` 个到期日(常是 DTE 4/11/18),太短、事件敏感;而它喂的 PCR/churn
+    信号有记分卡在跑,**改它的到期日集合 = 改一个在产信号的行为**。所以另起一遍。
+
+    用途(第四十二轮实测,别接错地方):
+      - ✅ 仓位分母。隐含对未来 21 日实现波动 相关 **0.610**,rv20 只有 **0.384**
+        (平均绝对误差 0.354 vs 0.524)。换分母后回撤 **两个半窗都改善约 10pp**。
+      - ✅ 幅度预警(`options_history.jump_risk_band`)。
+      - ❌ **不得**用于方向。偏斜与未来收益相关 +0.002。
+    """
+    try:
+        t = yf.Ticker(ticker)
+        exps = list(t.options or [])[:_IV_MAX_EXPS]
+        if not exps:
+            return {}
+        spot = float(spot_hint) if spot_hint and float(spot_hint) > 0 else float(
+            t.info.get("regularMarketPrice") or t.history(period="1d")["Close"].iloc[-1])
+        if spot <= 0:
+            return {}
+
+        today = pd.Timestamp.today().normalize()
+        pts: list[float] = []
+        used: list[int] = []
+        for exp in exps:
+            dte = (pd.Timestamp(exp) - today).days
+            if not (_IV_DTE_LO <= dte <= _IV_DTE_HI):
+                continue
+            try:
+                chain = t.option_chain(exp)
+            except Exception:
+                continue
+            for df in (chain.calls, chain.puts):
+                if df is None or df.empty or "impliedVolatility" not in df:
+                    continue
+                iv = pd.to_numeric(df["impliedVolatility"], errors="coerce")
+                k = pd.to_numeric(df["strike"], errors="coerce")
+                oi = pd.to_numeric(df.get("openInterest", 0), errors="coerce").fillna(0)
+                vol = pd.to_numeric(df.get("volume", 0), errors="coerce").fillna(0)
+                # 质量闸:IV 落在合理带内 + 该合约至少有人碰过(纯僵尸报价的 IV 是垃圾)
+                ok = (iv.between(0.05, 6.0) & (k / spot - 1).abs().le(_IV_MNY)
+                      & ((oi > 0) | (vol > 0)))
+                pts.extend(iv[ok].tolist())
+            if pts:
+                used.append(dte)
+
+        if len(pts) < 4:
+            return {}
+        # 中位数:对 Yahoo 偶发的离谱 IV 免疫(比均值稳)
+        return {
+            "atm_iv": round(float(np.median(pts)), 4),
+            "n_points": len(pts),
+            "dte_used": used,
+            "spot": round(spot, 2),
+        }
+    except Exception as e:
+        logger.warning("ATM IV fetch failed: %s", str(e)[:80])
+        return {}
 
 
 def _signal_from_summary(s: dict) -> dict:
@@ -193,6 +262,11 @@ def get_options_signal(force_refresh: bool = False,
     try:
         summary = _fetch_options_summary("QBTS", spot_hint=spot_hint)
         payload = _signal_from_summary(summary)
+        # ATM 隐含波动率:与上面的方向信号**完全解耦**(它喂 sizing,不进 log-odds)。
+        # 拿不到就不带这个 key —— 下游 exposure.py 退回 rv20 = 当前在产行为。
+        iv = _atm_iv("QBTS", spot_hint=spot_hint)
+        if iv:
+            payload["atm_iv"] = iv
     except Exception as e:
         logger.warning(f"Options fetch failed: {e}")
         payload = {"signal": 0, "label": "HOLD", "confidence": "low",

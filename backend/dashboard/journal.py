@@ -150,6 +150,9 @@ def record(decision: dict, price_at_decision: float, as_of: str,
         "conviction": decision.get("conviction"),
         "p_up_5d":    decision.get("p_up_5d"),
         "bold_call_5d": decision.get("bold_call_5d"),
+        # 敞口刻度(2026-08-24 上线即建账 —— 这个仓库的老毛病是「测出来有效却从没
+        # 接线/从没记分」,见 REVIEW-2026-07 §5.3)。判决线见 audit._exposure_audit。
+        "exposure_pct": ((decision.get("exposure") or {}) or {}).get("pct"),
         # DeepSeek 影子考场:表态每日评分(与 Fable 同一套 fwd5 口径),
         # 计划三价/行动一并存档供日后回测(用户 2026-07-13:决策都要存好。
         # 全文档在 dashboard_state 行里永久累积,这里存结构化字段免挖快照)

@@ -504,6 +504,98 @@ def _conviction_audit(recs: list[dict]) -> dict:
     return out
 
 
+# ── 敞口刻度判决线(2026-08-24 写死,上线当天定,审判日不得更改)──────────────
+# 刻度(exposure.py)**只做过一个承诺**:同等收益下把回撤压下来。它不预测方向,
+# 所以不能用命中率评它 —— 用命中率评一个 sizing 规则是口径错配(REVIEW-2026-07 §5.4
+# 那条根因:「挖矿问这套规则一年跑不跑得赢,仪表盘问今天买不买」)。
+#
+# **判决线**:n ≥ 60 个有刻度的交易日后,
+#   ✅ 兑现   —— 刻度加权纸面净值的最大回撤 < 买入持有最大回撤 **且** 收益 ≥ 买入持有的 60%
+#   ⚠️ 打折   —— 回撤更浅但收益 < 买入持有的 60%(降了风险也砍了行情,须复核目标波动)
+#   ❌ 没兑现 —— 回撤 ≥ 买入持有(它唯一的承诺没做到)→ 该把刻度撤回纯 rv20 或下线
+# 回测预期(QBTS 2024-02→2026-07,费后):刻度 −46% vs 买入持有 −71%,收益比 31%。
+# ⚠️ 收益比那条线定在 60% 是**回测里达不到的**(31%)—— 故意留成「打折」而非「兑现」,
+#    免得上线后拿一个必然通过的线自我表扬。真要判「兑现」必须比回测表现更好。
+_EXP_MIN_DAYS = 60
+_EXP_RET_FLOOR = 0.60
+
+
+def _exposure_audit(recs: list[dict], df_d) -> dict:
+    """敞口刻度:有没有兑现「同等收益、更浅回撤」(线见上方注释,零决策权)。"""
+    import math
+
+    rows = []
+    for r in recs:
+        p = r.get("exposure_pct")
+        d = r.get("date")
+        if p is None or not d:
+            continue
+        try:
+            p = float(p)
+        except (TypeError, ValueError):
+            continue
+        if 0.0 <= p <= 1.0:
+            rows.append((str(d), p))
+    rows.sort()
+    out = {"n": len(rows), "min_days": _EXP_MIN_DAYS,
+           "rule": ("n≥60 后:回撤更浅且收益≥买持60% → ✅兑现;更浅但收益不足 → ⚠️打折;"
+                    "回撤不更浅 → ❌没兑现(刻度唯一的承诺没做到)")}
+    if not rows:
+        out["verdict"] = "尚无带刻度的记录(刻度 2026-08-24 上线,从这天起累积)"
+        return out
+    out["first_date"], out["last_date"] = rows[0][0], rows[-1][0]
+    out["mean_exposure"] = round(sum(p for _, p in rows) / len(rows), 3)
+
+    if df_d is None or len(df_d) < 5:
+        out["verdict"] = "日线缺失,无法复算"
+        return out
+    try:
+        # 列名大小写在本文件里不统一(_horse_verdict 也做了同样的 rename 防御)
+        col = df_d.rename(columns=str.lower)["close"].astype(float)
+        closes = {str(ix)[:10]: float(c) for ix, c in zip(df_d.index, col)}
+    except Exception:
+        out["verdict"] = "日线格式异常,无法复算"
+        return out
+
+    # 刻度是**收盘定仓、次日生效**(与回测口径一致,避免用当天收益评当天的仓位)
+    nav_l, nav_b, peak_l, peak_b, dd_l, dd_b = 1.0, 1.0, 1.0, 1.0, 0.0, 0.0
+    prev_px, prev_w, used = None, 0.0, 0
+    for d, w in rows:
+        px = closes.get(d)
+        if px is None:
+            continue
+        if prev_px is not None and prev_px > 0:
+            r_d = px / prev_px - 1
+            nav_l *= (1 + prev_w * r_d - abs(prev_w - w) * 0.002)   # 费后 0.2%/边
+            nav_b *= (1 + r_d)
+            peak_l, peak_b = max(peak_l, nav_l), max(peak_b, nav_b)
+            dd_l = min(dd_l, nav_l / peak_l - 1)
+            dd_b = min(dd_b, nav_b / peak_b - 1)
+            used += 1
+        prev_px, prev_w = px, w
+
+    out.update(days_scored=used,
+               nav_ladder=round(nav_l, 4), nav_buyhold=round(nav_b, 4),
+               dd_ladder=round(dd_l, 4), dd_buyhold=round(dd_b, 4))
+    if used < _EXP_MIN_DAYS:
+        out["verdict"] = f"样本不足·继续测量({used}/{_EXP_MIN_DAYS} 天,线已预注册)"
+        return out
+
+    ret_l, ret_b = nav_l - 1, nav_b - 1
+    shallower = dd_l > dd_b                      # 回撤是负数,大 = 更浅
+    enough = (ret_l >= ret_b * _EXP_RET_FLOOR) if ret_b > 0 else (ret_l >= ret_b)
+    if shallower and enough:
+        out["verdict"] = (f"✅ 兑现:回撤 {dd_l:.1%} vs 买持 {dd_b:.1%},"
+                          f"收益 {ret_l:+.1%} vs {ret_b:+.1%}")
+    elif shallower:
+        out["verdict"] = (f"⚠️ 打折:回撤更浅({dd_l:.1%} vs {dd_b:.1%})但收益只有买持的 "
+                          f"{(ret_l/ret_b if ret_b else float('nan')):.0%} —— 复核目标波动 0.60")
+    else:
+        out["verdict"] = (f"❌ 没兑现:回撤 {dd_l:.1%} 不比买持 {dd_b:.1%} 浅 —— "
+                          f"刻度唯一的承诺没做到,应撤回纯 rv20 或下线")
+    return out
+
+
 def _p_up_diagnostic(recs: list[dict]) -> dict:
     """p_up 反预测立案(用户 2026-07-30 拍板,REVIEW-2026-07 §7 P1)。
 
@@ -674,6 +766,7 @@ def run_audit() -> dict:
         report["sections"]["decision_journal"]["horizons"] = _horizon_audit(recs, df_d)
         report["sections"]["decision_journal"]["p_up_diagnostic"] = _p_up_diagnostic(recs)
         report["sections"]["decision_journal"]["conviction"] = _conviction_audit(recs)
+        report["sections"]["decision_journal"]["exposure"] = _exposure_audit(recs, df_d)
         # 📋 板块记分卡(2026-07-31 建账):prompt 里有发言权、§1 却没记分卡的那些
         report["sections"]["decision_journal"]["readings"] = _readings_audit(recs)
         # 影子考场:Fable vs DeepSeek vs v1反向影子(2026-07-21,用户拍板) 的
@@ -1015,7 +1108,32 @@ if __name__ == "__main__":
     assert _conviction_audit([_rec(6, True)] * 5 + [_rec(4, False)] * 40
                              )["power_verdict"].startswith("样本不足")
     assert _conviction_audit([])["n"] == 0
-    print("audit.py self-check OK (独立段 + 信心刻度)")
+
+    # 敞口刻度台账(2026-08-24):判决线三条分支各造一个样本
+    import numpy as _np
+    import pandas as _pd
+    _dts = _pd.bdate_range("2026-01-01", periods=90)
+    _rng = _np.random.default_rng(7)
+    _df = _pd.DataFrame(
+        {"close": 20 * _np.exp(_np.cumsum(_rng.normal(0.002, 0.07, len(_dts))))},
+        index=_dts)
+    _mk = lambda w: [{"date": str(d.date()), "exposure_pct": x}
+                     for d, x in zip(_dts, w)]
+    assert _exposure_audit([], _df)["verdict"].startswith("尚无")
+    assert _exposure_audit(_mk([0.5] * 20), _df)["verdict"].startswith("样本不足")
+    # 恒定满仓 ≡ 买入持有 → 回撤不可能更浅 → 必须判「没兑现」
+    assert _exposure_audit(_mk([1.0] * 90), _df)["verdict"].startswith("❌")
+    # 恒定半仓 → 回撤必然更浅
+    assert _exposure_audit(_mk([0.5] * 90), _df)["verdict"][0] in "✅⚠"
+    # 脏数据(非数/缺日期/越界)必须全部被剔掉,而不是算进去
+    assert _exposure_audit([{"date": "2026-01-01", "exposure_pct": "x"},
+                            {"date": None, "exposure_pct": 0.5},
+                            {"exposure_pct": 0.5},
+                            {"date": "2026-01-02", "exposure_pct": 5.0}],
+                           _df)["n"] == 0
+    assert _exposure_audit(_mk([0.5] * 90), None)["verdict"].startswith("日线缺失")
+
+    print("audit.py self-check OK (独立段 + 信心刻度 + 敞口刻度)")
 
     if "--selfcheck" in sys.argv:
         sys.exit(0)

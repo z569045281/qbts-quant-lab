@@ -201,6 +201,16 @@ export default function Dashboard() {
   const meta = d ? getActionMeta(d.action, d.conviction) : null;
   const genAt = fmtLocalDateTime(snap.decision_generated_at);   // UTC → 浏览器本地时区
 
+  // ── 敞口刻度:全页**唯一真相源**(2026-08-24,mining 第四十二轮)────────────
+  // 决策卡自带的 d.exposure 优先 —— 它的分母是 max(20日已实现, ATM隐含),回测里
+  // 两个半窗回撤都比纯 rv20 浅约 10pp。旧缓存/决策未生成时退回 regime.vol_target
+  // (= 换分母之前的在产口径)。**绝不允许页面上同时出现两个不同的敞口百分比** ——
+  // 那正是记忆 review-cross-source-consistency 记的那类事故。
+  const expPct  = d?.exposure?.pct ?? snap.regime?.vol_target?.position_pct ?? null;
+  const expBand = d?.exposure?.band ?? null;
+  const expNote = d?.exposure?.note ?? snap.regime?.vol_target?.note ?? "";
+  const expDegraded = d?.exposure?.degraded === true;
+
   // ── Plan vitality check: compare LIVE price against the plan's kill level.
   // A displayed plan whose invalidation has been breached is worse than no
   // plan — flag it dead in red instead of letting a stale "buy at $26" stand.
@@ -521,6 +531,26 @@ export default function Dashboard() {
                 </div>
                 <div className="text-[9px] opacity-50 mt-1">{CONVICTION_LEGEND}</div>
               </div>
+              {/* 敞口刻度 —— 观望日照样显示。这是 2026-08-24 加的:此前 91% 的日子
+                  这张卡唯一能说的话是「观望 · 0 仓位」,而「今天不开新仓」和
+                  「手上这些该拿多大」是两个不同的问题。刻度只答后者。 */}
+              {expPct != null && (
+                <div className="mt-2.5 pt-2.5 border-t border-current/10" title={expNote}>
+                  <div className="flex justify-between items-baseline text-[10px] opacity-70 mb-1">
+                    <span>敞口刻度{expBand ? ` · ${expBand}` : ""}</span>
+                    <span className="font-mono font-semibold tabular-nums">
+                      {(expPct * 100).toFixed(0)}%
+                      {expDegraded && <span className="ml-1 opacity-60" title="期权源缺失,已退回纯已实现波动率">⚠︎</span>}
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-white/70 rounded-full overflow-hidden border border-current/10">
+                    <div className="h-full bg-indigo-500/70" style={{ width: `${expPct * 100}%` }} />
+                  </div>
+                  <div className="text-[9px] opacity-50 mt-1">
+                    只管拿多大 · 不管往哪买 · 观望日也有刻度
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="text-sm text-gray-400 mt-1">
@@ -548,8 +578,7 @@ export default function Dashboard() {
                  ["目标", fmtPx(d.trade_plan.etf_target), "text-emerald-600"],
                  ["盈亏比", d.trade_plan.rr_ratio ? `1:${d.trade_plan.rr_ratio.toFixed(1)}` : "—", "text-gray-900"],
                  ["仓位", `${d.trade_plan.suggested_position_pct}%`, "text-gray-900"],
-                 ["敞口上限", snap.regime?.vol_target?.position_pct != null
-                    ? `≤${(snap.regime.vol_target.position_pct * 100).toFixed(0)}%` : "—", "text-indigo-600"],
+                 ["敞口上限", expPct != null ? `≤${(expPct * 100).toFixed(0)}%` : "—", "text-indigo-600"],
                 ] as const).map(([k, v, cls]) => (
                 <div key={k}>
                   <div className="text-[10px] text-gray-400">{k}</div>
@@ -562,9 +591,9 @@ export default function Dashboard() {
               {d?.plan_valid === false
                 ? <span className="text-red-700">⚠️ 止损/目标方向异常,价位已隐藏以防误用 —— 重跑 publish.py。</span>
                 : <>📭 <b className="text-gray-700">暂不持仓</b>,没有入场 / 止损 / 目标,仓位 0%。
-                   {snap.regime?.vol_target?.position_pct != null && (
+                   {expPct != null && (
                      <span className="block mt-1 text-[12px] text-indigo-700">
-                       📐 投机仓整体敞口仍受 ≤{(snap.regime.vol_target.position_pct * 100).toFixed(0)}% 约束(与今日方向无关)。
+                       📐 投机仓整体敞口仍受 ≤{(expPct * 100).toFixed(0)}% 约束(与今日方向无关)。
                      </span>
                    )}</>}
             </div>
@@ -616,7 +645,7 @@ export default function Dashboard() {
               </div>
               <div className="bg-[#F6F6F8] rounded-lg px-2.5 py-1.5">
                 <div className="text-[10px] text-gray-400">④ 买多少 · 拿什么</div>
-                ≤<b className="font-mono">{((snap.regime?.vol_target?.position_pct ?? snap.champs.vt_pct) * 100).toFixed(0)}%</b> 投机资金,其余现金
+                ≤<b className="font-mono">{((expPct ?? snap.champs.vt_pct) * 100).toFixed(0)}%</b> 投机资金,其余现金
                 <span className="block text-[11px] text-gray-500">≤5 天用 QBTX,更久用 QBTS 正股</span>
               </div>
             </div>
@@ -774,10 +803,10 @@ export default function Dashboard() {
                     满足入场条件(见下方「展开看细节」)后再按对应方向进场;在此之前没有入场 / 止损 / 目标价,仓位 0%。
                   </div>
                   {/* HOLD 天也要看得到 sizing 规则 — 它管的是"整个投机仓该多大",与今日方向无关 */}
-                  {snap.regime?.vol_target?.position_pct != null && (
+                  {expPct != null && (
                     <div className="mt-2 text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-md px-2.5 py-1.5 leading-snug"
-                         title={snap.regime.vol_target.note}>
-                      📐 <b>波动率目标敞口 ≤{(snap.regime.vol_target.position_pct * 100).toFixed(0)}%</b>
+                         title={expNote}>
+                      📐 <b>敞口刻度 ≤{(expPct * 100).toFixed(0)}%</b>
                       ：以当前波动,投机仓整体别超过这个比例(一年回测:+60.6%/−56%回撤 vs 满仓买持 +41%/−71%;不预测方向,只管大小)。
                     </div>
                   )}
@@ -816,14 +845,14 @@ export default function Dashboard() {
                         </td>
                       </tr>
                       {/* 波动率目标仓位 — 一年回测唯一同时改善收益与回撤的 sizing 规则(不预测方向) */}
-                      {snap.regime?.vol_target?.position_pct != null && (
+                      {expPct != null && (
                         <tr>
-                          <td className="py-1.5 text-[#525461] text-xs" title={snap.regime.vol_target.note}>
+                          <td className="py-1.5 text-[#525461] text-xs" title={expNote}>
                             📐 波动率目标敞口
                           </td>
                           <td className="py-1.5 text-right font-mono font-semibold text-indigo-600"
-                              title={snap.regime.vol_target.note}>
-                            ≤{(snap.regime.vol_target.position_pct * 100).toFixed(0)}% 投机仓
+                              title={expNote}>
+                            ≤{(expPct * 100).toFixed(0)}% 投机仓
                           </td>
                         </tr>
                       )}

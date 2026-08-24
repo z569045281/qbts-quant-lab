@@ -699,17 +699,38 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
         parts.append("## 一级信号即时读数（回测验证过的高权重信号,与决策纪律 B 级清单对应）\n  "
                      + "\n  ".join(lv1))
 
-    # ── 波动率 regime（决定止损宽度与仓位档位）────────────────
+    # ── 波动率 regime（决定止损宽度）────────────────────────────
     reg = snapshot.get("regime")
     if reg and reg.get("rationale"):
-        vt = reg.get("vol_target") or {}
-        vt_s = ""
-        if vt.get("position_pct"):
-            # 一年窗口实测唯一同时改善收益与回撤的 sizing 规则 — 作为仓位上限参考
-            vt_s = (f"\n  {vt.get('note','')}\n"
-                    f"  纪律:你给的 suggested_position_pct 不应显著超过这个敞口参考"
-                    f"(它按波动自动缩放,是回测验证过的仓位天花板,不是方向观点)。")
-        parts.append(f"## 波动率 Regime\n  {reg['rationale']}{vt_s}")
+        parts.append(f"## 波动率 Regime\n  {reg['rationale']}")
+
+    # ── 敞口刻度（决定仓位大小；2026-08-24 取代旧的 regime.vol_target 段）──
+    # ⚠️ 刻度必须是**唯一**的敞口数字。旧 vol_target(0.60/rv20)与本刻度
+    #    (0.60/max(rv20, 隐含))算法不同,同时渲染会给出两个打架的百分比
+    #    —— 正是记忆 `review-cross-source-consistency` 那类事故。故旧段已删。
+    try:
+        from dashboard.exposure import compute_exposure, render_for_prompt
+    except ImportError:                      # 本地脚本式运行(无 dashboard 包前缀)
+        from exposure import compute_exposure, render_for_prompt
+    exp_block = compute_exposure(reg, snapshot.get("options"))
+    rendered = render_for_prompt(exp_block)
+    if rendered:
+        parts.append(rendered)
+
+    # 幅度预警(纯风险,零方向)—— 第四十二轮唯一过关的期权用途
+    try:
+        from dashboard.options_history import jump_risk_band
+    except ImportError:
+        from options_history import jump_risk_band
+    jr = jump_risk_band((exp_block or {}).get("atm_iv"))
+    if jr:
+        parts.append(
+            f"## 幅度预警（期权隐含，纯风险读数，**零方向信息**）\n"
+            f"  当前隐含波动率处于 {jr['band']} 档 → 未来 10 个交易日"
+            f"「最大单日涨跌」中位约 {jr['expected_max_daily_move_10d']*100:.0f}%，"
+            f"出现 ≥8% 跳空的概率约 {jr['p_gap_ge_8pct_10d']*100:.0f}%。\n"
+            f"  用途：定止损宽度、判断该不该持杠杆过夜、要不要提前减档。\n"
+            f"  ⚠️ {jr['note']} 不得据此给方向或调 conviction。")
 
     # ── Nadaraya-Watson 包络（非重绘均值回归带）────────────────
     nw = snapshot.get("nw_envelope")
@@ -1084,6 +1105,20 @@ def _sanitize_decision(decision: dict, snapshot: dict, extras: dict | None) -> d
     conv = int(decision.get("conviction", 0) or 0)
     action = decision.get("action")
     decision["watch_levels"] = _clean_watch_levels(decision.get("watch_levels"))
+
+    # ── 敞口刻度:代码算,不问模型 ────────────────────────────────
+    # 为什么不让模型给:conviction 实测 82% 卡在 4(2026-08-22),一个塌成点的量表
+    # 不能再生一个数字。刻度是确定性的,可复算、可审计、每天都有 —— 包括 HOLD 日。
+    try:
+        try:
+            from dashboard.exposure import compute_exposure
+        except ImportError:
+            from exposure import compute_exposure
+        decision["exposure"] = compute_exposure(
+            (snapshot or {}).get("regime"), (snapshot or {}).get("options"))
+    except Exception as e:                      # 刻度绝不能让整张决策卡挂掉
+        logger.warning("exposure ladder failed: %s", str(e)[:120])
+        decision["exposure"] = None
 
     # bold_call_5d 兜底:模型漏给/非法时从 p_up 推导(≥0.5→up),台账必须天天有表态
     if decision.get("bold_call_5d") not in ("up", "down"):
