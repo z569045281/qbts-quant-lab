@@ -693,6 +693,26 @@ export interface Decision {
     note?:       string;
     discipline?: string;
   } | null;
+  /* 载具推荐(2026-08-24,军规 D2 的数据面):QBTX 的无衰减替代品。
+     实测同窗 QBTS +171% 而 QBTX 只 +16%、回撤 −95%(年化方差拖累 ≈126%)。
+     筛选闸:DTE≥120 · delta≥0.75 · 有效杠杆 1.6-2.6× · 未平仓≥200 · 半边价差≤10%。*/
+  vehicle?: {
+    spot: number;
+    qbtx_drag_annual: number;      // 1.26 = 年化 126%
+    candidates: {
+      expiration: string; dte: number; strike: number;
+      bid: number; ask: number; mid: number;
+      cost_per_contract: number;   // 每张成本(=mid×100)
+      time_value: number;          // 房租
+      rent_share: number;          // 房租占权利金比例
+      rent_annual: number;         // 年化房租 ← 与 qbtx_drag_annual 直接可比
+      delta: number; shares_equiv: number; leverage: number;
+      breakeven: number; breakeven_move: number;
+      half_spread: number; open_interest: number; iv: number;
+    }[];
+    warning?: string;
+    note?: string;                 // 五道闸全落空时的说明
+  } | null;
   shadow?:            boolean;   // true = 影子决策(零决策权,仅对照)
   shadow_ds?:         Decision;  // DeepSeek V4 Pro 影子决策(卡上可切换;8/15 同框宣判)
   shadow_v1_inverse?: {          // 2026-07-21:原始21%命中元模型整体反向的零决策权影子(纯机械,不可切换查看,只做每日徽章)

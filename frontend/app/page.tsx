@@ -654,6 +654,56 @@ export default function Dashboard() {
               可能增发腰斩,止损保护不了隔夜跳空,<b>仓位小是唯一真防御</b>。
               DCA 核心仓(📥定投专区)永远另册,<b>两边不许挪钱</b>。
             </div>
+
+            {/* 载具选择(2026-08-24,mining 第 42 轮):军规原本只教「怎么少受伤」,
+                从没说过「其实有不受这个伤的东西」。这块补的就是那句话。 */}
+            {d?.vehicle?.candidates?.length ? (
+              <details className="mt-1.5 bg-indigo-50 rounded-lg px-2.5 py-1.5 text-[11px] leading-snug text-indigo-900 group">
+                <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                  <b>🔁 载具:QBTX 不是长持工具</b> —— 同窗实测 QBTS <b>+171%</b> 而 QBTX 只 <b>+16%</b>
+                  (回撤 −95%,年化方差拖累 ≈{(d.vehicle.qbtx_drag_annual * 100).toFixed(0)}%)。
+                  <span className="text-indigo-600 group-open:hidden"> 看替代方案 ›</span>
+                </summary>
+                <div className="mt-1.5 pt-1.5 border-t border-indigo-200">
+                  <div className="mb-1">
+                    「≤5 天用 QBTX」是<b>止血,不是解法</b>。要长期拿多头敞口,用正股或深度实值长期 call:
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[10px] tabular-nums">
+                      <thead className="text-indigo-500">
+                        <tr>
+                          <th className="text-left font-medium py-0.5">合约</th>
+                          <th className="text-right font-medium">每张</th>
+                          <th className="text-right font-medium">杠杆</th>
+                          <th className="text-right font-medium">年化房租</th>
+                          <th className="text-right font-medium">回本需涨</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {d.vehicle.candidates.map(c => (
+                          <tr key={`${c.expiration}-${c.strike}`} className="border-t border-indigo-100">
+                            <td className="py-0.5 font-mono">{c.expiration.slice(2)} ${c.strike}C</td>
+                            <td className="text-right font-mono">${c.cost_per_contract.toLocaleString()}</td>
+                            <td className="text-right font-mono">{c.leverage}×</td>
+                            <td className="text-right font-mono font-semibold">{(c.rent_annual * 100).toFixed(0)}%</td>
+                            <td className="text-right font-mono">{(c.breakeven_move * 100).toFixed(0)}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="mt-1.5 text-[10px] text-indigo-700">
+                    一张 = 100 股。<b>年化房租</b>直接对比 QBTX 的
+                    {" "}{(d.vehicle.qbtx_drag_annual * 100).toFixed(0)}%。
+                  </div>
+                  <div className="mt-1 text-[10px] text-red-700 bg-red-50 rounded px-1.5 py-1">
+                    ⚠️ <b>和 QBTX 最大的不同</b>:到期时正股若低于行权价,<b>权利金归零</b>
+                    (QBTX 跌一半还剩一半)。这是拿「确定的上限」换「不确定的流血」,不是无风险改进。
+                    换载具 ≠ 加仓;金额是否超 ⓪ 总闸自行核对。<b>只给建议,不代下单。</b>
+                  </div>
+                </div>
+              </details>
+            ) : null}
           </div>
         ) : <div />}
       </div>

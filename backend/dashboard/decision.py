@@ -83,6 +83,16 @@ C. 已判死的推理路径（数据来了也不许当证据）：追大跳空�
 D. 执行军规（第七轮实测）：QBTX 年拖累−24%/QBTZ−34%;持有≤5天用 QBTX,
    >5天建议正股,QBTZ 只做1-3天战术空且绝不过周——把这写进 entry_condition 相关建议。
 
+D2. **载具优先于信号**（第四十二轮实测,2026-08-24 新增）：
+   同窗(2025-04-25→2026-08-21) QBTS 正股 **+171%**,而 QBTX 2× 只 **+16%**、回撤 −95%
+   —— 112% 的实现波动率让日再平衡方差拖累达 **年化 ≈126%**。
+   **这个损耗量级大于本档案 42 轮挖矿在找的所有 edge。**
+   ⚠️ 上面 D 条的「持有≤5天」是**止血,不是解法**;解法是换掉载具:
+     · 长期持有多头敞口 → **正股** 或 **深度实值长期 call**(见下方「载具选择」段的实时推荐)
+     · QBTX 只在「≤5 天的战术多头」这一个用途上还成立
+   若用户实盘持有 QBTX 且已超 5 天,**必须在 position_advice 里点名这件事并给出替代方案**
+   (换几张、成本多少、盈亏平衡在哪、归零风险)。这是载具平移,**不是加仓**。
+
 ════ 决策纪律 ════
 1. 观望合法且常见。优势不明确绝不硬给方向——错误的高信心比观望贵得多。
 2. conviction ≥7 必须有多个【一级信号】共振;单一信号最多 5;二级/三级信号
@@ -992,6 +1002,29 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
             parts.append("## 用户实盘持仓（真金！请按规则 16 逐笔在 position_advice 给操作建议，"
                          "重点核对持有天数是否违反执行军规）\n  " + "\n  ".join(rows))
 
+    # ── 载具选择（军规 D2 的实时数据面；2026-08-24 第四十二轮建议① 落地）──
+    # 只在持有杠杆 ETF 或本来就该讨论多头敞口时才渲染 —— 否则每天占提示词篇幅。
+    # 网络在 recommend_vehicle 内部缓存 6h;整段失败只是不渲染,决策照出。
+    try:
+        try:
+            from dashboard.vehicle import recommend_vehicle
+            from dashboard.vehicle import render_for_prompt as _veh_render
+        except ImportError:
+            from vehicle import recommend_vehicle
+            from vehicle import render_for_prompt as _veh_render
+        _qbts_px, _qbtx_px, _ = _anchor_prices(snapshot, extras)
+        _qx_sh = _qx_px = None
+        for p in (snapshot.get("user_positions") or []):     # ← 持仓在 snapshot,不在 extras
+            if p.get("ticker") == "QBTX" and _num(p.get("qty")):
+                _qx_sh, _qx_px = _num(p.get("qty")), _qbtx_px
+                break
+        _veh = recommend_vehicle(spot=_qbts_px)
+        _veh_s = _veh_render(_veh, _qx_sh, _qx_px)
+        if _veh_s:
+            parts.append(_veh_s)
+    except Exception as e:
+        logger.warning("vehicle block skipped: %s", str(e)[:100])
+
     parts.append("请综合以上全部证据，按 system prompt 的 JSON 格式输出今天的交易决定。")
     return "\n\n".join(parts)
 
@@ -1129,6 +1162,18 @@ def _sanitize_decision(decision: dict, snapshot: dict, extras: dict | None) -> d
     except Exception as e:                      # 刻度绝不能让整张决策卡挂掉
         logger.warning("exposure ladder failed: %s", str(e)[:120])
         decision["exposure"] = None
+
+    # ── 载具推荐(军规 D2 的数据面)。同样:失败只是没有,不许让决策卡挂 ──
+    try:
+        try:
+            from dashboard.vehicle import recommend_vehicle
+        except ImportError:
+            from vehicle import recommend_vehicle
+        decision["vehicle"] = recommend_vehicle(
+            spot=_anchor_prices(snapshot, extras)[0]) or None
+    except Exception as e:
+        logger.warning("vehicle reco failed: %s", str(e)[:120])
+        decision["vehicle"] = None
 
     # bold_call_5d 兜底:模型漏给/非法时从 p_up 推导(≥0.5→up),台账必须天天有表态
     if decision.get("bold_call_5d") not in ("up", "down"):
