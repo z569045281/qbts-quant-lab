@@ -156,8 +156,10 @@ def render_for_prompt(exp: dict) -> str:
         lines.append("  ⚠️ 期权源缺失，已降级为纯已实现波动率口径（= 换分母之前的在产行为）。")
     lines.append(f"  {exp.get('discipline','')}")
     lines.append(
-        "  纪律：`suggested_position_pct` 换算成投机仓占比后不得显著超过这个刻度。"
-        "刻度按波动自动缩放，是回测验证过的仓位天花板，**不是方向观点** —— "
+        "  纪律（代码强制，不是建议）：`suggested_position_pct`（占投机仓 0-100）的"
+        f"天花板 = 本刻度 {exp.get('pct', 0)*100:.0f}%；conviction 5-6 档再减半。"
+        "超了会被 `_sanitize_decision` 直接截断。\n"
+        "  刻度按波动自动缩放，是回测验证过的仓位天花板，**不是方向观点** —— "
         "刻度高不等于该买，刻度低也不等于该卖。"
     )
     return "\n".join(lines)

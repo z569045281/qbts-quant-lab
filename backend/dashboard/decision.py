@@ -95,8 +95,17 @@ D. 执行军规（第七轮实测）：QBTX 年拖累−24%/QBTZ−34%;持有≤
 7. 全部中文,价格两位小数;面向用户的文字要像说话,绝不出现 JSON 字段名。
 8. 宏观纪律(QBTS=高beta长久期资产):48h内有 CPI/PPI/FOMC → conviction 上限6、
    仓位减半或改为"数据落地再进";通胀升温=逆风驱动;FOMC 周方向押注打折。
-9. conviction 与 action 一致性(严格):≤4→必须 HOLD;5-6→仓位≤12%且入场必须带
-   确认触发;≥7→15-30%。三者永远自洽。
+9. conviction 与 action 一致性(严格):**≤4→必须 HOLD**;5-6→入场必须带确认触发。
+   ⚠️ conviction **不再决定仓位大小**(2026-08-24 用户拍板改口径):
+   大小由【敞口刻度】定(见下方同名段落),因为 conviction 实测 82% 卡在 4、
+   分辨力至今只有 2 条高信心样本 —— 用一把没校准的尺子定仓位,不如用波动率。
+   conviction 只保留它已验证的职责:**闸方向**。
+
+9b. **仓位口径(2026-08-24 用户拍板,与旧版不同,以本条为准)**:
+   `suggested_position_pct` = **占投机仓的百分比,0-100**。
+   (投机仓自身 ≤ 总资产 10% 的总闸由军规卡⓪管,不在这个数字里,别重复打折。)
+   天花板 = **敞口刻度**;5-6 档再减半(试探)。代码会强制夹,你给超了会被截断。
+   例:刻度 51% + conviction 7 → 你最多给 51;刻度 51% + conviction 6 → 最多给 25。
 
 ════ conviction 刻度锚定(2026-08-22 新增,规则 2/8/9 一字未改)════
 **为什么加这段**:实测 2026-06-16→08-21 的 56 次决策,conviction 有 **46 次(82%)
@@ -162,7 +171,8 @@ D. 执行军规（第七轮实测）：QBTX 年拖累−24%/QBTZ−34%;持有≤
   "trade_plan": {
     "qbts_entry": <入场触发价>, "qbts_stop": <止损价>, "qbts_target": <目标价>,
     "etf_ticker": "QBTX"|"QBTZ"|null, "etf_entry": <价>, "etf_stop": <价>, "etf_target": <价>,
-    "rr_ratio": <盈亏比>, "suggested_position_pct": <建议仓位0-30>,
+    "rr_ratio": <盈亏比>, "suggested_position_pct": <占投机仓的百分比 0-100，见规则 9b；
+                          天花板=敞口刻度，5-6 档再减半，超了会被代码截断>,
     "entry_condition": "<什么条件下入场，如'放量突破$27'或'直接市价'>"
   },
   "key_drivers": [
@@ -1099,7 +1109,7 @@ def _sanitize_decision(decision: dict, snapshot: dict, extras: dict | None) -> d
     - recompute R:R from the levels (never trust the model's arithmetic).
     - OVERWRITE the ETF entry/stop/target deterministically from the real
       current ETF price — these are the prices the user actually transacts on.
-    - clamp suggested_position_pct to the conviction tier.
+    - clamp suggested_position_pct to the exposure ladder (占投机仓 0-100，见规则 9b).
     """
     tp = dict(decision.get("trade_plan") or {})
     conv = int(decision.get("conviction", 0) or 0)
@@ -1185,8 +1195,28 @@ def _sanitize_decision(decision: dict, snapshot: dict, extras: dict | None) -> d
         tp["etf_entry"] = tp["etf_stop"] = tp["etf_target"] = None
 
     # Position sizing must respect the conviction tier (rule 9).
+    # ── 仓位口径(2026-08-24 用户拍板)────────────────────────────────────
+    # `suggested_position_pct` = **占投机仓的百分比,上限 100%**(投机仓本身
+    # ≤ 总资产 10% 的总闸不动)。旧代码是 `min(pct, 12 或 30)` —— 那个 30 的
+    # 上限在旧口径下含义不明,且导致提示词里「不得超过敞口刻度」那句**从未生效过**
+    # (刻度常在 50-100,30 永远小于它)。现在刻度是真正的天花板。
+    #
+    # 天花板 = min(100%, 敞口刻度)。刻度用波动率定大小,是本仓库唯一被反复验证过的
+    # sizing 规则(mining 第 42 轮:回撤 −46% vs 买持 −71%,两个半窗都改善)。
+    # 大小不再挂 conviction —— conviction 实测 82% 卡在 4、分辨力至今只有 2 条
+    # 高信心样本(从没被验证过),用一把没校准的尺子定仓位比用波动率差。
+    # conviction 只保留它已验证的职责:≤4 → HOLD(方向闸门,上面那段,一个字没动)。
+    #
+    # 唯一保留的信心相关折扣:5-6 档减半。这不是新回测常数,是沿用旧规则 9
+    # 「5-6 = 试探档,入场必须带确认触发」的既有语义,避免顺手把一条安全性质删掉。
+    ladder = ((decision.get("exposure") or {}) or {}).get("pct")
+    ceiling = 100.0
+    if isinstance(ladder, (int, float)) and 0 < ladder <= 1:
+        ceiling = min(ceiling, float(ladder) * 100.0)
+    if conv <= 6:
+        ceiling *= 0.5                      # 试探档(承旧规则 9 的语义,非新常数)
     pct = _num(tp.get("suggested_position_pct")) or 0.0
-    tp["suggested_position_pct"] = int(max(0.0, min(pct, 12.0 if conv <= 6 else 30.0)))
+    tp["suggested_position_pct"] = int(max(0.0, min(pct, ceiling)))
 
     decision["trade_plan"] = tp
     return decision

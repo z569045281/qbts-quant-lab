@@ -577,7 +577,7 @@ export default function Dashboard() {
                  ["止损", fmtPx(d.trade_plan.etf_stop), "text-[#F03A3E]"],
                  ["目标", fmtPx(d.trade_plan.etf_target), "text-emerald-600"],
                  ["盈亏比", d.trade_plan.rr_ratio ? `1:${d.trade_plan.rr_ratio.toFixed(1)}` : "—", "text-gray-900"],
-                 ["仓位", `${d.trade_plan.suggested_position_pct}%`, "text-gray-900"],
+                 ["仓位", `${d.trade_plan.suggested_position_pct}%`, "text-gray-900"],   // 占投机仓,天花板=敞口刻度
                  ["敞口上限", expPct != null ? `≤${(expPct * 100).toFixed(0)}%` : "—", "text-indigo-600"],
                 ] as const).map(([k, v, cls]) => (
                 <div key={k}>
@@ -807,7 +807,11 @@ export default function Dashboard() {
                     <div className="mt-2 text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-md px-2.5 py-1.5 leading-snug"
                          title={expNote}>
                       📐 <b>敞口刻度 ≤{(expPct * 100).toFixed(0)}%</b>
-                      ：以当前波动,投机仓整体别超过这个比例(一年回测:+60.6%/−56%回撤 vs 满仓买持 +41%/−71%;不预测方向,只管大小)。
+                      ：以当前波动,投机仓整体别超过这个比例。
+                      {/* 2026-08-24 换分母后的实测(mining 第 42 轮,QBTS 2024-02→2026-07 费后)。
+                          旧文案挂的是纯 rv20 口径的数字,分母改了就不再成立,一并换掉。 */}
+                      回测:回撤 −46% vs 满仓买持 −71%,夏普 1.67 vs 1.71,收益打平;
+                      前后两个半窗回撤都更浅。不预测方向,只管大小。
                     </div>
                   )}
                 </div>
@@ -841,7 +845,7 @@ export default function Dashboard() {
                       <tr>
                         <td className="py-1.5 text-[#525461] text-xs">建议仓位</td>
                         <td className="py-1.5 text-right font-mono font-semibold">
-                          {d.trade_plan.suggested_position_pct}% 资金
+                          {d.trade_plan.suggested_position_pct}% 投机仓
                         </td>
                       </tr>
                       {/* 波动率目标仓位 — 一年回测唯一同时改善收益与回撤的 sizing 规则(不预测方向) */}
@@ -946,7 +950,7 @@ export default function Dashboard() {
                       <div className="mt-1 text-[11px] font-mono text-gray-600">
                         {tp.etf_ticker} {fmtPx(tp.etf_entry)} / <span className="text-[#F03A3E]">{fmtPx(tp.etf_stop)}</span> / <span className="text-emerald-600">{fmtPx(tp.etf_target)}</span>
                         <span className="text-gray-400"> · </span>1:{tp.rr_ratio?.toFixed(1) ?? "—"}
-                        <span className="text-gray-400"> · </span>{tp.suggested_position_pct}% 仓
+                        <span className="text-gray-400"> · </span>{tp.suggested_position_pct}% 投机仓
                       </div>
                     )}
                     {tp?.entry_condition && (
