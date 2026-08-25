@@ -67,13 +67,25 @@ _REANALYZE_SECONDS = 4 * 3600    # 即便无新头条,分析 >4h 也重跑一次
 _PER_TRACK_LIMIT   = 10
 _PROMPT_CAP        = 18          # 喂给 Haiku 的条数上限
 
-# (track, 中文标签, Google News 检索式) — `when:1d` 限最近 24h
+# (track, 中文标签, Google News 检索式) — `when:1d` 由 `_fetch_track` 统一追加
 _TRACKS = [
     ("company", "公司",
      '"D-Wave Quantum" OR "D-Wave" QBTS OR QBTS stock'),
     ("sector", "板块同行",
      '"quantum computing" stock OR IonQ OR Rigetti OR "quantum computing" contract'),
 ]
+
+# 硬时效闸(2026-08-25 事故修复)。
+# 事故:08-25 03:53 推了「特朗普政府宣布 20 亿美元量子融资计划」当 breaking,
+# 而那是 **2026-05-21** 的旧闻(当天 QBTS 已跳 33%,消息早在价格里)。
+#
+# 根因**不是**检索式漏了 when:1d(`_fetch_track` 一直有追加)—— 是两件事叠加:
+#   ① **Google News 的 `when:` 并不总被遵守**,旧稿照样能漏进来;
+#   ② 模块 docstring 写着「48h 前的消息早就在价格里了」,但那句话**从没被代码
+#      执行过** —— age_h 算出来只用于显示,没有任何地方拿它过滤。
+# 所以闸门必须落在代码里,不能只靠检索式(与 `is_price_result` 同一条教训:
+# 提示词/查询串里的规则不会自执行)。
+_MAX_AGE_H = 48.0
 
 _IMPACT_CN = {"breaking": "🔴 重大催化", "watch": "🟡 有消息", "quiet": "🟢 无事"}
 _LEVEL_RANK = {"quiet": 0, "watch": 1, "breaking": 2}
@@ -195,6 +207,13 @@ def _fetch_track(track: str, track_cn: str, query: str) -> list[dict]:
             published, age_h = "", None
         if not title:
             continue
+        # 硬时效闸(2026-08-25 事故修复,见 _MAX_AGE_H 注释)。
+        # age_h is None = pubDate 解析失败 = **无法证明它是新的** → 一律丢弃。
+        # 那条 5 月旧闻正是这种:推送里没有「Xh前」,因为它的 age_h 就是 None。
+        # 宁可少报一条催化剂,也不能把三个月前的消息当 breaking 推给用户。
+        if age_h is None or age_h > _MAX_AGE_H:
+            logger.info("catalyst 丢弃过期/无日期条目 (age_h=%s): %s", age_h, title[:60])
+            continue
         items.append({
             "key":       _item_key(title),
             "track":     track,
@@ -241,7 +260,7 @@ _ANALYSIS_PROMPT = """你是给 QBTS(D-Wave Quantum,高贝塔量子股,通过 2�
 然后给整体:
   - impact_level : "breaking"(有 high 级新催化剂,今日价格可能被它主导)
                  | "watch"(有值得注意的消息,但不足以主导价格)
-                 | "quiet"(没有真катализ,都是噪音稿)。
+                 | "quiet"(没有真催化剂,都是噪音稿)。
   - headline_cn  : ≤30字,一句话概括当前最重要的那条(没有就写「无重大消息」)。
   - summary_cn   : 2-3句中文:①最重要的消息是什么 ②对 QBTS 的具体含义(方向+幅度量级+
                    该防什么)。没有重大消息就直说「消息面平静」,不要硬凑。
@@ -251,6 +270,12 @@ _ANALYSIS_PROMPT = """你是给 QBTS(D-Wave Quantum,高贝塔量子股,通过 2�
 - 「XX 股票暴涨/暴跌」这种**描述价格结果**的标题不是催化剂,是结果 —— 一律 low,
   除非它同时给出了原因。我们要的是因,不是果。
 - 内容农场稿(Zacks/Motley Fool 的「3 只该买的量子股」)一律 low。
+- **新文章 ≠ 新事件**(2026-08-25 事故规则):一篇今天发的稿子在复述几周/几个月前
+  就已公布、且当时价格已经反应过的事件(政府拨款计划、早已宣布的合作、上季财报),
+  **一律 low,且不得据此判 breaking**。判 breaking 的前提是**事件本身是新的**。
+  分不清事件何时发生 → 按旧闻处理(保守)。
+  事故原型:08-25 把 2026-05-21 公布的「20 亿美元量子融资计划」当 breaking 推送,
+  而那天 QBTS 已经跳过 33%,消息早在价格里。
 - 不确定就保守(medium 而非 high)。宁可漏推,不可乱响铃。
 
 只输出 JSON(无 markdown 围栏):
