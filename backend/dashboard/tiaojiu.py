@@ -106,6 +106,24 @@ def maybe_tiaojiu_push(prev: dict | None, now_et: datetime) -> dict | None:
         logger.warning(f"catchup readout failed: {e}")
     out["catchup"] = catchup
 
+    # ── 其它在册买入扳机(2026-08-24 用户点单「别的指标让我买入了也说一声」)──
+    # 此前心跳只报特调 + 追赶,排行榜上另外两条有扳机的腿从没进过推送。
+    # 并进这条已有心跳,**不新开 ntfy 路**(一晚 20 条轰炸的前科见 geopolitics 频控)。
+    bt_lines, bt_fired = "", []
+    try:
+        from dashboard.buy_triggers import check as _bt_check, render_lines as _bt_render
+        # 特调抄底腿的「预备价」:快%R 要先跌破 −80 才进入待触发状态。
+        # 反解 %R>-80 ⟺ C > HH21 − 0.8×(HH21−LL21) —— 低于它才算贴地。
+        _hh = float(df.rename(columns=str.lower)["high"].tail(21).max())
+        _ll = float(df.rename(columns=str.lower)["low"].tail(21).min())
+        _tj_arm = round(_hh - 0.80 * (_hh - _ll), 2) if _hh > _ll else None
+        _bt = _bt_check(df)
+        bt_fired = _bt.get("fired") or []
+        bt_lines = _bt_render(_bt, tj_pending_px=(_tj_arm if not sig["buy_base"] else None))
+    except Exception as e:
+        logger.warning(f"buy_triggers in heartbeat failed: {e}")
+    out["other_fired"] = [f["key"] for f in bt_fired]
+
     # 每日必推一条(心跳):无信号=低优先级不响铃;有信号=高优先级。
     # 哪天 22:05(墨尔本冬令时,16:05 ET)后没收到任何推送 = 系统挂了,来找我。
     from dashboard.notify import push as _ntfy, P_ACTION
@@ -131,13 +149,24 @@ def maybe_tiaojiu_push(prev: dict | None, now_et: datetime) -> dict | None:
             f"同行落后追赶 触发(今日收盘确认)\n"
             f"收盘 ${px:.2f}({chg:+.1%}) · {catch_line}\n"
             f"回测:触发后5天 +11.7%(基线+5.2%)—— 全系统最硬正腿\n"
-            f"(口径:同行均涨>3% 且 QBTS 落后 IONQ >1pp;验证期信号,小仓)"),
+            + (f"{bt_lines}\n" if bt_lines else "")
+            + f"(口径:同行均涨>3% 且 QBTS 落后 IONQ >1pp;验证期信号,小仓)"),
+            tags="dart", priority=P_ACTION)
+    elif bt_fired:
+        # 特调/追赶都没响,但别的在册腿触发了 —— 同样值一次响铃(2026-08-24)
+        names = "、".join(f["name"] for f in bt_fired)
+        out["pushed"] = _ntfy("QBTS buy trigger", (
+            f"{names} 触发(今日收盘确认)\n"
+            f"收盘 ${px:.2f}({chg:+.1%}) · 特调本身没响(快%R {sig['fast']}/慢%R {sig['slow']})\n"
+            f"{bt_lines}\n"
+            f"(验证期信号 UNPROVEN,触发≠该买;仓位不得超敞口刻度)"),
             tags="dart", priority=P_ACTION)
     else:
         extra = f"\n{catch_line} → 追赶未触发" if catch_line else ""
         out["pushed"] = _ntfy("QBTS daily check OK", (
             f"✓ 系统正常 · QBTS 收盘 ${px:.2f}({chg:+.1%})\n"
             f"特调无触发(快%R {sig['fast']} / 慢%R {sig['slow']})· 七马明晨结算"
-            f"{extra}"),
+            f"{extra}"
+            + (f"\n{bt_lines}" if bt_lines else "")),
             tags="white_check_mark", priority="low")
     return out
