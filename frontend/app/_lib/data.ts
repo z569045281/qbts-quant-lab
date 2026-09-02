@@ -1132,7 +1132,11 @@ export interface SpacexDecision {
 }
 export interface SpacexNews { title: string; published: string; source: string; }
 /* 抢先量三条腿(不吃日线历史长度)*/
-export interface SpacexOptionTerm { expiry: string; dte: number | null; expected_move_pct: number | null; atm_iv: number | null; }
+export interface SpacexOptionTerm {
+  expiry: string; dte: number | null; expected_move_pct: number | null; atm_iv: number | null;
+  /** chain=链上直取 · straddle=跨式反解(链上是坏数据) · null=取不到 */
+  iv_source?: "chain" | "straddle" | null;
+}
 export interface SpacexOptions {
   spot: number;
   term: SpacexOptionTerm[];
@@ -1140,6 +1144,10 @@ export interface SpacexOptions {
   event_date: string;
   near_expected_move_pct: number | null;
   skew_put_minus_call: number | null;
+  /** 远月 IV − 近月 IV。预期波动随 √T 上升是机械效应,只有这个才是期限结构信号 */
+  iv_slope?: number | null;
+  /** true = 链上 IV 字段全坏(抓取早于期权开盘),下面的 IV 是跨式反解的陈旧估计 */
+  iv_degraded?: boolean | null;
 }
 export interface SpacexIntraday {
   interval: string; n_bars: number;
@@ -1153,6 +1161,24 @@ export interface SpacexPeerPrior {
   spcx_own_vol: number | null; peer_prior: number | null;
   peers: SpacexPeer[]; shrink_weight: number | null; blended_vol: number | null; n_bars: number;
 }
+/** 一条已归档的历史决策(spacex_state 里 id='j:<date>' 的行,由 spacex_journal 写) */
+export interface SpacexScoreRow {
+  date: string; action: string; price: number;
+  status: "pending" | "graded";
+  ret5: number | null; correct: boolean | null;
+}
+/** 战绩(2026-09-02 补:此前上线 50 天零台账,"战绩如何"根本答不出来) */
+export interface SpacexScorecard {
+  n_total: number; n_graded: number; n_pending: number;
+  first_date: string | null;
+  action_counts: Record<string, number>;
+  n_directional: number; wins: number;
+  win_rate: number | null; wilson_lo: number | null; avg_ret5: number | null;
+  hold_n: number; hold_miss_rate: number | null;
+  /** 预注册判决线:方向性样本 <20 一律 UNPROVEN */
+  verdict: string;
+  recent: SpacexScoreRow[];
+}
 export interface SpacexState {
   generated_at: string;
   engine: string;
@@ -1164,6 +1190,7 @@ export interface SpacexState {
   catalysts: SpacexCatalyst[];
   catalyst_asof: string;
   decision: SpacexDecision | null;
+  scorecard?: SpacexScorecard | null;
 }
 
 /** Latest SpaceX read (single 'current' row; null if table missing / not generated). */

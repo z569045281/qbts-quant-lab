@@ -148,6 +148,7 @@ export default function SpacexPage() {
   }
 
   const dd = state?.data;
+  const sc = state?.scorecard;   // 2026-09-02 起才有;老快照里没有这个字段
   const up = (dd?.today_change ?? 0) >= 0;
 
   return (
@@ -234,6 +235,66 @@ export default function SpacexPage() {
             </section>
           )}
 
+          {/* 📒 战绩台账(2026-09-02 补:此前上线 50 天零记录,"战绩如何"根本答不出来)*/}
+          <section className="rounded-2xl border border-gray-300 bg-white p-4 shadow-sm">
+            <div className="text-xs font-bold text-gray-800 mb-2">
+              📒 战绩台账 · 每条决策记录 + 5 个交易日后打分
+            </div>
+            {!sc || sc.n_total === 0 ? (
+              <p className="text-[12px] text-gray-500 leading-relaxed">
+                台账 2026-09-02 才建。<b>此前的决策没有任何记录</b>(每日只覆盖同一行快照),
+                历史无法回填 —— 从下一次云端刷新开始逐条累积。
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                  {[
+                    { k: "已记录", v: `${sc.n_total} 条`, s: sc.first_date ? `起 ${sc.first_date}` : "" },
+                    { k: "已打分", v: `${sc.n_graded} 条`, s: `${sc.n_pending} 条未满 5 天` },
+                    { k: "方向性胜率", v: sc.win_rate != null ? `${(sc.win_rate * 100).toFixed(0)}%` : "—", s: `${sc.wins}/${sc.n_directional}(BUY+REDUCE)` },
+                    { k: "观望漏判率", v: sc.hold_miss_rate != null ? `${(sc.hold_miss_rate * 100).toFixed(0)}%` : "—", s: `HOLD ${sc.hold_n} 条 · |5日|≥3%` },
+                  ].map((x) => (
+                    <div key={x.k} className="rounded-lg bg-gray-50 px-2.5 py-1.5">
+                      <div className="text-[10px] text-gray-500">{x.k}</div>
+                      <div className="font-mono font-bold text-[15px] text-gray-800">{x.v}</div>
+                      <div className="text-[10px] text-gray-400">{x.s}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className={`text-[11px] rounded-lg px-2.5 py-1.5 mb-3 ${
+                  sc.verdict.startsWith("UNPROVEN") ? "bg-gray-100 text-gray-600"
+                    : sc.verdict.startsWith("有 edge") ? "bg-emerald-50 text-emerald-700"
+                    : "bg-rose-50 text-rose-700"}`}>
+                  <b>预注册判决</b>:{sc.verdict}
+                  <span className="text-gray-400">
+                    {" "}· 线是先写好的:方向性样本 &lt;20 一律 UNPROVEN,够了看 Wilson 95% 下界是否 &gt;50%。
+                    HOLD 不进准确率(它没有方向)。
+                  </span>
+                </div>
+                {sc.recent.length > 0 && (
+                  <div className="space-y-1">
+                    {sc.recent.map((r) => (
+                      <div key={r.date} className="flex items-center gap-2 text-[12px] bg-gray-50 rounded-lg px-2.5 py-1">
+                        <span className="font-mono text-gray-500 w-20 shrink-0">{r.date}</span>
+                        <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          ACT[r.action]?.chip ?? "bg-gray-400"} text-white`}>
+                          {ACT[r.action]?.cn ?? r.action}
+                        </span>
+                        <span className="font-mono text-gray-400 text-[11px]">{usd(r.price)}</span>
+                        <span className="ml-auto font-mono text-[11px] text-gray-600">
+                          {r.status === "pending" ? <span className="text-gray-400">待满 5 天</span> : pct(r.ret5)}
+                        </span>
+                        <span className="w-5 text-center shrink-0">
+                          {r.correct === true ? "✅" : r.correct === false ? "❌" : r.status === "graded" ? "–" : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+
           {/* 抢先量导语 */}
           {(state.options || state.intraday || state.peer_prior) && (
             <div className="text-[11px] text-gray-500 leading-relaxed px-1">
@@ -247,9 +308,16 @@ export default function SpacexPage() {
             <section className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4 shadow-sm">
               <div className="text-xs font-bold text-violet-800 mb-1">🔮 ① 期权隐含波动 · 市场对未来的预测(零历史需求)</div>
               <p className="text-[11px] text-violet-700/80 mb-3 leading-relaxed">
-                ATM 跨式给出的<b>预期波动</b>就是市场预测的幅度。看期限结构的跳变 —— 覆盖 8/6 事件的到期被显著抬高,
-                就是解禁+财报的溢价被定价了。<b>这是幅度、不是方向</b>。
+                ATM 跨式给出的<b>预期波动</b>就是市场预测的幅度。<b>这是幅度、不是方向</b>。
+                <br />
+                ⚠️ 预期波动从近月到远月<b>必然</b>变大(√T 的机械效应),<b>它上升不构成任何信号</b> ——
+                要看市场是否预期波动放大,只看下面的 <b>IV 斜率</b>。
               </p>
+              {state.options.iv_degraded && (
+                <div className="mb-2 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-800">
+                  ⚠️ 本次链上 IV 字段不可用(抓取早于期权 09:30 开盘),下面的 IV 是用跨式报价<b>反解</b>的陈旧估计。
+                </div>
+              )}
               <div className="space-y-1.5">
                 {state.options.term.map((x, i) => {
                   const isEvent = state.options?.event_expiry?.expiry === x.expiry;
@@ -261,18 +329,31 @@ export default function SpacexPage() {
                       <span className={`font-mono font-bold ${isEvent ? "text-rose-600" : "text-violet-700"}`}>
                         ±{x.expected_move_pct != null ? (x.expected_move_pct * 100).toFixed(1) : "—"}%
                       </span>
-                      <span className="text-[10px] text-gray-400">IV {x.atm_iv != null ? (x.atm_iv * 100).toFixed(0) : "—"}%</span>
-                      {isEvent && <span className="ml-auto text-[10px] font-bold text-rose-600">← 覆盖 8/6 事件</span>}
+                      <span className="text-[10px] text-gray-400">
+                        IV {x.atm_iv != null ? (x.atm_iv * 100).toFixed(0) : "—"}%
+                        {x.iv_source === "straddle" && <span className="text-amber-600">(反解)</span>}
+                      </span>
+                      {isEvent && <span className="ml-auto text-[10px] font-bold text-rose-600">← 覆盖事件</span>}
                     </div>
                   );
                 })}
               </div>
-              {state.options.skew_put_minus_call != null && (
-                <div className="mt-2 text-[11px] text-gray-600">
-                  IV 偏斜(看跌−看涨)= <b className="font-mono">{(state.options.skew_put_minus_call * 100).toFixed(0)} 点</b>
-                  {" · "}{state.options.skew_put_minus_call > 0.01 ? "下行恐惧买盘更重" : state.options.skew_put_minus_call < -0.01 ? "偏追涨" : "基本对称"}
-                </div>
-              )}
+              <div className="mt-2 space-y-1 text-[11px] text-gray-600">
+                {state.options.iv_slope != null && (
+                  <div>
+                    IV 期限结构斜率(远月−近月)= <b className="font-mono">{(state.options.iv_slope * 100) >= 0 ? "+" : ""}{(state.options.iv_slope * 100).toFixed(1)} 点</b>
+                    {" · "}{state.options.iv_slope > 0.02 ? "市场预期未来波动放大" : state.options.iv_slope < -0.02 ? "市场预期波动收敛" : "基本持平,无期限结构信号"}
+                  </div>
+                )}
+                {state.options.skew_put_minus_call != null ? (
+                  <div>
+                    IV 偏斜(看跌−看涨)= <b className="font-mono">{(state.options.skew_put_minus_call * 100).toFixed(0)} 点</b>
+                    {" · "}{state.options.skew_put_minus_call > 0.01 ? "下行恐惧买盘更重" : state.options.skew_put_minus_call < -0.01 ? "偏追涨" : "基本对称"}
+                  </div>
+                ) : (
+                  <div className="text-gray-400">IV 偏斜:<b>取不到</b> —— 不代表偏斜为零,别读成「下行担忧不重」。</div>
+                )}
+              </div>
             </section>
           )}
 

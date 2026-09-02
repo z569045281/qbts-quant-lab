@@ -183,6 +183,42 @@ def _opt_price(row) -> float | None:
     return float(last) if last and last > 0 else None
 
 
+# ── ATM IV 的两道保险(2026-09-02)────────────────────────────────────────────
+# 事故:每日 publish 跑在 **09:00 ET**,而期权市场 **09:30** 才开。抓到的链里
+# yfinance 的 `impliedVolatility` 字段是没刷新的垃圾 —— 09-01 那次存进库的是
+# atm_iv 0.0039 / 0.002 / 0.002 / 0.002(0.2% 的隐含波动物理上不可能;盘后重抓
+# 同样四个到期是 48–54%)。两条下游后果:
+#   ① DeepSeek 拿着 0.0039→0.002 写出「IV 期限结构上升显示未来波动加大」——
+#      方向都读反了,在对废数字编故事。
+#   ② 偏斜那段只要求 pv>0 and cv>0,两个垃圾值都能过闸 → 存进 skew=0.0,
+#      提示词渲染成「下行担忧不重」。**假的安心比没有更糟。**
+# 所以:范围闸挡掉不可能的值,挡掉之后用**跨式报价反解**兜底。跨式价来自
+# lastPrice/bid-ask,是上一个交易时段的真成交,陈旧但真实 —— 这正是
+# expected_move_pct 一直没坏的原因(±4.5%/±10.3% 与 ~50% IV 完全对得上)。
+_IV_LO, _IV_HI = 0.05, 5.0          # 5%–500%:此区间外一律判为坏数据
+
+
+def _iv_from_straddle(straddle: float, spot: float, dte: int | None) -> float | None:
+    """ATM 跨式 → IV(Brenner–Subrahmanyam 闭式近似,ATM 上误差 ~1%)。
+
+    单腿 ATM:C ≈ 0.4·S·σ·√T ⟹ 跨式 ≈ 0.8·S·σ·√T ⟹ σ = 跨式/(0.8·S·√T)。
+    **故意不用 brentq**:只为 ATM 一个点反解却把 scipy 拖进 Lambda 依赖不值得,
+    而且这里的输入本来就是陈旧报价,精度不是瓶颈(见 options_history.implied_vol,
+    那边要解整个曲面才需要数值解)。
+    """
+    if not (straddle and spot and dte) or dte <= 0:
+        return None
+    iv = straddle / (0.8 * spot * (dte / 365.0) ** 0.5)
+    return round(iv, 4) if _IV_LO <= iv <= _IV_HI else None
+
+
+def _sane_iv(x) -> float | None:
+    """链上的 impliedVolatility 只在合理区间内才认。"""
+    if isinstance(x, (int, float)) and _IV_LO <= float(x) <= _IV_HI:
+        return float(x)
+    return None
+
+
 def fetch_spacex_options(spot: float) -> dict | None:
     """① 期权隐含波动:ATM 跨式→预期波动%,ATM IV,期限结构,事件到期溢价,IV 偏斜。
     全 best-effort:无期权/数据异常 → None(不阻断)。"""
@@ -213,17 +249,23 @@ def fetch_spacex_options(spot: float) -> dict | None:
             if not cp or not pp:
                 continue
             straddle = cp + pp
-            ivs = [float(x) for x in (ac.get("impliedVolatility"), ap.get("impliedVolatility"))
-                   if isinstance(x, (int, float)) and x > 0]
-            atm_iv = sum(ivs) / len(ivs) if ivs else None
             try:
                 dte = (date.fromisoformat(exp) - today).days
             except ValueError:
                 dte = None
+            ivs = [v for v in (_sane_iv(ac.get("impliedVolatility")),
+                               _sane_iv(ap.get("impliedVolatility"))) if v is not None]
+            if ivs:
+                atm_iv, iv_source = round(sum(ivs) / len(ivs), 4), "chain"
+            else:
+                atm_iv, iv_source = _iv_from_straddle(straddle, spot, dte), "straddle"
+                if atm_iv is None:
+                    iv_source = None
             term.append({
                 "expiry": exp, "dte": dte,
                 "expected_move_pct": round(straddle / spot, 4) if spot else None,
-                "atm_iv": round(atm_iv, 4) if atm_iv else None,
+                "atm_iv": atm_iv,
+                "iv_source": iv_source,   # chain=链上直取 · straddle=跨式反解(链上是坏数据)
             })
             # 事件到期上算一次 IV 偏斜(~10% OTM 看跌 IV − 看涨 IV;正=下行恐惧买盘)
             if exp >= _EVENT_DATE and skew is None:
@@ -231,9 +273,11 @@ def fetch_spacex_options(spot: float) -> dict | None:
                     otm_p = puts[puts["strike"] <= spot * 0.9]
                     otm_c = calls[calls["strike"] >= spot * 1.1]
                     if not otm_p.empty and not otm_c.empty:
-                        pv = float(otm_p.iloc[(otm_p["strike"] - spot * 0.9).abs().argmin()]["impliedVolatility"])
-                        cv = float(otm_c.iloc[(otm_c["strike"] - spot * 1.1).abs().argmin()]["impliedVolatility"])
-                        if pv > 0 and cv > 0:
+                        # 同一道范围闸:旧代码只要求 >0,两个 0.002 的垃圾值都能过,
+                        # 相减得 skew=0.0 → 提示词渲染成「下行担忧不重」的假安心。
+                        pv = _sane_iv(otm_p.iloc[(otm_p["strike"] - spot * 0.9).abs().argmin()]["impliedVolatility"])
+                        cv = _sane_iv(otm_c.iloc[(otm_c["strike"] - spot * 1.1).abs().argmin()]["impliedVolatility"])
+                        if pv is not None and cv is not None:
                             skew = round(pv - cv, 4)
                 except Exception:
                     pass
@@ -241,8 +285,22 @@ def fetch_spacex_options(spot: float) -> dict | None:
             logger.warning(f"spacex opt chain {exp} failed: {e}")
     if not term:
         return None
-    event_expiry = next((x for x in term if x["expiry"] >= _EVENT_DATE), None)
+    # 事件到期只在事件**还没发生**时才有意义。_EVENT_DATE 是 2026-08-06 的硬编码,
+    # 过了那天以后 `expiry >= _EVENT_DATE` 对每个到期都成立 → 永远返回近月,
+    # 提示词照旧写「市场已给 8/6 事件定价」。事件过去一个月了还在当前瞻催化剂讲,
+    # 跟 catalyst_radar 那次旧闻当 breaking 是同一类错(见 docs/LESSONS.md)。
+    event_expiry = (next((x for x in term if x["expiry"] >= _EVENT_DATE), None)
+                    if _EVENT_DATE >= today.isoformat() else None)
     near = term[0]
+    # 期限结构斜率**只能拿 IV 算**。expected_move 从近月到远月一定变大 —— 那是
+    # √T 的机械效应,IV 持平也照样上升。09-01 那次 DeepSeek 正是把它当成
+    # 「波动要放大」写进了 driver。这里先算好、直接给结论,别让模型自己看图说话。
+    ivs = [(x["dte"], x["atm_iv"]) for x in term
+           if x.get("atm_iv") and x.get("dte") is not None]
+    iv_slope = None
+    if len(ivs) >= 2:
+        ivs.sort()
+        iv_slope = round(ivs[-1][1] - ivs[0][1], 4)
     return {
         "spot": round(spot, 2),
         "term": term,
@@ -250,6 +308,8 @@ def fetch_spacex_options(spot: float) -> dict | None:
         "event_date": _EVENT_DATE,
         "near_expected_move_pct": near.get("expected_move_pct"),
         "skew_put_minus_call": skew,       # 正=看跌 IV 更高=下行恐惧;负=追涨
+        "iv_slope": iv_slope,              # 远月 IV − 近月 IV(正=市场预期波动放大)
+        "iv_degraded": all(x.get("iv_source") != "chain" for x in term),
     }
 
 
@@ -402,14 +462,28 @@ def _build_prompt(data: dict, news: list[dict],
         for x in options["term"]:
             em = f"±{x['expected_move_pct']*100:.1f}%" if x.get("expected_move_pct") else "—"
             iv = f"{x['atm_iv']*100:.0f}%" if x.get("atm_iv") else "—"
+            src = {"straddle": "(跨式反解)", "chain": ""}.get(x.get("iv_source"), "(缺)")
             tag = " ←覆盖8/6事件" if options.get("event_expiry") and x["expiry"] == options["event_expiry"]["expiry"] else ""
-            lines.append(f"- 到期 {x['expiry']}(还有{x.get('dte','?')}天):预期波动 {em} · ATM IV {iv}{tag}")
+            lines.append(f"- 到期 {x['expiry']}(还有{x.get('dte','?')}天):预期波动 {em} · ATM IV {iv}{src}{tag}")
+        # 2026-09-02:上一版模型把「预期波动从 ±4.5% 涨到 ±10.3%」读成了波动要放大。
+        # 那是 √T,不是信号。把陷阱写死在提示词里,并直接给出真正的斜率结论。
+        lines.append("→ ⚠️ 预期波动随到期变远**必然**变大(√T 的机械效应),"
+                     "**它上升不构成任何信号**。要判断市场是否预期波动放大,只看 ATM IV 的差。")
+        sl = options.get("iv_slope")
+        if sl is not None:
+            lines.append(f"→ IV 期限结构斜率(远月−近月)={sl*100:+.1f} 个点:"
+                         f"{'市场确实预期未来波动放大' if sl > 0.02 else '市场预期波动收敛' if sl < -0.02 else '基本持平,无期限结构信号'}。")
+        if options.get("iv_degraded"):
+            lines.append("→ ⚠️ 本次链上 IV 字段全部不可用(抓取早于期权开盘),"
+                         "上面的 IV 是用跨式报价反解的**陈旧**估计,别拿它做精细判断。")
         ev = options.get("event_expiry")
         if ev and ev.get("expected_move_pct"):
             lines.append(f"→ 市场已给 8/6 事件定价:到期 {ev['expiry']} 预期波动 ±{ev['expected_move_pct']*100:.1f}%。")
         sk = options.get("skew_put_minus_call")
         if sk is not None:
             lines.append(f"→ IV 偏斜(看跌−看涨)={sk*100:+.0f} 个点:{'下行恐惧买盘更重' if sk > 0 else '偏追涨/下行担忧不重'}。")
+        else:
+            lines.append("→ IV 偏斜:**取不到**(链上数据不可用)—— 不代表偏斜为零,别当作「下行担忧不重」。")
 
     # ② 盘中 1h(数据充足,技术面以此为准)
     if intraday:
@@ -436,8 +510,19 @@ def _build_prompt(data: dict, news: list[dict],
         "",
         f"# 事件日历(as of {_CATALYST_ASOF},需复核)",
     ]
+    # 2026-09-02:日历是硬编码的,8/6 那条早就过去了,原来照旧当前瞻催化剂渲染,
+    # 提示词里还写着「解禁临近就下调信心」—— 模型没法从一行日期看出它是过去式。
+    # 显式标【已发生】/【还有N天】,并给天数,把"新旧"从注释变成模型看得见的字段。
+    _today = datetime.now(timezone.utc).date().isoformat()
     for c in _CATALYSTS:
-        lines.append(f"- 【{c['impact']}】{c['date']} {c['event']}:{c['note']}")
+        cd = str(c["date"])
+        if len(cd) == 10:
+            days = (date.fromisoformat(cd) - date.fromisoformat(_today)).days
+            when = f"【已发生·{-days}天前】" if days < 0 else f"【还有{days}天】"
+        else:
+            when = "【已发生】" if cd < _today[:len(cd)] else "【未来】"
+        lines.append(f"- {when}【{c['impact']}】{cd} {c['event']}:{c['note']}")
+    lines.append("→ 标【已发生】的事件是**背景**,不是待定风险;只有标【还有N天】的才算前瞻催化剂。")
     lines.append("")
     lines.append("# 近3日新闻头条")
     if news:
@@ -538,9 +623,30 @@ def compute_spacex(force_refresh: bool = False) -> dict:
     }
 
 
+def _journal_step(payload: dict) -> dict | None:
+    """记账 + 给到期的旧决策打分 → 战绩摘要。全 best-effort:台账炸了也不能
+    拖垮当日 publish(它只是记录者,不参与决策)。"""
+    try:
+        from dashboard import spacex_journal as sj
+        sj.record(payload)
+        df = yf.download(TICKER, period="6mo", interval="1d",
+                         auto_adjust=True, progress=False)
+        if df is not None and not df.empty:
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            graded = sj.grade_pending(df)
+            if graded:
+                logger.info("spacex journal: graded %d", len(graded))
+        return sj.scorecard()
+    except Exception as e:
+        logger.warning("spacex journal step failed: %s", e)
+        return None
+
+
 def publish_spacex() -> dict:
     """Compute + upsert to Supabase spacex_state id='current'. Shared by daily publish."""
     payload = compute_spacex()
+    payload["scorecard"] = _journal_step(payload)   # 2026-09-02:上线 50 天零台账的补丁
     url = os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL")
     key = os.getenv("SUPABASE_SECRET_KEY") or os.getenv("SUPABASE_SERVICE_KEY")
     if url and key:
