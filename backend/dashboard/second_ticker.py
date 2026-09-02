@@ -51,6 +51,31 @@ REVIEW-2026-07 §5 的算术:判决主体(方向表态)每个交易日只 +1 个
 5. **判决分池**。MU 池与 QBTS 池分开报、分开判,不合并成一个大 n
    (两只票同一天的表态不独立 —— 都受大盘影响 —— 合并会虚增有效样本)。
 6. **成本可见**:每天 1 次 LLM 调用。不重试、不影子、不并发。
+7. **一个信息集只准问一次**(2026-09-02 加)。幂等键 = `<票>-<as_of>`,**不是日历日**。
+   周末跑、盘前跑拿到昨天的 bar —— 这两种情况的 as_of 都撞已有记录,直接跳过。
+
+## ⚠️ 2026-09-02 修的三个记账 bug(用户问「能用了吗」查出来的)
+
+上线一个月攒了 25 条记录,**其中只有 18 个独立信息集**(28% 是同一道题问两遍):
+
+    date        wd   as_of        price     ← 重复来源
+    2026-08-09  Sun  2026-08-07   877.57    周末也记账(没有交易日闸门)
+    2026-08-10  Mon  2026-08-07   877.57
+    2026-08-16  Sun  2026-08-14   971.66    ← 周日
+    2026-08-17  Mon  2026-08-14   971.66
+    2026-08-06  Thu  2026-08-05   893.19    盘前跑,yfinance 还没出当天 bar
+    (08-23/08-25/08-27/08-30/08-31 同理)
+
+1. **周末也记账** —— `record()` 用 ET 日历日,没有交易日闸门。4 个周日各一条。
+2. **幂等键用日历日** —— 同一个 as_of 能长出两条,纪律 5「不许虚增样本」被架空。
+3. **评分锚点用 `date` 而不是 `as_of`** —— 价格属于 as_of(常常是 date−1),窗口却从
+   date 之后起算 → 「1d 收益」有时 1 根 bar、有时 2 根,**视界长度随当天几点跑而变**。
+   不是未来函数(评分 bar 始终晚于 as_of),但视界标签是错的,而判决线第四条
+   正要求「非四视界中的孤例」—— 标签不干净,那条根本没法判。
+
+1+2 一个修就够:**键改成 as_of**,重复自动撞键跳过,周末闸门都不用单独写。
+3 是 `grade()` 里一行。25 条已按 as_of 合并成 18 条(重复组保留**最早问的那条** ——
+留后一条等于挑答案),horizons 已全部按新锚点重算。
 """
 
 from __future__ import annotations
@@ -132,6 +157,38 @@ def _save(records: list[dict]) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 #  简报:全部复用已有的通用模块(它们都只吃 DataFrame,本来就与票无关)
 # ─────────────────────────────────────────────────────────────────────────────
+def _drop_incomplete_bar(d: pd.DataFrame) -> pd.DataFrame:
+    """丢掉「今天还没收盘」的那根 bar,保证 as_of 指向一根**已完成**的交易日。
+
+    2026-09-02 实测的第四个 bug:job 09:00 ET 跑,yfinance 会给出一根日期为今天的
+    占位 bar,close 有时是昨天的值 —— 于是 `as_of` 写着今天,`price` 其实是昨天的:
+
+        as_of=2026-08-17 记的 $971.66 · 该日真实收盘 $1011.75(差 4%,记的是 08-14 的)
+        as_of=2026-08-26 记的 $938.48 · 真实 $938.40   (盘中快照)
+        as_of=2026-08-28 记的 $933.30 · 真实 $932.86   (盘中快照)
+
+    18 条里 3 条对不上。**as_of 是评分锚点**,它指错了日子,整条记录的视界就错位。
+    这与 dca.py 2026-07-16 那个「盘前占位 bar close=NaN 静默传染」是同一个家族
+    (见 docs/LESSONS.md),那次是 NaN 好歹能 dropna 掉,这次是**陈旧的真值**,
+    dropna 抓不住 —— 只能靠时钟判断。
+    """
+    if d is None or d.empty:
+        return d
+    now = datetime.now(ZoneInfo("America/New_York"))
+    try:
+        last = pd.Timestamp(d.index[-1]).date()
+    except Exception:
+        return d
+    # 收盘 16:00 ET;留 5 分钟给数据落地,与 tiaojiu 的 16:05 心跳同一个数。
+    closed = now.hour > 16 or (now.hour == 16 and now.minute >= 5)
+    if last == now.date() and not closed and len(d) > 2:
+        logger.info("second_ticker: 丢掉未收盘的 %s bar,as_of 退回 %s",
+                    last, pd.Timestamp(d.index[-2]).date())
+        return d.iloc[:-1]
+    return d
+
+
+
 def build_brief(ticker: str = TICKER) -> dict:
     """组装该票的证据简报。**不新写任何指标** —— 复用现役模块,
     这样第二考场考的是同一套东西,不是一套新东西。"""
@@ -145,6 +202,7 @@ def build_brief(ticker: str = TICKER) -> dict:
 
     df_h, df_d = load_or_fetch(ticker)
     d = df_d.rename(columns=str.lower)
+    d = _drop_incomplete_bar(d)
     close = float(d["close"].iloc[-1])
     prev = float(d["close"].iloc[-2])
     brief: dict = {
@@ -313,15 +371,36 @@ def generate_lean(ticker: str = TICKER, brief: dict | None = None) -> dict:
 
 
 def record(ticker: str = TICKER, lean: dict | None = None, brief: dict | None = None) -> dict | None:
-    """记一条表态。幂等:每票每日一条(同日重跑覆盖当日那条,与 journal.record 同规矩)。
-    返回该条记录;拿不到 Supabase 或 LLM 失败则返回 None(测量轨不许拖垮主链路)。"""
+    """记一条表态。**幂等键 = `<票>-<as_of>`,一个信息集只准问一次。**
+    返回该条记录;已问过 / 拿不到 Supabase / LLM 失败 → None(测量轨不许拖垮主链路)。
+
+    ⚠️ 2026-09-02 修:键原本是 `<票>-<今天的日历日>`,导致 25 条记录里只有 18 个
+    独立信息集(28% 是重复问)。两个来源:
+      · **周末也记账** —— 没有交易日闸门,4 个周日各记一条,全用周五的数据。
+      · **盘前跑拿到昨天的 bar** —— job 09:00 ET 跑,yfinance 常常还没出当天 bar,
+        于是今天和昨天的记录 as_of 相同(08-06/08-17/08-25/08-27 都是)。
+    改键之后两种情况自动合并成一条,周末闸门都不用单独写 —— 周日跑出来的 as_of
+    就是周五,撞上周五那条,直接跳过。**这是纪律 5「不许虚增样本」的落地。**
+
+    **同一个 as_of 已有记录 → 跳过,不重问也不覆盖。** 覆盖 = 对同一道题重摇一次
+    骰子再留后一个答案,那是在挑答案,不是在测量。
+    """
     if _supabase() is None:
         logger.warning("second_ticker: no Supabase — 测量轨跳过(本地文件回退会造成假账本)")
         return None
-    today = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
-    rid = f"{ticker}-{today}"
     try:
         b = brief or build_brief(ticker)
+    except Exception as e:
+        logger.warning(f"second_ticker[{ticker}]: brief failed — {e}")
+        return None
+    rid = f"{ticker}-{b['as_of']}"
+    # 查重放在 LLM 调用**之前** —— 既省掉那次调用($0.1/次,纪律 6 成本可见),
+    # 也保证已落库的表态不会被同一道题的第二次回答改写。
+    if any(r.get("id") == rid for r in _load()):
+        logger.info("second_ticker[%s]: as_of %s 已有表态,跳过(一个信息集只问一次)",
+                    ticker, b["as_of"])
+        return None
+    try:
         ln = lean or generate_lean(ticker, b)
     except Exception as e:
         logger.warning(f"second_ticker[{ticker}]: lean failed — {e}")
@@ -333,7 +412,11 @@ def record(ticker: str = TICKER, lean: dict | None = None, brief: dict | None = 
         logger.warning(f"second_ticker[{ticker}]: 非法表态 {ln['bold_call_5d']!r},丢弃")
         return None
     rec = {
-        "id": rid, "ticker": ticker, "date": today, "as_of": b["as_of"],
+        # date = 这条表态是哪天问的(审计用);as_of = 价格/证据属于哪根 bar(评分锚点)。
+        # 两者常常差一天,**评分必须用 as_of**(见 grade())。
+        "id": rid, "ticker": ticker,
+        "date": datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
+        "as_of": b["as_of"],
         "price": b["price"],
         "p_up_5d": round(max(0.0, min(1.0, float(ln["p_up_5d"]))), 3),
         "bold_call_5d": ln["bold_call_5d"],
@@ -368,7 +451,12 @@ def grade(ticker: str = TICKER, df_d: pd.DataFrame | None = None) -> int:
     touched = []
     for r in records:
         try:
-            d0 = pd.Timestamp(r["date"]).normalize()
+            # ⚠️ 2026-09-02 修:锚点必须是 **as_of**(价格所属的那根 bar),不是 `date`
+            # (表态被问出来的日历日)。原来用 date:价格属于 as_of=date−1,而窗口从
+            # date 之后起算 → 「1d 收益」有时真是 1 根 bar、有时是 2 根,**视界长度
+            # 随当天几点跑而变**。不是未来函数(评分 bar 始终晚于 as_of),但视界标签
+            # 是错的,四个视界横向比就不干净 —— 而判决线第四条正要求「非四视界中的孤例」。
+            d0 = pd.Timestamp(r.get("as_of") or r["date"]).normalize()
             p0 = float(r["price"])
         except (KeyError, TypeError, ValueError):
             continue
@@ -404,7 +492,10 @@ def run_daily() -> dict:
             out["graded"][t] = None
         try:
             rec = record(t)
-            out["recorded"][t] = rec["bold_call_5d"] if rec else None
+            # 2026-09-02:跳过(周末 / 盘前还没出新 bar → as_of 已问过)是**正常**路径,
+            # 不是失败。原来两者都记 None,CloudWatch 里分不出"今天本来就不该记"和
+            # "今天该记但炸了"—— 而这条日志是唯一的监控。
+            out["recorded"][t] = rec["bold_call_5d"] if rec else "skipped_or_failed"
         except Exception as e:
             logger.warning(f"second_ticker[{t}]: record failed — {e}")
             out["recorded"][t] = None
@@ -432,8 +523,9 @@ def load_board(ticker: str = TICKER, n: int = 30) -> dict | None:
     from dashboard.audit import _HORIZON_RULE, _verdict
     from dashboard.journal import _HORIZONS
 
+    # 按 as_of 排 —— 它才是样本身份(2026-09-02 起 id 也是它)。`date` 只是被问的日历日。
     recs = sorted([r for r in _load() if r.get("ticker") == ticker],
-                  key=lambda r: r.get("date", ""), reverse=True)
+                  key=lambda r: r.get("as_of") or r.get("date", ""), reverse=True)
     if not recs:
         return None
     by_h = {}
@@ -477,3 +569,18 @@ def load_board(ticker: str = TICKER, n: int = 30) -> dict | None:
                           "表态可以说 down,因为没有任何东西会去执行它 —— 这不是复活做空腿。"
                           "与 QBTS 台账分池存放、分池判决(同一天两只票的表态不独立,合并会虚增样本)。"),
     }
+
+
+if __name__ == "__main__":
+    # 只自测 2026-09-02 新加的那道闸(其余路径都要 Supabase / LLM,不适合无网自测)。
+    logging.basicConfig(level=logging.INFO)
+    _now = datetime.now(ZoneInfo("America/New_York"))
+    _closed = _now.hour > 16 or (_now.hour == 16 and _now.minute >= 5)
+    _mk = lambda ds: pd.DataFrame({"close": range(len(ds))}, index=pd.to_datetime(ds))
+
+    _today = _now.date().isoformat()
+    assert len(_drop_incomplete_bar(_mk(["2026-01-02", "2026-01-05", _today]))) == (3 if _closed else 2)
+    assert len(_drop_incomplete_bar(_mk(["2026-01-02", "2026-01-05", "2026-01-06"]))) == 3   # 过去的日子原样
+    assert len(_drop_incomplete_bar(_mk(["2026-01-05", _today]))) == 2                       # 只剩2根不丢
+    assert _drop_incomplete_bar(pd.DataFrame()).empty and _drop_incomplete_bar(None) is None
+    print(f"✅ _drop_incomplete_bar 自测通过(ET {_now:%H:%M},{'已' if _closed else '未'}收盘)")
