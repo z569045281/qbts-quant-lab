@@ -89,7 +89,12 @@ function RecordRow({ r }: { r: SecondRecord }) {
   return (
     <div className="border-b border-[#F0F0F2] last:border-0 py-2.5">
       <div className="flex items-center gap-2 flex-wrap text-[12px]">
-        <span className="font-mono text-gray-500">{r.date.slice(5)}</span>
+        {/* 显示 as_of(证据/价格属于哪根 bar,也是评分锚点),不是 date(哪天问的)。
+            2026-09-02:后端锚点已改成 as_of,两者常差 1–3 天 —— 再按 date 标行,
+            就会把日期摆在一串「从另一根 bar 起算」的收益旁边,正是后端刚修掉的错配。*/}
+        <span className="font-mono text-gray-500" title={`表态问于 ${r.date}`}>
+          {(r.as_of ?? r.date).slice(5)}
+        </span>
         <span className={`px-1.5 py-0.5 rounded font-bold text-[11px] ${c.chip}`}>{c.cn}</span>
         <span className="text-gray-400 tabular-nums">
           p{r.p_up_5d.toFixed(2)} · 信心{r.conviction} · ${r.price}
@@ -136,7 +141,10 @@ export function Board({ b }: { b: SecondBoard }) {
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
               纯测量 · 无动作
             </span>
-            <span className="text-[10px] text-gray-400 font-mono">{b.latest.date}</span>
+            <span className="text-[10px] text-gray-400 font-mono"
+                  title={`表态问于 ${b.latest.date}`}>
+              数据截至 {b.latest.as_of ?? b.latest.date}
+            </span>
           </span>
         </div>
         <div className="flex items-center gap-3 flex-wrap">

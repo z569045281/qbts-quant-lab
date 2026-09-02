@@ -56,7 +56,7 @@ REVIEW-2026-07 §5 的算术:判决主体(方向表态)每个交易日只 +1 个
 
 ## ⚠️ 2026-09-02 修的三个记账 bug(用户问「能用了吗」查出来的)
 
-上线一个月攒了 25 条记录,**其中只有 18 个独立信息集**(28% 是同一道题问两遍):
+上线一个月攒了 25 条记录,**其中只有 17 个独立信息集**(32% 是同一道题问两遍):
 
     date        wd   as_of        price     ← 重复来源
     2026-08-09  Sun  2026-08-07   877.57    周末也记账(没有交易日闸门)
@@ -73,8 +73,16 @@ REVIEW-2026-07 §5 的算术:判决主体(方向表态)每个交易日只 +1 个
    不是未来函数(评分 bar 始终晚于 as_of),但视界标签是错的,而判决线第四条
    正要求「非四视界中的孤例」—— 标签不干净,那条根本没法判。
 
+还有第 4 个,最毒:**盘前占位 bar 携带陈旧真值**。`as_of=2026-08-17` 记 $971.66,
+而 MU 当日真实收盘 **$1011.75**(差 4%,记的其实是 08-14 的)。`as_of` 是评分锚点,
+指错日子整条记录就错位。与 dca.py 2026-07-16「盘前占位 bar」同族,但那次是 NaN
+(dropna 能抓),这次是**看起来完全正常的旧数字** —— 只能靠时钟判断
+(`_drop_incomplete_bar`)。这一条同时说明 08-17 那条问的其实是 08-14 的信息集,
+按同一条规矩当重复丢掉。
+
 1+2 一个修就够:**键改成 as_of**,重复自动撞键跳过,周末闸门都不用单独写。
-3 是 `grade()` 里一行。25 条已按 as_of 合并成 18 条(重复组保留**最早问的那条** ——
+3 是 `grade()` 里一行(锚点 date → as_of),4 是 `_drop_incomplete_bar()`。
+25 条已按 as_of 合并、再丢掉 08-17 那条 → **17 条**(重复组保留**最早问的那条** ——
 留后一条等于挑答案),horizons 已全部按新锚点重算。
 """
 
@@ -140,6 +148,19 @@ def _load() -> list[dict]:
         return []
 
 
+def _id_exists(rid: str) -> bool | None:
+    """这个 id 是否已在库里。**读库失败返回 None**(不是 False)——
+    调用方必须把 None 当"不确定"处理,而不是当"不存在"。"""
+    sb = _supabase()
+    if sb is None:
+        return None
+    try:
+        return bool(sb.table(_TABLE).select("id").eq("id", rid).execute().data)
+    except Exception as e:
+        logger.warning(f"second_ticker: id 查重失败 — {e}")
+        return None
+
+
 def _save(records: list[dict]) -> bool:
     """写库。**返回是否真的写成功** —— 不许静默失败:表还没建时若返回成功,
     页面会显示一个根本没落库的表态,第二天凭空消失,台账等于假账。"""
@@ -157,6 +178,22 @@ def _save(records: list[dict]) -> bool:
 # ─────────────────────────────────────────────────────────────────────────────
 #  简报:全部复用已有的通用模块(它们都只吃 DataFrame,本来就与票无关)
 # ─────────────────────────────────────────────────────────────────────────────
+def _trim_to(df, as_of) -> "pd.DataFrame | None":
+    """裁掉 `as_of` 当天收盘之后的所有 bar(小时线 / 大盘线共用)。
+    锚点是哪根日线,证据就不许越过那根。拿不到就原样返回,不阻断。"""
+    if df is None or len(df) == 0:
+        return df
+    try:
+        cutoff = pd.Timestamp(as_of).normalize() + pd.Timedelta(days=1)
+        idx = pd.DatetimeIndex(df.index)
+        if idx.tz is not None:
+            cutoff = cutoff.tz_localize(idx.tz)
+        return df[idx < cutoff]
+    except Exception as e:
+        logger.warning("second_ticker: _trim_to 失败,原样使用 — %s", e)
+        return df
+
+
 def _drop_incomplete_bar(d: pd.DataFrame) -> pd.DataFrame:
     """丢掉「今天还没收盘」的那根 bar,保证 as_of 指向一根**已完成**的交易日。
 
@@ -167,7 +204,9 @@ def _drop_incomplete_bar(d: pd.DataFrame) -> pd.DataFrame:
         as_of=2026-08-26 记的 $938.48 · 真实 $938.40   (盘中快照)
         as_of=2026-08-28 记的 $933.30 · 真实 $932.86   (盘中快照)
 
-    18 条里 3 条对不上。**as_of 是评分锚点**,它指错了日子,整条记录的视界就错位。
+    (按 as_of 去重后的 18 条里有 3 条对不上;08-17 那条差 4%、等于重复问了 08-14,
+    已丢掉 → 最终 17 条。后两条只差几分,是盘中快照,不影响锚点归属。)
+    **as_of 是评分锚点**,它指错了日子,整条记录的视界就错位。
     这与 dca.py 2026-07-16 那个「盘前占位 bar close=NaN 静默传染」是同一个家族
     (见 docs/LESSONS.md),那次是 NaN 好歹能 dropna 掉,这次是**陈旧的真值**,
     dropna 抓不住 —— 只能靠时钟判断。
@@ -201,8 +240,11 @@ def build_brief(ticker: str = TICKER) -> dict:
     from dashboard.event_day import detect_event_day
 
     df_h, df_d = load_or_fetch(ticker)
-    d = df_d.rename(columns=str.lower)
-    d = _drop_incomplete_bar(d)
+    d = _drop_incomplete_bar(df_d.rename(columns=str.lower))
+    # 小时线同样不能越过锚点:`as_of` 之后的 1h bar 属于"表态之后才发生的事",
+    # 喂给 analyze_smc / analyze_volume_profile 就是把答案泄进考卷。
+    # (盘前跑时本来就没有;盘中手动跑 `run_daily` 时这一刀才起作用。)
+    df_h = _trim_to(df_h, d.index[-1])
     close = float(d["close"].iloc[-1])
     prev = float(d["close"].iloc[-2])
     brief: dict = {
@@ -245,6 +287,7 @@ def build_brief(ticker: str = TICKER) -> dict:
         # 否则 float() 拿到的是 Series 直接抛 TypeError(首版就栽在这)。
         qqq = yf.download("QQQ", period="6mo", progress=False,
                           auto_adjust=True)["Close"].dropna().squeeze()
+        qqq = _trim_to(qqq, brief["as_of"])      # 大盘灯同样不许越过锚点
         ma50 = float(qqq.rolling(50).mean().iloc[-1])
         last = float(qqq.iloc[-1])
         brief["market"] = {"qqq": round(last, 2), "ma50": round(ma50, 2),
@@ -253,6 +296,12 @@ def build_brief(ticker: str = TICKER) -> dict:
         logger.warning(f"second_ticker[{ticker}]: market light failed — {e}")
         brief["market"] = None
     # 该票在 scan 里已经算好的基本面/财报/增发(每天扫描已产出,这里只借用)
+    # ⚠️ 已知残留(2026-09-02 code review 提出,故意不修):`scan_ticker` 自己重新拉数据,
+    # 没法从这里裁到 as_of —— 要裁就得改它的签名,影响 /watch 整条扫描线,不值得。
+    # 它带回来的 score/trend/rsi/levels 确实含今天那根未完成的 bar。
+    # **定时 job 跑在 09:00 ET 盘前,那时今天还没有 bar,所以线上路径不受影响**;
+    # 只有盘中手动 run_daily 才会漏一点。真要动手,正确做法是给 scan_ticker 加一个
+    # `df` 入参而不是在这里补丁。
     try:
         from dashboard.scan import scan_ticker
         card, _ = scan_ticker(ticker)
@@ -374,7 +423,7 @@ def record(ticker: str = TICKER, lean: dict | None = None, brief: dict | None = 
     """记一条表态。**幂等键 = `<票>-<as_of>`,一个信息集只准问一次。**
     返回该条记录;已问过 / 拿不到 Supabase / LLM 失败 → None(测量轨不许拖垮主链路)。
 
-    ⚠️ 2026-09-02 修:键原本是 `<票>-<今天的日历日>`,导致 25 条记录里只有 18 个
+    ⚠️ 2026-09-02 修:键原本是 `<票>-<今天的日历日>`,导致 25 条记录里只有 17 个
     独立信息集(28% 是重复问)。两个来源:
       · **周末也记账** —— 没有交易日闸门,4 个周日各记一条,全用周五的数据。
       · **盘前跑拿到昨天的 bar** —— job 09:00 ET 跑,yfinance 常常还没出当天 bar,
@@ -394,9 +443,17 @@ def record(ticker: str = TICKER, lean: dict | None = None, brief: dict | None = 
         logger.warning(f"second_ticker[{ticker}]: brief failed — {e}")
         return None
     rid = f"{ticker}-{b['as_of']}"
+    asked_on = datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d")
     # 查重放在 LLM 调用**之前** —— 既省掉那次调用($0.1/次,纪律 6 成本可见),
     # 也保证已落库的表态不会被同一道题的第二次回答改写。
-    if any(r.get("id") == rid for r in _load()):
+    # ⚠️ 必须用 `_id_exists` 而不是 `_load()`:后者读库出错时返回 `[]`,会被读成
+    # 「这个 as_of 没问过」→ 重新问一次 LLM 并 upsert 覆盖已有答案,正是本文件
+    # 明令禁止的「对同一道题重摇骰子」。查重失败必须**保守跳过**,不能失败即放行。
+    seen = _id_exists(rid)
+    if seen is None:
+        logger.warning("second_ticker[%s]: 查重读库失败,保守跳过(不许失败即放行)", ticker)
+        return None
+    if seen:
         logger.info("second_ticker[%s]: as_of %s 已有表态,跳过(一个信息集只问一次)",
                     ticker, b["as_of"])
         return None
@@ -414,9 +471,7 @@ def record(ticker: str = TICKER, lean: dict | None = None, brief: dict | None = 
     rec = {
         # date = 这条表态是哪天问的(审计用);as_of = 价格/证据属于哪根 bar(评分锚点)。
         # 两者常常差一天,**评分必须用 as_of**(见 grade())。
-        "id": rid, "ticker": ticker,
-        "date": datetime.now(ZoneInfo("America/New_York")).strftime("%Y-%m-%d"),
-        "as_of": b["as_of"],
+        "id": rid, "ticker": ticker, "date": asked_on, "as_of": b["as_of"],
         "price": b["price"],
         "p_up_5d": round(max(0.0, min(1.0, float(ln["p_up_5d"]))), 3),
         "bold_call_5d": ln["bold_call_5d"],
@@ -431,8 +486,9 @@ def record(ticker: str = TICKER, lean: dict | None = None, brief: dict | None = 
         logger.warning("second_ticker[%s]: 表态已生成但**没落库**(表是否已建?"
                        "跑 sql/second_journal_migration.sql)—— 按未记录处理", ticker)
         return None
-    logger.info("second_ticker[%s] %s → %s (p_up %.2f, conv %d)",
-                ticker, today, rec["bold_call_5d"], rec["p_up_5d"], rec["conviction"])
+    logger.info("second_ticker[%s] as_of %s(问于 %s)→ %s (p_up %.2f, conv %d)",
+                ticker, rec["as_of"], asked_on, rec["bold_call_5d"],
+                rec["p_up_5d"], rec["conviction"])
     return rec
 
 
@@ -444,7 +500,12 @@ def grade(ticker: str = TICKER, df_d: pd.DataFrame | None = None) -> int:
 
     if df_d is None:
         _, df_d = load_or_fetch(ticker)
-    d = df_d.rename(columns=str.lower)
+    # ⚠️ 评分侧也得裁。唯一的工作日 job 是 **09:00 ET 盘前**(aws/template.yaml
+    # `cron(0 9 ? * MON-FRI *)`),`after` 的最后一根就是今天那根未收盘的占位 bar。
+    # 锚点改成 as_of 之后,每条记录**最前面那个视界**都会拿这根算 —— 占位 close 常常
+    # 等于昨收,于是 fwd_ret 变成 0.0,一个 "up" 表态被判错,还会写进库、进胜率和基线。
+    # 更糟的是它可能把 5d 槽提前填满,`status` 直接结案成 graded,错值就固化了。
+    d = _drop_incomplete_bar(df_d.rename(columns=str.lower))
     closes = d["close"]
     dates = pd.DatetimeIndex(d.index).normalize()
     records = [r for r in _load() if r.get("ticker") == ticker]
