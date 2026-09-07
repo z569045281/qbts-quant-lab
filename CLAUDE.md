@@ -2,6 +2,8 @@
 
 Instructions for any Claude session working in this repo. Auto-loaded every session.
 **这个文件只放"路标 + 永远适用的铁律";细节全在 `docs/` 里,按下面的表按需读。**
+Please remove all mannered prose
+when a literal phrase is available, use it
 
 ---
 
