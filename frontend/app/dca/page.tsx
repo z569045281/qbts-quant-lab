@@ -27,64 +27,64 @@ function DcaCard({ r }: { r: DcaResult }) {
   const v = VAL[r.valuation] ?? FALLBACK;
   if (r.error) {
     return (
-      <div className="rounded-2xl border border-hairline bg-surface p-4 flex items-center gap-3">
-        <span className="text-lg">⚠️</span>
+      <div className="rounded-card border border-hairline bg-surface p-4 flex items-center gap-3">
+        <span className="text-section">⚠️</span>
         <span className="font-bold text-gray-800">{r.ticker}</span>
-        <span className="text-xs text-gray-400">{r.name} · 数据拉取失败</span>
+        <span className="text-body text-gray-400">{r.name} · 数据拉取失败</span>
       </div>
     );
   }
   const up = (r.today_change ?? 0) >= 0;
   return (
-    <div className={`rounded-2xl border ${v.border} ${v.bg} p-4 shadow-sm`}>
+    <div className={`rounded-card border ${v.border} ${v.bg} p-4 shadow-sm`}>
       {/* 头行 */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-lg font-bold text-gray-900">{r.ticker}</span>
-        <span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">{r.name}</span>
-        {r.role && <span className="text-[10px] text-gray-400">{r.role}</span>}
-        <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${v.chip}`}>{r.valuation_emoji} {r.valuation}</span>
-        <span className="ml-auto text-sm font-mono text-gray-900">${r.price?.toFixed(2)}</span>
-        <span className={`text-sm font-semibold ${up ? "text-emerald-600" : "text-down"}`}>{signed(r.today_change)}</span>
+        <span className="text-section font-bold text-gray-900">{r.ticker}</span>
+        <span className="text-meta px-1.5 py-0.5 rounded-inner bg-gray-100 text-gray-500 font-medium">{r.name}</span>
+        {r.role && <span className="text-meta text-gray-400">{r.role}</span>}
+        <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${v.chip}`}>{r.valuation_emoji} {r.valuation}</span>
+        <span className="ml-auto text-card font-mono text-gray-900">${r.price?.toFixed(2)}</span>
+        <span className={`text-card font-semibold ${up ? "text-emerald-600" : "text-down"}`}>{signed(r.today_change)}</span>
       </div>
 
       {/* 历史平均年回报(复合年化 CAGR,含分红)——用户最关心的数字,做醒目条 */}
       {r.cagr != null && (
-        <div className="mt-2.5 flex items-baseline gap-2 rounded-lg bg-emerald-50/70 border border-emerald-100 px-3 py-2">
-          <span className="text-[11px] text-emerald-700/80">历史年化回报</span>
-          <span className="text-lg font-bold font-mono text-emerald-600">{signed(r.cagr)}</span>
-          {r.cagr_years != null && <span className="text-[10px] text-emerald-700/50">近 {r.cagr_years} 年 · 含分红 · 复合非算术</span>}
+        <div className="mt-2.5 flex items-baseline gap-2 rounded-inner bg-emerald-50/70 border border-emerald-100 px-3 py-2">
+          <span className="text-meta text-emerald-700/80">历史年化回报</span>
+          <span className="text-section font-bold font-mono text-emerald-600">{signed(r.cagr)}</span>
+          {r.cagr_years != null && <span className="text-meta text-emerald-700/50">近 {r.cagr_years} 年 · 含分红 · 复合非算术</span>}
         </div>
       )}
 
       {/* 估值 + 目标权重 */}
-      <div className="mt-2.5 grid grid-cols-3 gap-2 text-xs">
-        <div className="bg-surface/70 rounded-lg px-2.5 py-1.5">
-          <div className="text-[10px] text-gray-400">P/E</div>
+      <div className="mt-2.5 grid grid-cols-3 gap-2 text-body">
+        <div className="bg-surface/70 rounded-inner px-2.5 py-1.5">
+          <div className="text-meta text-gray-400">P/E</div>
           <div className="font-mono font-semibold text-gray-700">{r.pe ?? "—"}</div>
         </div>
-        <div className="bg-surface/70 rounded-lg px-2.5 py-1.5" title="盈利收益率 1/PE ≈ 粗略的长期预期年化(实际)">
-          <div className="text-[10px] text-gray-400">粗估长期年化</div>
+        <div className="bg-surface/70 rounded-inner px-2.5 py-1.5" title="盈利收益率 1/PE ≈ 粗略的长期预期年化(实际)">
+          <div className="text-meta text-gray-400">粗估长期年化</div>
           <div className="font-mono font-semibold text-gray-700">{r.earnings_yield != null ? `~${(r.earnings_yield * 100).toFixed(1)}%` : "—"}</div>
         </div>
-        <div className="bg-surface/70 rounded-lg px-2.5 py-1.5">
-          <div className="text-[10px] text-gray-400">建议权重</div>
+        <div className="bg-surface/70 rounded-inner px-2.5 py-1.5">
+          <div className="text-meta text-gray-400">建议权重</div>
           <div className="font-mono font-semibold text-brand">{r.target_weight != null ? `${r.target_weight}%` : "—"}</div>
         </div>
       </div>
 
       {/* 证据版「何时多投」 */}
       {r.deploy && (
-        <div className="mt-2.5 rounded-lg px-2.5 py-2 bg-surface/70 border border-black/5">
-          <div className="text-[12px] font-semibold text-gray-800">{r.deploy.emoji} {r.deploy.tag}</div>
-          <p className="mt-0.5 text-[12px] leading-relaxed text-gray-600">{r.deploy.text}</p>
-          <div className="mt-1 text-[10px] text-gray-400 font-mono">
+        <div className="mt-2.5 rounded-inner px-2.5 py-2 bg-surface/70 border border-black/5">
+          <div className="text-body font-semibold text-gray-800">{r.deploy.emoji} {r.deploy.tag}</div>
+          <p className="mt-0.5 text-body leading-relaxed text-gray-600">{r.deploy.text}</p>
+          <div className="mt-1 text-meta text-gray-400 font-mono">
             距52周高点 {signed(r.drawdown_pct)} · vs 200日线 {signed(r.vs_200dma_pct)}{r.below_200 ? "(下方)" : ""}
           </div>
         </div>
       )}
 
       {/* 季节性(次要参考)*/}
-      <div className="mt-2 text-[10px] text-gray-400 leading-relaxed">
+      <div className="mt-2 text-meta text-gray-400 leading-relaxed">
         历史最强 {mo(r.best_month)}({signed(r.best_month_avg)}) · 最弱 {mo(r.worst_month)}({signed(r.worst_month_avg)})
         · ❄️冬 {signed(r.winter_avg)} vs ☀️夏 {signed(r.summer_avg)}/月
       </div>
@@ -109,27 +109,27 @@ export default function DcaPage() {
     <main className="max-w-[1100px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-4">
       <SelfCheckCard page="dca" />
       {/* 标题 + 大盘估值背景 */}
-      <section className="bg-surface rounded-2xl border border-hairline p-5 shadow-sm">
+      <section className="bg-surface rounded-card border border-hairline p-5 shadow-sm">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-base">📥</span>
-          <span className="text-sm font-semibold text-gray-800">定投专区 · 全球估值菜单</span>
-          {genAt && <span className="ml-auto text-[10px] text-gray-400 font-mono">更新于 {genAt}</span>}
+          <span className="text-section">📥</span>
+          <span className="text-card font-semibold text-gray-800">定投专区 · 全球估值菜单</span>
+          {genAt && <span className="ml-auto text-meta text-gray-400 font-mono">更新于 {genAt}</span>}
         </div>
         {state?.macro && (
-          <div className="mt-3 rounded-xl px-4 py-2.5 text-[13px] leading-relaxed bg-blue-50 text-blue-800 border border-blue-200">
+          <div className="mt-3 rounded-inner px-4 py-2.5 text-body leading-relaxed bg-blue-50 text-blue-800 border border-blue-200">
             🌍 美股 CAPE ≈ <b>{state.macro.us_cape}</b> · 全球 ≈ <b>{state.macro.global_cape}</b>
-            <span className="text-[11px] text-blue-700/70"> （{state.macro.as_of}）</span>
-            <p className="mt-1 text-[12px] text-blue-700/90">{state.macro.note}</p>
+            <span className="text-meta text-blue-700/70"> （{state.macro.as_of}）</span>
+            <p className="mt-1 text-body text-blue-700/90">{state.macro.note}</p>
           </div>
         )}
-        {state?.principle && <p className="mt-2 text-[11px] text-gray-500 leading-relaxed">{state.principle}</p>}
+        {state?.principle && <p className="mt-2 text-meta text-gray-500 leading-relaxed">{state.principle}</p>}
       </section>
 
       {/* 建议配置 */}
       {state?.allocation && Object.keys(weights).length > 0 && (
-        <section className="bg-surface rounded-2xl border border-hairline p-4 shadow-sm">
-          <div className="text-xs font-semibold text-gray-700 mb-2">🎯 建议配置(温和的估值倾斜,每年再平衡)</div>
-          <div className="flex h-6 rounded-lg overflow-hidden text-[10px] font-semibold text-white">
+        <section className="bg-surface rounded-card border border-hairline p-4 shadow-sm">
+          <div className="text-body font-semibold text-gray-700 mb-2">🎯 建议配置(温和的估值倾斜,每年再平衡)</div>
+          <div className="flex h-6 rounded-inner overflow-hidden text-meta font-semibold text-white">
             {Object.entries(weights).map(([t, w], i) => (
               <div key={t}
                 className={["bg-brand", "bg-emerald-500", "bg-amber-500", "bg-purple-500",
@@ -139,7 +139,7 @@ export default function DcaPage() {
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-gray-500 leading-relaxed">{state.allocation.note}</p>
+          <p className="mt-2 text-meta text-gray-500 leading-relaxed">{state.allocation.note}</p>
         </section>
       )}
 
@@ -151,12 +151,12 @@ export default function DcaPage() {
 
       {/* 卡片 */}
       {loading ? (
-        <div className="text-sm text-ink-muted flex items-center gap-2 px-1">
+        <div className="text-card text-ink-muted flex items-center gap-2 px-1">
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-brand animate-pulse" /> 读取定投建议…
         </div>
       ) : !state || state.results.length === 0 ? (
-        <div className="bg-surface rounded-2xl border border-hairline p-8 text-center text-sm text-gray-400">
-          尚未生成 — 运行一次 <code className="font-mono bg-gray-100 px-1 rounded">publish.py</code>(或等每日自动任务)后这里就会有数据。
+        <div className="bg-surface rounded-card border border-hairline p-8 text-center text-card text-gray-400">
+          尚未生成 — 运行一次 <code className="font-mono bg-gray-100 px-1 rounded-inner">publish.py</code>(或等每日自动任务)后这里就会有数据。
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -166,9 +166,9 @@ export default function DcaPage() {
 
       {/* 择机观察(不进核心配置,便宜了再买)*/}
       {state?.watch && state.watch.length > 0 && (
-        <section className="rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4 shadow-sm">
-          <div className="text-xs font-semibold text-indigo-700 mb-1">🔭 择机观察 · 便宜了再买(不占核心权重)</div>
-          {state.watch_note && <p className="text-[11px] text-indigo-600/80 leading-relaxed mb-3">{state.watch_note}</p>}
+        <section className="rounded-card border border-indigo-200 bg-indigo-50/40 p-4 shadow-sm">
+          <div className="text-body font-semibold text-indigo-700 mb-1">🔭 择机观察 · 便宜了再买(不占核心权重)</div>
+          {state.watch_note && <p className="text-meta text-indigo-600/80 leading-relaxed mb-3">{state.watch_note}</p>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {state.watch.map(r => <DcaCard key={r.ticker} r={r} />)}
           </div>
@@ -177,10 +177,10 @@ export default function DcaPage() {
 
       {/* 压舱石档(债+金):有卡片有权重,与股票核心合成 100% */}
       {(state?.ballast_etfs?.length || state?.ballast) && (
-        <section className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
-          <div className="text-xs font-semibold text-slate-700 mb-1">⚓ 压舱石(已纳入上面的配置权重)</div>
+        <section className="rounded-card border border-slate-200 bg-slate-50 p-4 shadow-sm">
+          <div className="text-body font-semibold text-slate-700 mb-1">⚓ 压舱石(已纳入上面的配置权重)</div>
           {state?.ballast && (
-            <p className="text-[12px] leading-relaxed text-slate-600 mb-3">{state.ballast}</p>
+            <p className="text-body leading-relaxed text-slate-600 mb-3">{state.ballast}</p>
           )}
           {state?.ballast_etfs && state.ballast_etfs.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -192,12 +192,12 @@ export default function DcaPage() {
 
       {/* 与投机仓分开 */}
       {state?.separation && (
-        <section className="rounded-2xl border border-rose-200 bg-rose-50 p-3.5 shadow-sm">
-          <p className="text-[12px] leading-relaxed text-rose-700">{state.separation}</p>
+        <section className="rounded-card border border-rose-200 bg-rose-50 p-3.5 shadow-sm">
+          <p className="text-body leading-relaxed text-rose-700">{state.separation}</p>
         </section>
       )}
 
-      <footer className="text-center text-[10px] text-gray-400 pb-4 leading-relaxed">
+      <footer className="text-center text-meta text-gray-400 pb-4 leading-relaxed">
         📥 定投专区 · 估值/季节性是<b>长周期的弱倾斜、不是择时</b>,单一年份可能完全相反 · 长期持续投入 &gt; 精准择时 · 非投资建议
       </footer>
     </main>

@@ -32,29 +32,29 @@ export default function MuPage() {
   return (
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-4 space-y-4">
       <header className="space-y-1">
-        <h1 className="text-lg font-bold text-gray-900">🔬 第二考场</h1>
-        <p className="text-[12px] text-ink-muted leading-relaxed">
+        <h1 className="text-section font-bold text-gray-900">🔬 第二考场</h1>
+        <p className="text-body text-ink-muted leading-relaxed">
           第二只票的<b>涨/跌表态</b>测量轨。存在的理由:QBTS 那边每个交易日只攒 1 个样本,
           9 月初才够第一次真判决 —— 而<b>一个考场的结论永远可能是运气</b>。
           加一只与 QBTS 低相关的票,样本速度翻倍,而且变成两场独立考试:
           两边都显不出本事,那就是真没本事;只有一边行,那大概是噪声。
         </p>
-        <p className="text-[12px] text-[#B45309] leading-relaxed">
+        <p className="text-body text-[#B45309] leading-relaxed">
           这一页没有入场价、没有止损、没有仓位、没有按钮 —— 它是成绩单,不是下单界面。
           看到「看跌」也不要去买反向 ETF:<b>没有任何东西会执行这些表态,这是它能诚实的前提。</b>
         </p>
       </header>
 
       {loading ? (
-        <div className="text-sm text-ink-muted flex items-center gap-2 px-1">
+        <div className="text-card text-ink-muted flex items-center gap-2 px-1">
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-brand animate-pulse" /> 读取台账…
         </div>
       ) : tickers.length === 0 ? (
-        <div className="bg-surface rounded-2xl border border-hairline p-8 text-center space-y-2">
-          <p className="text-sm text-gray-500">测量轨还没有数据。</p>
-          <p className="text-[12px] text-gray-400 leading-relaxed">
+        <div className="bg-surface rounded-card border border-hairline p-8 text-center space-y-2">
+          <p className="text-card text-gray-500">测量轨还没有数据。</p>
+          <p className="text-body text-gray-400 leading-relaxed">
             需要先在 Supabase 跑一次{" "}
-            <code className="font-mono bg-gray-100 px-1 rounded">sql/second_journal_migration.sql</code>
+            <code className="font-mono bg-gray-100 px-1 rounded-inner">sql/second_journal_migration.sql</code>
             ,然后等下一次发布(或本地跑一次决策)写入第一条表态。
           </p>
         </div>
@@ -64,7 +64,7 @@ export default function MuPage() {
         </div>
       )}
 
-      <footer className="text-center text-[10px] text-gray-400 pb-4 leading-relaxed">
+      <footer className="text-center text-meta text-gray-400 pb-4 leading-relaxed">
         🔬 第二考场 · 纯测量轨,<b>零决策权</b> · 不进 QBTS 的决策提示词(两个考场互相看答案就不独立了)
         · 与 QBTS 台账分池存放、分池判决 · 非投资建议
       </footer>

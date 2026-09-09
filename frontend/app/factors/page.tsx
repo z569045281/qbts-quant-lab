@@ -18,18 +18,18 @@ function StrategyCard({ s }: { s: ReplayStrategy }) {
   const trades = showAll ? s.trades : s.trades.slice(0, 5);
   const st = s.stats, cur = s.current;
   return (
-    <section className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+    <section className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
       {/* 名称 + 当前状态 */}
       <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
-        <span className="text-sm font-bold text-[#1C1C1E]">{s.emoji} {s.name}</span>
-        <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
+        <span className="text-card font-bold text-ink">{s.emoji} {s.name}</span>
+        <span className={`text-meta font-bold px-2.5 py-1 rounded-full ${
           cur.in_market ? "bg-emerald-100 text-emerald-700" : "bg-sunken text-gray-500"}`}>
           {cur.in_market
             ? `在场 ${(cur.exposure * 100).toFixed(0)}%${cur.sym ? ` · ${cur.sym}` : ""}${cur.since ? ` · ${cur.since} 入 $${cur.entry_px?.toFixed(2)} · 浮 ${pct(cur.unreal, 1)}` : ""}`
             : cur.triggered_today ? "今日触发 · 日内单" : "空仓等待"}
         </span>
       </div>
-      <p className="text-[12px] text-gray-400 leading-relaxed mb-3">{s.rule}</p>
+      <p className="text-body text-gray-400 leading-relaxed mb-3">{s.rule}</p>
 
       {/* 整体收益 */}
       <div className="grid grid-cols-5 gap-1.5 text-center mb-3">
@@ -41,9 +41,9 @@ function StrategyCard({ s }: { s: ReplayStrategy }) {
           ["段胜率", st.win_rate != null ? `${(st.win_rate * 100).toFixed(0)}%` : "—",
            st.win_rate != null && st.win_rate >= 0.5 ? "text-emerald-600" : "text-red-500"],
         ] as [string, string, string][]).map(([label, val, color]) => (
-          <div key={label} className="bg-sunken rounded-xl px-1 py-2">
-            <div className="text-[10px] text-gray-400">{label}</div>
-            <div className={`text-[13px] font-bold font-mono ${color}`}>{val}</div>
+          <div key={label} className="bg-sunken rounded-inner px-1 py-2">
+            <div className="text-meta text-gray-400">{label}</div>
+            <div className={`text-body font-bold font-mono ${color}`}>{val}</div>
           </div>
         ))}
       </div>
@@ -51,9 +51,9 @@ function StrategyCard({ s }: { s: ReplayStrategy }) {
       {/* 历史买卖点位 */}
       {s.trades.length > 0 && (
         <div className="overflow-x-auto">
-          <table className="w-full text-[12px]">
+          <table className="w-full text-body">
             <thead>
-              <tr className="text-[10px] text-gray-400 text-left">
+              <tr className="text-meta text-gray-400 text-left">
                 <th className="py-1 font-normal">买入</th>
                 <th className="py-1 font-normal">卖出</th>
                 <th className="py-1 font-normal text-right">天数</th>
@@ -64,7 +64,7 @@ function StrategyCard({ s }: { s: ReplayStrategy }) {
               {trades.map(t => (
                 <tr key={`${t.buy_date}-${t.sym ?? ""}`} className={`border-t border-hairline ${t.open ? "bg-emerald-50/60" : ""}`}>
                   <td className="py-1.5 font-mono whitespace-nowrap">
-                    {t.sym && <span className="mr-1 text-[10px] font-bold text-[#007AFF] bg-blue-50 rounded px-1 py-0.5">{t.sym}</span>}
+                    {t.sym && <span className="mr-1 text-meta font-bold text-brand bg-blue-50 rounded-inner px-1 py-0.5">{t.sym}</span>}
                     {t.buy_date} <span className="text-gray-400">@</span> ${t.buy_px.toFixed(2)}</td>
                   <td className="py-1.5 font-mono whitespace-nowrap">
                     {t.open
@@ -79,7 +79,7 @@ function StrategyCard({ s }: { s: ReplayStrategy }) {
           </table>
           {s.trades.length > 5 && (
             <button onClick={() => setShowAll(!showAll)}
-              className="mt-1.5 text-[11px] text-[#007AFF] font-semibold">
+              className="mt-1.5 text-meta text-brand font-semibold">
               {showAll ? "收起" : `展开最近 ${s.trades.length} 段(全历史共 ${s.n_trades_total} 段)`}
             </button>
           )}
@@ -94,31 +94,31 @@ function GuerrillaCard({ g }: { g: GuerrillaState }) {
   const led = g.ledger;
   const hasAny = g.open.length > 0 || (led?.trades?.length ?? 0) > 0 || g.cooldowns.length > 0;
   return (
-    <section className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+    <section className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
       <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
-        <span className="text-sm font-bold text-[#1C1C1E]">🎯 极度超卖游击战 · Extreme Reversion</span>
-        <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-600">
+        <span className="text-card font-bold text-ink">🎯 极度超卖游击战 · Extreme Reversion</span>
+        <span className="text-meta font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-600">
           高危观察 · 收盘自算
         </span>
       </div>
-      <p className="text-[12px] text-gray-400 leading-relaxed mb-3">
+      <p className="text-body text-gray-400 leading-relaxed mb-3">
         Bear Lock 下的逆宏观顺订单流游击线程:VMC&lt;−70 + 连续两根日线 Intrabar POC 重合≤$0.05(停机坪)
         + RR≥2.5,<b>服务端收盘后自算</b>,命中即 ntfy 推送 + $1000/枪纸面;止盈/止损即平仓并进入
         <b>24h 强制冷却</b>。零决策权、UNPROVEN,8/15 与观察组同审。
       </p>
       {!hasAny && (
-        <div className="text-[12px] text-gray-400 bg-sunken rounded-xl px-3 py-3 text-center">
+        <div className="text-body text-gray-400 bg-sunken rounded-inner px-3 py-3 text-center">
           待第一枪 —— 三条件极端合取,尚未触发过(常态是长期静默)
         </div>
       )}
       {g.cooldowns.map(c => (
-        <div key={c.ticker} className="mb-2 text-[12px] bg-indigo-50 text-indigo-700 rounded-xl px-3 py-2">
+        <div key={c.ticker} className="mb-2 text-body bg-indigo-50 text-indigo-700 rounded-inner px-3 py-2">
           ❄️ {c.ticker} 冷却中(至 {c.until_iso.slice(5, 16).replace("T", " ")} UTC)
           {c.reason ? ` · 上一枪 ${c.reason}` : ""} —— 24h 内无视一切多头信号
         </div>
       ))}
       {g.open.map(p => (
-        <div key={p.ticker} className="mb-2 text-[12px] bg-emerald-50 rounded-xl px-3 py-2 font-mono">
+        <div key={p.ticker} className="mb-2 text-body bg-emerald-50 rounded-inner px-3 py-2 font-mono">
           <span className="font-bold text-emerald-700">在场 {p.ticker}</span>
           {" "}入 ${p.entry.toFixed(2)} · 止损 ${p.stop.toFixed(2)} · 目标 ${p.target.toFixed(2)} · RR {p.rr.toFixed(1)}
         </div>
@@ -133,15 +133,15 @@ function GuerrillaCard({ g }: { g: GuerrillaState }) {
               ["累计盈亏", `${(led!.realized ?? 0) >= 0 ? "+" : ""}$${(led!.realized ?? 0).toFixed(0)}`,
                (led!.realized ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"],
             ] as [string, string, string][]).map(([label, val, color]) => (
-              <div key={label} className="bg-sunken rounded-xl px-1 py-2">
-                <div className="text-[10px] text-gray-400">{label}</div>
-                <div className={`text-[13px] font-bold font-mono ${color}`}>{val}</div>
+              <div key={label} className="bg-sunken rounded-inner px-1 py-2">
+                <div className="text-meta text-gray-400">{label}</div>
+                <div className={`text-body font-bold font-mono ${color}`}>{val}</div>
               </div>
             ))}
           </div>
           <div className="space-y-1">
             {led!.trades.slice(0, 6).map(t => (
-              <div key={t.opened_at} className="flex items-center gap-2 text-[12px] font-mono border-t border-hairline py-1.5">
+              <div key={t.opened_at} className="flex items-center gap-2 text-body font-mono border-t border-hairline py-1.5">
                 <span className="font-bold">{t.ticker}</span>
                 <span>{t.opened_at.slice(5, 10)} 入 ${t.entry.toFixed(2)}</span>
                 <span className={t.exit_why === "target" ? "text-emerald-600" : "text-red-500"}>
@@ -178,31 +178,31 @@ export default function StrategyRecordPage() {
     <main className="max-w-3xl mx-auto px-4 py-6 space-y-4">
     <SelfCheckCard page="factors" />
       <div>
-        <h1 className="text-xl font-bold text-[#1C1C1E]">🏇 策略战绩</h1>
-        <p className="text-[12px] text-gray-400 mt-1">
+        <h1 className="text-section font-bold text-ink">🏇 策略战绩</h1>
+        <p className="text-body text-gray-400 mt-1">
           七套验证模型的全历史规则复算 —— 过去每一次买卖点位、整体收益、当前状态。
           {replay && <> 数据截至 <b>{replay.as_of}</b> · 窗口 {replay.window_start} 起 · 死拿对照:全期 {pct(replay.bh.ret_full)} / 近1年 {pct(replay.bh.ret_1y)} / 回撤 {pct(replay.bh.max_dd)}</>}
         </p>
       </div>
 
       {/* 诚实声明 */}
-      <div className="bg-amber-50 rounded-2xl px-4 py-3 text-[12px] leading-relaxed text-amber-900">
+      <div className="bg-amber-50 rounded-card px-4 py-3 text-body leading-relaxed text-amber-900">
         ⚠️ <b>这是回测复算,不是实盘记录。</b>点位按各策略规则在历史数据上重放(0.2%/边成本,收盘成交),
         每天随新 K 线滚动更新,数字会与 mining.md 档案的冻结值有出入;首页「策略马厩」才是 7/2 起的实盘模拟台账,
         两者起始条件不同、当前状态可能不同。全部策略统计上仍属<b>验证期</b>(冻结至 8/15,凭台账定去留)。
         因子挖矿已归档,本页替代原因子排行榜。
       </div>
 
-      {err && <div className="bg-surface rounded-2xl px-4 py-6 text-center text-sm text-gray-400">{err}</div>}
-      {!err && !replay && <div className="bg-surface rounded-2xl px-4 py-6 text-center text-sm text-gray-400">加载中…</div>}
+      {err && <div className="bg-surface rounded-card px-4 py-6 text-center text-card text-gray-400">{err}</div>}
+      {!err && !replay && <div className="bg-surface rounded-card px-4 py-6 text-center text-card text-gray-400">加载中…</div>}
       {replay?.strategies.filter(s => s.tier !== "watch").map(s => <StrategyCard key={s.key} s={s} />)}
 
       {/* 👀 观察组:观察名单候选的前向战绩(未晋升,8/15 凭记录+判活标准复查) */}
       {replay?.strategies.some(s => s.tier === "watch") && (
         <>
           <div className="pt-3">
-            <h2 className="text-sm font-bold text-ink-muted">👀 观察组 · 未晋升</h2>
-            <p className="text-[11px] text-gray-400 mt-0.5 leading-relaxed">
+            <h2 className="text-card font-bold text-ink-muted">👀 观察组 · 未晋升</h2>
+            <p className="text-meta text-gray-400 mt-0.5 leading-relaxed">
               挖矿观察名单的候选(各轮判活差一口气的信号)——同框记战绩,但<b>不进决策、不算在册马</b>;
               8/15 审判时凭记录 + 预注册判活标准复查,过线才升马。卡片规则里写明了各自出身轮次与没晋升的原因。
             </p>
@@ -214,7 +214,7 @@ export default function StrategyRecordPage() {
       {/* 🎯 极度超卖游击战:TradingView webhook 高危观察模块(表未建/未开火不渲染空卡) */}
       {guerrilla && <GuerrillaCard g={guerrilla} />}
 
-      <div className="text-center text-[10px] text-gray-400">
+      <div className="text-center text-meta text-gray-400">
         规则与回测口径见 mining.md · 仅供研究参考,非投资建议
       </div>
     </main>

@@ -67,36 +67,36 @@ export function AuditModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
          onClick={onClose}>
-      <div className="bg-surface rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col"
+      <div className="bg-surface rounded-card shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col"
            onClick={e => e.stopPropagation()}>
         <div className="px-5 py-3.5 border-b border-hairline flex items-center">
-          <span className="text-sm font-semibold text-gray-800">👀 谁点了按钮</span>
-          <span className="ml-2 text-[10px] text-gray-400">Lambda 记录 · 定时任务不计入</span>
+          <span className="text-card font-semibold text-gray-800">👀 谁点了按钮</span>
+          <span className="ml-2 text-meta text-gray-400">Lambda 记录 · 定时任务不计入</span>
           <button onClick={onClose}
-                  className="ml-auto text-gray-400 hover:text-gray-600 text-lg leading-none px-1">✕</button>
+                  className="ml-auto text-gray-400 hover:text-gray-600 text-section leading-none px-1">✕</button>
         </div>
 
-        <div className="overflow-y-auto px-5 py-4 space-y-4 text-sm">
+        <div className="overflow-y-auto px-5 py-4 space-y-4 text-card">
           {error && (
-            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            <div className="text-body text-amber-700 bg-amber-50 border border-amber-200 rounded-inner px-3 py-2">
               读取失败:{error}
               {/not exist|relation|schema/i.test(error) &&
                 " — 需先在 Supabase SQL Editor 跑 sql/publish_audit_migration.sql 建表"}
             </div>
           )}
-          {rows === null && !error && <div className="text-xs text-gray-400 py-6">加载中…</div>}
+          {rows === null && !error && <div className="text-body text-gray-400 py-6">加载中…</div>}
           {rows !== null && rows.length === 0 && !error && (
-            <div className="text-xs text-gray-400 py-6">还没有点击记录(部署后第一次真人点击才会出现)</div>
+            <div className="text-body text-gray-400 py-6">还没有点击记录(部署后第一次真人点击才会出现)</div>
           )}
 
           {visitors.size > 0 && (
             <div>
-              <div className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-1.5">
+              <div className="text-card font-semibold text-gray-800 mb-1.5">
                 访客小结(按 IP+设备)
               </div>
               <div className="space-y-1">
                 {[...visitors.entries()].map(([k, v]) => (
-                  <div key={k} className="flex items-baseline gap-2 text-xs">
+                  <div key={k} className="flex items-baseline gap-2 text-body">
                     <span className="font-mono text-gray-800">{k}</span>
                     <span className="text-gray-400">{v.tz ? `时区 ${v.tz} · ` : ""}共 {v.n} 次 · 最近 {fmtLocal(v.last)}</span>
                   </div>
@@ -107,12 +107,12 @@ export function AuditModal({ onClose }: { onClose: () => void }) {
 
           {(rows ?? []).length > 0 && (
             <div>
-              <div className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-1.5">
+              <div className="text-card font-semibold text-gray-800 mb-1.5">
                 逐条记录(近 100 条 · 本地时间)
               </div>
               <div className="space-y-1.5">
                 {(rows ?? []).map(r => (
-                  <div key={r.id} className="flex items-baseline gap-2 text-xs flex-wrap">
+                  <div key={r.id} className="flex items-baseline gap-2 text-body flex-wrap">
                     <span className="font-mono text-gray-500 shrink-0">{fmtLocal(r.ts)}</span>
                     <span className="text-gray-800 shrink-0">{ACTION_CN[r.action] ?? r.action}</span>
                     <span className="font-mono text-gray-600">{r.ip}</span>
@@ -125,7 +125,7 @@ export function AuditModal({ onClose }: { onClose: () => void }) {
             </div>
           )}
 
-          <div className="text-[10px] text-gray-300 pt-1">
+          <div className="text-meta text-gray-300 pt-1">
             采集口径:IP + User-Agent + 时区/语言/平台/屏幕(浏览器无法提供计算机名)· 表本身对站点读者可见
           </div>
         </div>

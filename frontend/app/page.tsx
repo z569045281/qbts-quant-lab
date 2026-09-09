@@ -171,7 +171,7 @@ export default function Dashboard() {
   if (loading && !snap) {
     return (
       <main className="max-w-[1200px] mx-auto px-6 py-10">
-        <div className="flex items-center gap-2 text-sm text-ink-muted">
+        <div className="flex items-center gap-2 text-card text-ink-muted">
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-brand animate-pulse" />
           读取最新决策…
         </div>
@@ -181,11 +181,11 @@ export default function Dashboard() {
   if (error && !snap) {
     return (
       <main className="max-w-[1200px] mx-auto px-6 py-10">
-        <div className="bg-surface rounded-xl border border-red-200 p-6 max-w-xl">
-          <div className="text-sm font-semibold text-down mb-2">⚠️ 加载失败</div>
-          <pre className="text-xs font-mono text-ink-muted bg-red-50 rounded-md px-3 py-2 whitespace-pre-wrap">{error}</pre>
+        <div className="bg-surface rounded-inner border border-red-200 p-6 max-w-xl">
+          <div className="text-card font-semibold text-down mb-2">⚠️ 加载失败</div>
+          <pre className="text-body font-mono text-ink-muted bg-red-50 rounded-inner px-3 py-2 whitespace-pre-wrap">{error}</pre>
           <button onClick={refresh}
-                  className="mt-4 px-3 py-1.5 text-xs bg-brand text-white rounded-md hover:bg-blue-600">
+                  className="mt-4 px-3 py-1.5 text-body bg-brand text-on-solid rounded-inner hover:bg-blue-600">
             重试
           </button>
         </div>
@@ -378,61 +378,61 @@ export default function Dashboard() {
           : ch.state === "SHORT_MUTED" ? "border-red-200 bg-red-50/60"
           : "border-hairline bg-sunken";
         return (
-          <div className={`rounded-2xl border-2 ${tone} px-4 py-3`}>
+          <div className={`rounded-card border-2 ${tone} px-4 py-3`}>
             <div className="flex items-center gap-2 flex-wrap mb-2">
-              <span className="text-[13px] font-bold text-[#1A1A1E]">🏆 策略冠军</span>
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-surface/70 font-mono text-ink-muted">
+              <span className="text-body font-bold text-ink">🏆 策略冠军</span>
+              <span className="text-meta px-2 py-0.5 rounded-full bg-surface/70 font-mono text-ink-muted">
                 共识 {ch.consensus}
               </span>
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-surface/70 font-medium">
+              <span className="text-meta px-2 py-0.5 rounded-full bg-surface/70 font-medium">
                 {ch.gate.cn}
               </span>
-              <span className="ml-auto text-[12px] font-semibold text-[#1A1A1E]">{ch.state_cn}</span>
+              <span className="ml-auto text-body font-semibold text-ink">{ch.state_cn}</span>
             </div>
             <div className="space-y-1">
               {ch.members.map((m) => (
-                <div key={m.key} className="flex items-start gap-2 text-[12px] leading-snug">
+                <div key={m.key} className="flex items-start gap-2 text-body leading-snug">
                   <span className={
                     m.stance === "up" ? "text-emerald-600 font-bold"
                     : m.stance === "down" ? "text-red-600 font-bold" : "text-gray-300"}>
                     {m.stance === "up" ? "▲" : m.stance === "down" ? "▼" : "○"}
                   </span>
-                  <span className="font-medium text-[#1A1A1E] shrink-0">{m.name}</span>
-                  <span className="text-[10px] font-mono text-gray-400 shrink-0">
+                  <span className="font-medium text-ink shrink-0">{m.name}</span>
+                  <span className="text-meta font-mono text-gray-400 shrink-0">
                     大波动日 {m.big_hit}%·n={m.big_n}
                   </span>
                   <span className="text-gray-500 ml-auto text-right truncate">{m.read}</span>
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-[11px] text-ink-muted leading-snug">{ch.gate.note}</p>
-            <p className="mt-1 text-[11px] text-amber-700 leading-snug">{ch.unproven_note}</p>
+            <p className="mt-2 text-meta text-ink-muted leading-snug">{ch.gate.note}</p>
+            <p className="mt-1 text-meta text-amber-700 leading-snug">{ch.unproven_note}</p>
           </div>
         );
       })()}
 
       {/* ── 警报槽:平时一个像素都不占,出事才插队 ─────────────────────── */}
       {planBreached && d && (
-        <div className="rounded-xl bg-red-600 text-white px-4 py-2.5 text-[13px] leading-snug flex items-start gap-2 shadow-md">
+        <div className="rounded-inner bg-red-600 text-on-solid px-4 py-2.5 text-body leading-snug flex items-start gap-2 shadow-md">
           <span className="leading-none mt-0.5">🚨</span>
           <div>
             <b>本交易计划已失效</b> — 实时价 ${liveQbts!.price.toFixed(2)} 已
             {d.action === "LONG_QBTX" ? "跌破" : "涨破"}失效位
             ${(d.invalidation_price ?? d.trade_plan?.qbts_stop)?.toFixed(2)}。
             下方计划仅作历史参考,请勿执行;本地跑
-            <code className="mx-1 px-1 rounded bg-current/10 font-mono text-[11px]">python publish.py</code>
+            <code className="mx-1 px-1 rounded-inner bg-current/10 font-mono text-meta">python publish.py</code>
             生成新决策。
           </div>
         </div>
       )}
       {!planBreached && planStale && d && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 text-amber-800 px-4 py-2 text-[13px]">
+        <div className="rounded-inner border border-amber-300 bg-amber-50 text-amber-800 px-4 py-2 text-body">
           ⏳ 本决策生成于 {Math.round(decisionAgeH!)} 小时前,市场可能已变化 —— 建议重跑
-          <code className="mx-1 px-1 rounded bg-amber-100 font-mono text-[11px]">publish.py</code>。
+          <code className="mx-1 px-1 rounded-inner bg-amber-100 font-mono text-meta">publish.py</code>。
         </div>
       )}
       {d?.intraday_unstable && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 text-amber-800 px-4 py-2 text-[13px] leading-snug">
+        <div className="rounded-inner border border-amber-300 bg-amber-50 text-amber-800 px-4 py-2 text-body leading-snug">
           ⚠️ <b>今日判断不稳定</b>:今天多次生成,结果在{" "}
           <span className="font-mono">
             {(d.intraday_actions ?? [])
@@ -449,51 +449,51 @@ export default function Dashboard() {
         const ev = live?.event_day ?? snap.event_day;
         if (!ev?.is_event_day) return null;
         return (
-          <details className="group rounded-xl border-2 border-orange-400 bg-orange-50 px-4 py-2.5">
+          <details className="group rounded-inner border-2 border-orange-400 bg-orange-50 px-4 py-2.5">
             <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden
-                                text-[13px] font-bold text-orange-800 flex items-center gap-2 flex-wrap">
+                                text-body font-bold text-orange-800 flex items-center gap-2 flex-wrap">
               <span>⚠️ 事件日 · 技术面结论已熔断</span>
               {ev.gap !== null && (
                 <span className="font-mono">{ev.gap >= 0 ? "+" : ""}{(ev.gap * 100).toFixed(1)}%</span>
               )}
-              <span className="ml-auto text-[11px] font-normal text-orange-500">
+              <span className="ml-auto text-meta font-normal text-orange-500">
                 <span className="group-open:hidden">看原因 ›</span>
                 <span className="hidden group-open:inline">收起</span>
               </span>
             </summary>
             <ul className="mt-2 space-y-0.5">
               {ev.reasons.map((r, i) => (
-                <li key={i} className="text-[13px] text-orange-900">· {r}</li>
+                <li key={i} className="text-body text-orange-900">· {r}</li>
               ))}
             </ul>
-            <p className="mt-1.5 text-[13px] leading-relaxed text-orange-900">{ev.note_cn}</p>
-            <p className="mt-1.5 text-[11px] text-orange-600 font-mono">{ev.evidence_cn}</p>
+            <p className="mt-1.5 text-body leading-relaxed text-orange-900">{ev.note_cn}</p>
+            <p className="mt-1.5 text-meta text-orange-600 font-mono">{ev.evidence_cn}</p>
           </details>
         );
       })()}
 
       {/* ── 价格轨 ────────────────────────────────────────────────────── */}
-      <div className="bg-surface rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 py-2.5
+      <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 py-2.5
                       flex items-baseline gap-x-3 gap-y-1 flex-wrap">
-        <span className="text-[11px] text-ink-muted uppercase tracking-wider">QBTS</span>
-        <span className="text-[26px] leading-none font-bold text-gray-900 tabular-nums">
+        <span className="text-meta text-ink-muted">QBTS</span>
+        <span className="text-price leading-none font-bold text-gray-900 tabular-nums">
           ${qPrice.toFixed(2)}
         </span>
-        <span className={`text-[15px] font-semibold tabular-nums ${qUp ? "text-emerald-600" : "text-down"}`}>
+        <span className={`text-card font-semibold tabular-nums ${qUp ? "text-emerald-600" : "text-down"}`}>
           {qUp ? "▲" : "▼"} {Math.abs(qChg * 100).toFixed(2)}%
         </span>
         {qBadge && (
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${qBadge.cls}`}>
+          <span className={`text-meta px-2 py-0.5 rounded-full font-semibold ${qBadge.cls}`}>
             {qBadge.label} · {live!.asof_et.slice(11, 16)} ET
             {epochMelbTime(live!.asof_epoch) ? ` (墨 ${epochMelbTime(live!.asof_epoch)})` : ""}
           </span>
         )}
-        <span className="text-[11px] text-gray-400 font-mono">
+        <span className="text-meta text-gray-400 font-mono">
           QBTX {fmtPx(etfPx.qbtx)}{etfStale.qbtx && <span title="最后成交比 QBTS 旧 >15 分钟(薄流动性),涨跌口径不同步">⏱</span>}
           {" · "}QBTZ {fmtPx(etfPx.qbtz)}{etfStale.qbtz && <span title="最后成交比 QBTS 旧 >15 分钟(薄流动性),涨跌口径不同步">⏱</span>}
         </span>
         <span className="ml-auto flex items-center gap-2.5">
-          <span className="text-[10px] text-gray-400">
+          <span className="text-meta text-gray-400">
             数据截至 {snap.as_of?.slice(0, 10)}{genAt ? ` · 决策 ${genAt}` : ""}
           </span>
           {/* 🧠 出今天的决策 —— 每天都要点的动作,必须在首屏。完整控制台
@@ -514,14 +514,14 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1fr)_minmax(0,1.18fr)] gap-2.5">
 
         {/* ① 裁决 —— 全页唯一的大字号,颜色即结论 */}
-        <div className={`rounded-2xl border-2 p-4 flex flex-col justify-center ${meta ? meta.cls : "bg-surface border-hairline"}`}>
-          <div className="text-[10px] uppercase tracking-widest opacity-60">今日行动</div>
+        <div className={`rounded-card border-2 p-4 flex flex-col justify-center ${meta ? meta.cls : "bg-surface border-hairline"}`}>
+          <div className="text-meta opacity-70">今日行动</div>
           {d && meta ? (
             <>
-              <div className="text-[30px] leading-tight font-bold mt-0.5">{meta.title}</div>
-              <div className="text-[11px] opacity-70">{meta.sub}</div>
+              <div className="text-display leading-tight font-bold mt-0.5">{meta.title}</div>
+              <div className="text-meta opacity-70">{meta.sub}</div>
               <div className="mt-2.5">
-                <div className="flex justify-between text-[10px] opacity-70 mb-1">
+                <div className="flex justify-between text-meta opacity-70 mb-1">
                   <span>信心 {d.conviction}/10</span>
                   <span>
                     P(涨5d) {(d.p_up_5d * 100).toFixed(0)}%
@@ -536,14 +536,14 @@ export default function Dashboard() {
                 <div className="h-1.5 bg-current/15 rounded-full overflow-hidden border border-current/10">
                   <div className={`h-full ${meta.bar}`} style={{ width: `${d.conviction * 10}%` }} />
                 </div>
-                <div className="text-[9px] opacity-50 mt-1">{CONVICTION_LEGEND}</div>
+                <div className="text-meta opacity-50 mt-1">{CONVICTION_LEGEND}</div>
               </div>
               {/* 敞口刻度 —— 观望日照样显示。这是 2026-08-24 加的:此前 91% 的日子
                   这张卡唯一能说的话是「观望 · 0 仓位」,而「今天不开新仓」和
                   「手上这些该拿多大」是两个不同的问题。刻度只答后者。 */}
               {expPct != null && (
                 <div className="mt-2.5 pt-2.5 border-t border-current/10" title={expNote}>
-                  <div className="flex justify-between items-baseline text-[10px] opacity-70 mb-1">
+                  <div className="flex justify-between items-baseline text-meta opacity-70 mb-1">
                     <span>敞口刻度{expBand ? ` · ${expBand}` : ""}</span>
                     <span className="font-mono font-semibold tabular-nums">
                       {(expPct * 100).toFixed(0)}%
@@ -553,25 +553,25 @@ export default function Dashboard() {
                   <div className="h-1.5 bg-current/15 rounded-full overflow-hidden border border-current/10">
                     <div className="h-full bg-indigo-500/70" style={{ width: `${expPct * 100}%` }} />
                   </div>
-                  <div className="text-[9px] opacity-50 mt-1">
+                  <div className="text-meta opacity-50 mt-1">
                     只管拿多大 · 不管往哪买 · 观望日也有刻度
                   </div>
                 </div>
               )}
             </>
           ) : (
-            <div className="text-sm text-gray-400 mt-1">
-              还没有 AI 决策 — 本地跑 <code className="font-mono bg-gray-100 px-1 rounded">python publish.py</code>。
+            <div className="text-card text-gray-400 mt-1">
+              还没有 AI 决策 — 本地跑 <code className="font-mono bg-gray-100 px-1 rounded-inner">python publish.py</code>。
             </div>
           )}
         </div>
 
         {/* ② 交易计划摘要 —— 只留能直接下单的数字;推理/波动档/ETF 换算在「今日决策」里 */}
-        <div className="bg-surface rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] p-4">
+        <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] p-4">
           <div className="flex items-baseline justify-between mb-2">
-            <span className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider">📋 交易计划</span>
+            <span className="text-card font-semibold text-gray-800">📋 交易计划</span>
             {d && (
-              <span className="text-[10px] text-gray-400">
+              <span className="text-meta text-gray-400">
                 {d.action === "HOLD" ? "观望 · 0 仓位"
                   : d.plan_valid === false ? "价位不自洽 · 已隐藏"
                   : d.trade_plan.etf_ticker}
@@ -588,18 +588,18 @@ export default function Dashboard() {
                  ["敞口上限", expPct != null ? `≤${(expPct * 100).toFixed(0)}%` : "—", "text-indigo-600"],
                 ] as const).map(([k, v, cls]) => (
                 <div key={k}>
-                  <div className="text-[10px] text-gray-400">{k}</div>
-                  <div className={`font-mono font-semibold text-[15px] tabular-nums ${cls}`}>{v}</div>
+                  <div className="text-meta text-gray-400">{k}</div>
+                  <div className={`font-mono font-semibold text-card tabular-nums ${cls}`}>{v}</div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-[13px] text-ink-muted leading-relaxed">
+            <div className="text-body text-ink-muted leading-relaxed">
               {d?.plan_valid === false
                 ? <span className="text-red-700">⚠️ 止损/目标方向异常,价位已隐藏以防误用 —— 重跑 publish.py。</span>
                 : <>📭 <b className="text-gray-700">暂不持仓</b>,没有入场 / 止损 / 目标,仓位 0%。
                    {expPct != null && (
-                     <span className="block mt-1 text-[12px] text-indigo-700">
+                     <span className="block mt-1 text-body text-indigo-700">
                        📐 投机仓整体敞口仍受 ≤{(expPct * 100).toFixed(0)}% 约束(与今日方向无关)。
                      </span>
                    )}</>}
@@ -607,14 +607,14 @@ export default function Dashboard() {
           )}
           {/* 观望日最该看的一行:到底在等什么 */}
           {topWait && (
-            <div className="mt-2 text-[12px] text-ink-muted bg-sunken rounded-lg px-2.5 py-1.5 leading-snug">
+            <div className="mt-2 text-body text-ink-muted bg-sunken rounded-inner px-2.5 py-1.5 leading-snug">
               ⏳ 在等:<b className="text-gray-700">{topWait.name}</b> · {topWait.hint}
             </div>
           )}
           {/* 失效条件常是一大段(双向作废条件全写在里面)——夹成一行,点开看全文,
               否则它一个人就能把计划卡撑到两倍高。 */}
           {d?.invalidation && (
-            <details className="group mt-2 text-[11px] text-[#B45309] bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 leading-snug">
+            <details className="group mt-2 text-meta text-[#B45309] bg-amber-50 border border-amber-200 rounded-inner px-2.5 py-1.5 leading-snug">
               <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                 ⚠️ 失效条件:
                 <span className="group-open:hidden">
@@ -629,34 +629,34 @@ export default function Dashboard() {
 
         {/* ③ 四条军规 —— 254 套回测的最终提炼,数字全实时 */}
         {snap.champs ? (
-          <div className="bg-surface rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] p-4">
+          <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] p-4">
             <div className="flex items-baseline justify-between mb-2">
-              <span className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider">🚦 四条军规</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+              <span className="text-card font-semibold text-gray-800">🚦 四条军规</span>
+              <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${
                 snap.champs.risk_on ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
                 大盘{snap.champs.risk_on ? "🟢 顺风" : "🔴 逆风"}
               </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[12px] leading-snug">
-              <div className="bg-sunken rounded-lg px-2.5 py-1.5">
-                <div className="text-[10px] text-gray-400">① 大盘红绿灯</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-body leading-snug">
+              <div className="bg-sunken rounded-inner px-2.5 py-1.5">
+                <div className="text-meta text-gray-400">① 大盘红绿灯</div>
                 {snap.champs.risk_on ? <span>🟢 可以玩</span> : <span>🔴 <b>今天什么都不买</b></span>}
               </div>
-              <div className="bg-sunken rounded-lg px-2.5 py-1.5">
-                <div className="text-[10px] text-gray-400">② 什么价买</div>
+              <div className="bg-sunken rounded-inner px-2.5 py-1.5">
+                <div className="text-meta text-gray-400">② 什么价买</div>
                 跌到 <b className="font-mono text-emerald-700">${snap.champs.swing.lo5.toFixed(2)}</b> · 永不追涨
               </div>
-              <div className="bg-sunken rounded-lg px-2.5 py-1.5">
-                <div className="text-[10px] text-gray-400">③ 什么价卖</div>
+              <div className="bg-sunken rounded-inner px-2.5 py-1.5">
+                <div className="text-meta text-gray-400">③ 什么价卖</div>
                 弹回 <b className="font-mono text-red-600">${(snap.champs.swing.open?.hi5 ?? snap.champs.swing.hi5).toFixed(2)}</b> · 最多 10 天
               </div>
-              <div className="bg-sunken rounded-lg px-2.5 py-1.5">
-                <div className="text-[10px] text-gray-400">④ 买多少 · 拿什么</div>
+              <div className="bg-sunken rounded-inner px-2.5 py-1.5">
+                <div className="text-meta text-gray-400">④ 买多少 · 拿什么</div>
                 ≤<b className="font-mono">{((expPct ?? snap.champs.vt_pct) * 100).toFixed(0)}%</b> 投机资金,其余现金
-                <span className="block text-[11px] text-gray-500">≤5 天用 QBTX,更久用 QBTS 正股</span>
+                <span className="block text-meta text-gray-500">≤5 天用 QBTX,更久用 QBTS 正股</span>
               </div>
             </div>
-            <div className="mt-1.5 bg-amber-50 rounded-lg px-2.5 py-1.5 text-[11px] leading-snug text-amber-900">
+            <div className="mt-1.5 bg-amber-50 rounded-inner px-2.5 py-1.5 text-meta leading-snug text-amber-900">
               <b>⓪ 总闸(先于一切)</b>:QBTS 投机仓 ≤ 你全部资产的 <b>10%</b> —— 这只票可能单日 −40%、
               可能增发腰斩,止损保护不了隔夜跳空,<b>仓位小是唯一真防御</b>。
               DCA 核心仓(📥定投专区)永远另册,<b>两边不许挪钱</b>。
@@ -665,7 +665,7 @@ export default function Dashboard() {
             {/* 载具选择(2026-08-24,mining 第 42 轮):军规原本只教「怎么少受伤」,
                 从没说过「其实有不受这个伤的东西」。这块补的就是那句话。 */}
             {d?.vehicle?.candidates?.length ? (
-              <details className="mt-1.5 bg-indigo-50 rounded-lg px-2.5 py-1.5 text-[11px] leading-snug text-indigo-900 group">
+              <details className="mt-1.5 bg-indigo-50 rounded-inner px-2.5 py-1.5 text-meta leading-snug text-indigo-900 group">
                 <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                   <b>🔁 载具:QBTX 不是长持工具</b> —— 同窗实测 QBTS <b>+171%</b> 而 QBTX 只 <b>+16%</b>
                   (回撤 −95%,年化方差拖累 ≈{(d.vehicle.qbtx_drag_annual * 100).toFixed(0)}%)。
@@ -676,7 +676,7 @@ export default function Dashboard() {
                     「≤5 天用 QBTX」是<b>止血,不是解法</b>。要长期拿多头敞口,用正股或深度实值长期 call:
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-[10px] tabular-nums">
+                    <table className="w-full text-meta tabular-nums">
                       <thead className="text-indigo-500">
                         <tr>
                           <th className="text-left font-medium py-0.5">合约</th>
@@ -699,11 +699,11 @@ export default function Dashboard() {
                       </tbody>
                     </table>
                   </div>
-                  <div className="mt-1.5 text-[10px] text-indigo-700">
+                  <div className="mt-1.5 text-meta text-indigo-700">
                     一张 = 100 股。<b>年化房租</b>直接对比 QBTX 的
                     {" "}{(d.vehicle.qbtx_drag_annual * 100).toFixed(0)}%。
                   </div>
-                  <div className="mt-1 text-[10px] text-red-700 bg-red-50 rounded px-1.5 py-1">
+                  <div className="mt-1 text-meta text-red-700 bg-red-50 rounded-inner px-1.5 py-1">
                     ⚠️ <b>和 QBTX 最大的不同</b>:到期时正股若低于行权价,<b>权利金归零</b>
                     (QBTX 跌一半还剩一半)。这是拿「确定的上限」换「不确定的流血」,不是无风险改进。
                     换载具 ≠ 加仓;金额是否超 ⓪ 总闸自行核对。<b>只给建议,不代下单。</b>
@@ -718,16 +718,16 @@ export default function Dashboard() {
       {/* ── 一段话总结 + 给 Vivienne ────────────────────────────────────
           两条都是"人话",放一起;技术细节全在标签页里。 ───────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
-        <div className="bg-surface rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 py-3">
+        <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 py-3">
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider">🧭 一句话结论</span>
+            <span className="text-card font-semibold text-gray-800">🧭 一句话结论</span>
             {dsd && (
               <span className="ml-auto flex items-center gap-1">
                 {(["fable", "ds"] as const).map(m => (
                   <button key={m} onClick={() => setModelView(m)}
-                    className={`text-[10px] px-2 py-0.5 rounded-full border font-medium transition-colors ${
+                    className={`text-meta px-2 py-0.5 rounded-full border font-medium transition-colors ${
                       modelView === m
-                        ? "bg-brand text-white border-brand"
+                        ? "bg-brand text-on-solid border-brand"
                         : "bg-surface text-ink-muted border-hairline hover:border-gray-300"}`}>
                     {m === "fable" ? "主决策" : "影子"}
                   </button>
@@ -741,47 +741,47 @@ export default function Dashboard() {
               <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                 {/* 注意别加 `block`:line-clamp 靠 display:-webkit-box 生效,
                     `block` 会把它覆盖掉,夹行就静默失效(实测踩过)。 */}
-                <span className="text-[14px] leading-relaxed text-gray-800 line-clamp-4 group-open:line-clamp-none">
+                <span className="text-card leading-relaxed text-gray-800 line-clamp-4 group-open:line-clamp-none">
                   {d.summary}
                 </span>
-                <span className="text-[11px] text-brand group-open:hidden">展开全文 ›</span>
+                <span className="text-meta text-brand group-open:hidden">展开全文 ›</span>
               </summary>
             </details>
           ) : (
-            <p className="text-[14px] leading-relaxed text-gray-400">还没有 AI 决策。</p>
+            <p className="text-card leading-relaxed text-gray-400">还没有 AI 决策。</p>
           )}
           {modelView === "ds" && (
-            <div className="mt-1.5 text-[10px] text-amber-600">
+            <div className="mt-1.5 text-meta text-amber-600">
               影子对照:不驱动交易/推送/台账;方向表态另记分,8/15 与 Fable 同框宣判
             </div>
           )}
         </div>
 
-        <div className="rounded-2xl border border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50/40 px-4 py-3">
+        <div className="rounded-card border border-rose-200 bg-gradient-to-br from-rose-50 to-pink-50/40 px-4 py-3">
           {(() => {
             const v = vivienneAction(d?.action);
             return (
               <>
                 <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-[11px] font-semibold text-rose-700">💌 给 Vivienne 的</span>
+                  <span className="text-meta font-semibold text-rose-700">💌 给 Vivienne 的</span>
                   {/* 裸日期会被读成"这封信什么时候写的",但 as_of 是最后一根已收盘日线 */}
-                  <span className="ml-auto text-[10px] text-rose-300 font-mono">
+                  <span className="ml-auto text-meta text-rose-300 font-mono">
                     {genAt ? `写于 ${genAt}` : snap.as_of ? `数据截至 ${snap.as_of.slice(0, 10)}` : ""}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xl leading-none">{v.emoji}</span>
-                  <span className="text-[15px] font-bold text-gray-800">{v.line}</span>
+                  <span className="text-section leading-none">{v.emoji}</span>
+                  <span className="text-card font-bold text-gray-800">{v.line}</span>
                 </div>
                 {/* 默认展开:这张卡的读者不看技术细节,那段大白话就是她要的全部,
                     而且左边那张总结卡本来就比它高,收起来只是留一块空白。 */}
                 <details open className="group mt-1">
                   <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden
-                                      text-[11px] text-rose-400 hover:text-rose-600">
+                                      text-meta text-rose-400 hover:text-rose-600">
                     <span className="group-open:hidden">展开完整说明 ›</span>
                     <span className="hidden group-open:inline">收起</span>
                   </summary>
-                  <p className="mt-1.5 text-[14px] leading-relaxed text-gray-700 whitespace-pre-line">
+                  <p className="mt-1.5 text-card leading-relaxed text-gray-700 whitespace-pre-line">
                     {d?.vivienne_note ?? v.fallback}
                   </p>
                 </details>
@@ -802,13 +802,13 @@ export default function Dashboard() {
           system: !!(snap.data_health && !snap.data_health.ok),
         }}
         rail={
-          <span className="flex items-baseline gap-2 text-[13px]">
+          <span className="flex items-baseline gap-2 text-body">
             <span className="font-mono font-bold text-gray-900 tabular-nums">${qPrice.toFixed(2)}</span>
             <span className={`font-mono tabular-nums ${qUp ? "text-emerald-600" : "text-down"}`}>
               {qUp ? "▲" : "▼"}{Math.abs(qChg * 100).toFixed(2)}%
             </span>
             {meta && (
-              <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${meta.cls}`}>
+              <span className={`px-2 py-0.5 rounded-full text-meta font-bold border ${meta.cls}`}>
                 {meta.title}
               </span>
             )}
@@ -835,15 +835,15 @@ export default function Dashboard() {
           {/* ══ 2. 交易计划 + 3. 关键驱动 ══════════════════════════════════ */}
           <section className="grid grid-cols-1 lg:grid-cols-[380px_1fr] gap-4">
             {/* 交易计划 */}
-            <div className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
-              <div className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-3">
+            <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+              <div className="text-section font-semibold text-gray-900 mb-3">
                 📋 计划细节
                 <span className="normal-case font-normal text-gray-400 ml-1.5">
                   入场条件 · 波动档 · QBTS 价位 · 杠杆换算
                 </span>
               </div>
               {/* 方向 — 一眼看清是做多还是做空、实际买哪个 ETF */}
-              <div className={`text-sm font-semibold rounded-lg px-3 py-2 mb-3 ${
+              <div className={`text-card font-semibold rounded-inner px-3 py-2 mb-3 ${
                 d.action === "LONG_QBTX" ? "bg-emerald-50 text-emerald-700"
                 : d.action === "SHORT_QBTZ" ? "bg-red-50 text-red-700"
                 : "bg-sunken text-ink-muted"}`}>
@@ -854,14 +854,14 @@ export default function Dashboard() {
               {/* HOLD has no single entry/stop/target — show the watch state
                   instead of an empty price table (which reads as "broken"). */}
               {d.action === "HOLD" ? (
-                <div className="text-sm text-ink-muted bg-sunken rounded-lg px-3 py-3 leading-relaxed">
+                <div className="text-card text-ink-muted bg-sunken rounded-inner px-3 py-3 leading-relaxed">
                   📭 <span className="font-semibold text-gray-700">观望中 · 暂不持仓</span>
-                  <div className="mt-1 text-xs">
+                  <div className="mt-1 text-body">
                     满足入场条件(见下方「展开看细节」)后再按对应方向进场;在此之前没有入场 / 止损 / 目标价,仓位 0%。
                   </div>
                   {/* HOLD 天也要看得到 sizing 规则 — 它管的是"整个投机仓该多大",与今日方向无关 */}
                   {expPct != null && (
-                    <div className="mt-2 text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-md px-2.5 py-1.5 leading-snug"
+                    <div className="mt-2 text-body text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-inner px-2.5 py-1.5 leading-snug"
                          title={expNote}>
                       📐 <b>敞口刻度 ≤{(expPct * 100).toFixed(0)}%</b>
                       ：以当前波动,投机仓整体别超过这个比例。
@@ -875,17 +875,17 @@ export default function Dashboard() {
               ) : d.plan_valid === false ? (
                 /* Geometry check failed (stop/target on the wrong side) — never
                    show numbers the user might trade on; tell them to regenerate. */
-                <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-3 leading-relaxed">
+                <div className="text-card text-red-700 bg-red-50 border border-red-200 rounded-inner px-3 py-3 leading-relaxed">
                   ⚠️ <span className="font-semibold">计划价位不自洽</span>(止损/目标方向异常),已隐藏以防误用。
-                  <div className="mt-1 text-xs">请重新运行 <code className="font-mono bg-red-100 px-1 rounded">publish.py</code> 生成新计划。</div>
+                  <div className="mt-1 text-body">请重新运行 <code className="font-mono bg-red-100 px-1 rounded-inner">publish.py</code> 生成新计划。</div>
                 </div>
               ) : (
                 <>
-                  <table className="w-full text-sm">
+                  <table className="w-full text-card">
                     <tbody>
                       {d.trade_plan.etf_ticker && (
                         <tr className="border-b border-hairline">
-                          <td className="py-1.5 text-ink-muted text-xs">
+                          <td className="py-1.5 text-ink-muted text-body">
                             <span className="font-semibold text-gray-700">{d.trade_plan.etf_ticker}</span> 入场 / 止损 / 目标
                           </td>
                           <td className="py-1.5 text-right font-mono">
@@ -894,13 +894,13 @@ export default function Dashboard() {
                         </tr>
                       )}
                       <tr className="border-b border-hairline">
-                        <td className="py-1.5 text-ink-muted text-xs">盈亏比</td>
+                        <td className="py-1.5 text-ink-muted text-body">盈亏比</td>
                         <td className="py-1.5 text-right font-mono font-semibold">
                           1 : {d.trade_plan.rr_ratio?.toFixed(1) ?? "—"}
                         </td>
                       </tr>
                       <tr>
-                        <td className="py-1.5 text-ink-muted text-xs">建议仓位</td>
+                        <td className="py-1.5 text-ink-muted text-body">建议仓位</td>
                         <td className="py-1.5 text-right font-mono font-semibold">
                           {d.trade_plan.suggested_position_pct}% 投机仓
                         </td>
@@ -908,7 +908,7 @@ export default function Dashboard() {
                       {/* 波动率目标仓位 — 一年回测唯一同时改善收益与回撤的 sizing 规则(不预测方向) */}
                       {expPct != null && (
                         <tr>
-                          <td className="py-1.5 text-ink-muted text-xs" title={expNote}>
+                          <td className="py-1.5 text-ink-muted text-body" title={expNote}>
                             📐 波动率目标敞口
                           </td>
                           <td className="py-1.5 text-right font-mono font-semibold text-indigo-600"
@@ -925,7 +925,7 @@ export default function Dashboard() {
                     if (ev == null || ev >= 0) return null;
                     const pWin = d.action === "LONG_QBTX" ? d.p_up_5d : 1 - d.p_up_5d;
                     return (
-                      <div className="mt-3 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 leading-relaxed">
+                      <div className="mt-3 text-body text-red-700 bg-red-50 border border-red-200 rounded-inner px-3 py-2 leading-relaxed">
                         ⚠️ <span className="font-semibold">期望值为负(EV≈{ev.toFixed(2)})</span>：
                         按系统自己的概率({(pWin * 100).toFixed(0)}% 赢面)× 盈亏比 1:{d.trade_plan.rr_ratio?.toFixed(1)},
                         长期重复做这种赔率赚不回来 —— 赔率太薄或胜算不够,这种更该观望。
@@ -936,23 +936,23 @@ export default function Dashboard() {
                 </>
               )}
               {/* 失效条件 */}
-              <div className="mt-3 text-xs text-[#B45309] bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 leading-relaxed">
+              <div className="mt-3 text-body text-[#B45309] bg-amber-50 border border-amber-200 rounded-inner px-3 py-2 leading-relaxed">
                 ⚠️ <span className="font-semibold">失效条件：</span>{d.invalidation}
               </div>
 
               {/* 展开看细节 — 把 HVN/BOS/ATR/镜像价位这些收起来,默认不挡视线 */}
               <details className="mt-3 group">
-                <summary className="text-[11px] text-ink-muted cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:text-gray-700 flex items-center gap-1">
+                <summary className="text-meta text-ink-muted cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden hover:text-gray-700 flex items-center gap-1">
                   <span className="transition-transform group-open:rotate-90">▸</span>
                   展开看细节(入场条件 · 波动档 · QBTS 价位 · 杠杆说明)
                 </summary>
                 <div className="mt-2 space-y-2">
-                  <div className="text-xs text-gray-700 bg-sunken rounded-lg px-3 py-2 leading-relaxed">
+                  <div className="text-body text-gray-700 bg-sunken rounded-inner px-3 py-2 leading-relaxed">
                     <span className="font-semibold">入场条件：</span>{d.trade_plan.entry_condition}
                   </div>
                   {snap.regime?.regime && (
-                    <div className="text-[11px] text-ink-muted bg-sunken rounded-lg px-3 py-1.5 leading-snug flex items-start gap-1.5">
-                      <span className={`shrink-0 px-1.5 py-0.5 rounded font-bold ${
+                    <div className="text-meta text-ink-muted bg-sunken rounded-inner px-3 py-1.5 leading-snug flex items-start gap-1.5">
+                      <span className={`shrink-0 px-1.5 py-0.5 rounded-inner font-bold ${
                         snap.regime.regime === "expansion" ? "bg-amber-100 text-amber-700"
                         : snap.regime.regime === "contraction" ? "bg-blue-50 text-blue-600"
                         : "bg-gray-100 text-gray-500"}`}>
@@ -963,7 +963,7 @@ export default function Dashboard() {
                     </div>
                   )}
                   {d.action !== "HOLD" && d.plan_valid !== false && (
-                    <div className="text-xs text-ink-muted bg-sunken rounded-lg px-3 py-2 font-mono flex justify-between gap-2">
+                    <div className="text-body text-ink-muted bg-sunken rounded-inner px-3 py-2 font-mono flex justify-between gap-2">
                       <span className="shrink-0">QBTS 入场/止损/目标</span>
                       <span className="text-right">
                         {fmtPx(d.trade_plan.qbts_entry)} / <span className="text-down">{fmtPx(d.trade_plan.qbts_stop)}</span> / <span className="text-emerald-600">{fmtPx(d.trade_plan.qbts_target)}</span>
@@ -971,7 +971,7 @@ export default function Dashboard() {
                     </div>
                   )}
                   {d.trade_plan.etf_ticker && d.action !== "HOLD" && (
-                    <div className="text-[10px] text-gray-400 leading-snug px-1">
+                    <div className="text-meta text-gray-400 leading-snug px-1">
                       {d.trade_plan.etf_ticker} 价位由实时报价按 2× 自动换算(入场时刻精确);杠杆 ETF 每日再平衡,持仓多日有衰减,止损/目标价仅为近似参考。
                     </div>
                   )}
@@ -985,18 +985,18 @@ export default function Dashboard() {
                 const tp = other.trade_plan;
                 const agree = other.action === d.action;
                 return (
-                  <div className={`mt-3 rounded-lg border px-3 py-2.5 ${
+                  <div className={`mt-3 rounded-inner border px-3 py-2.5 ${
                     isDs ? "bg-violet-50/60 border-violet-200" : "bg-blue-50/60 border-blue-200"}`}>
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="text-[11px] font-bold text-gray-700">
+                      <span className="text-meta font-bold text-gray-700">
                         {isDs ? "🤖 DeepSeek 影子判断" : "🧠 Fable 5 主决策"}(同卷对照)
                       </span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+                      <span className={`text-meta px-1.5 py-0.5 rounded-full font-semibold ${
                         agree ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                         {agree ? "两模型同向 ✓" : "两模型分歧 ⚠️"}
                       </span>
                     </div>
-                    <div className="mt-1.5 text-xs text-gray-700">
+                    <div className="mt-1.5 text-body text-gray-700">
                       {other.action === "LONG_QBTX" ? "📈 做多 — 买 QBTX"
                        : other.action === "SHORT_QBTZ" ? "📉 做空 — 买 QBTZ" : "⏸️ 观望"}
                       <span className="text-gray-400"> · </span>信心 {other.conviction}/10
@@ -1004,19 +1004,19 @@ export default function Dashboard() {
                       押{other.bold_call_5d === "up" ? "涨 ▲" : "跌 ▼"}(P(up) {(other.p_up_5d * 100).toFixed(0)}%)
                     </div>
                     {other.action !== "HOLD" && other.plan_valid !== false && tp?.etf_ticker && (
-                      <div className="mt-1 text-[11px] font-mono text-gray-600">
+                      <div className="mt-1 text-meta font-mono text-gray-600">
                         {tp.etf_ticker} {fmtPx(tp.etf_entry)} / <span className="text-down">{fmtPx(tp.etf_stop)}</span> / <span className="text-emerald-600">{fmtPx(tp.etf_target)}</span>
                         <span className="text-gray-400"> · </span>1:{tp.rr_ratio?.toFixed(1) ?? "—"}
                         <span className="text-gray-400"> · </span>{tp.suggested_position_pct}% 投机仓
                       </div>
                     )}
                     {tp?.entry_condition && (
-                      <div className="mt-1 text-[10px] text-gray-500 leading-snug">
+                      <div className="mt-1 text-meta text-gray-500 leading-snug">
                         入场条件:{tp.entry_condition.slice(0, 90)}
                       </div>
                     )}
                     {isDs && (
-                      <div className="mt-1 text-[9px] text-amber-600">
+                      <div className="mt-1 text-meta text-amber-600">
                         影子判断 · 不驱动交易/推送/台账;方向表态每日记分,8/15 与主决策同框宣判
                       </div>
                     )}
@@ -1028,19 +1028,19 @@ export default function Dashboard() {
               {snap.decision?.shadow_v1_inverse && (() => {
                 const v1i = snap.decision!.shadow_v1_inverse!;
                 return (
-                  <div className="mt-3 rounded-lg border px-3 py-2 bg-gray-50/60 border-gray-200">
+                  <div className="mt-3 rounded-inner border px-3 py-2 bg-gray-50/60 border-gray-200">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="text-[11px] font-bold text-gray-600">🔬 v1 反向影子(测量用)</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-500">
+                      <span className="text-meta font-bold text-gray-600">🔬 v1 反向影子(测量用)</span>
+                      <span className="text-meta px-1.5 py-0.5 rounded-full font-semibold bg-gray-100 text-gray-500">
                         零决策权
                       </span>
                     </div>
-                    <div className="mt-1 text-xs text-gray-600">
+                    <div className="mt-1 text-body text-gray-600">
                       原始 v1 表态{v1i.v1_call === "up" ? "看涨" : "看跌"}(P(up) {(v1i.v1_p_up * 100).toFixed(0)}%)
                       <span className="text-gray-400"> → </span>
                       本影子反着押{v1i.bold_call_5d === "up" ? "涨 ▲" : "跌 ▼"}
                     </div>
-                    <div className="mt-1 text-[9px] text-gray-400 leading-snug">
+                    <div className="mt-1 text-meta text-gray-400 leading-snug">
                       v1(2026-07-17 前上线版)22 条已判 21% 命中 · 劣于随机;反向是否有真 edge 未证实,
                       8/15 与 Fable/DeepSeek 同框宣判
                     </div>
@@ -1050,35 +1050,35 @@ export default function Dashboard() {
             </div>
 
             {/* 关键驱动 + 风险 */}
-            <div className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
-              <div className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-3">
+            <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+              <div className="text-section font-semibold text-gray-900 mb-3">
                 🧭 为什么 — 关键驱动
               </div>
               <div className="space-y-2">
                 {d.key_drivers.map((k, i) => (
                   <div key={i} className="flex items-start gap-2.5">
-                    <span className={`shrink-0 mt-0.5 text-sm ${k.direction === "bullish" ? "text-emerald-600" : "text-down"}`}>
+                    <span className={`shrink-0 mt-0.5 text-card ${k.direction === "bullish" ? "text-emerald-600" : "text-down"}`}>
                       {k.direction === "bullish" ? "▲" : "▼"}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <span className="text-sm font-medium text-gray-900">{k.name}</span>
-                      <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded font-semibold
+                      <span className="text-card font-medium text-gray-900">{k.name}</span>
+                      <span className={`ml-2 text-meta px-1.5 py-0.5 rounded-inner font-semibold
                         ${k.strength === "强" ? "bg-violet-100 text-violet-700"
                           : k.strength === "中" ? "bg-blue-50 text-blue-600"
                           : "bg-gray-100 text-gray-500"}`}>
                         {k.strength}
                       </span>
-                      <p className="text-xs text-ink-muted mt-0.5 leading-snug">{k.note}</p>
+                      <p className="text-body text-ink-muted mt-0.5 leading-snug">{k.note}</p>
                     </div>
                   </div>
                 ))}
               </div>
               {d.risks?.length > 0 && (
                 <div className="mt-4 pt-3 border-t border-hairline">
-                  <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1.5">主要风险</div>
+                  <div className="text-meta text-gray-500 mb-1.5">主要风险</div>
                   <ul className="space-y-1">
                     {d.risks.map((r, i) => (
-                      <li key={i} className="text-xs text-ink-muted leading-snug">• {r}</li>
+                      <li key={i} className="text-body text-ink-muted leading-snug">• {r}</li>
                     ))}
                   </ul>
                 </div>
@@ -1088,24 +1088,24 @@ export default function Dashboard() {
 
           {/* ══ 4. 未来催化剂 ═══════════════════════════════════════════════ */}
           {d.upcoming_catalysts?.length > 0 && (
-            <section className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
-              <div className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-3">
+            <section className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+              <div className="text-section font-semibold text-gray-900 mb-3">
                 📅 接下来盯什么
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2.5">
                 {d.upcoming_catalysts.map((c, i) => (
-                  <div key={i} className="border border-hairline rounded-lg px-3 py-2.5 bg-sunken">
+                  <div key={i} className="border border-hairline rounded-inner px-3 py-2.5 bg-sunken">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs font-mono font-semibold text-gray-900">{c.date}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold
+                      <span className="text-body font-mono font-semibold text-gray-900">{c.date}</span>
+                      <span className={`text-meta px-1.5 py-0.5 rounded-inner font-semibold
                         ${c.impact === "高" ? "bg-red-100 text-red-700"
                           : c.impact === "中" ? "bg-amber-100 text-amber-700"
                           : "bg-gray-100 text-gray-500"}`}>
                         {c.impact}冲击
                       </span>
                     </div>
-                    <div className="text-sm font-medium text-gray-900">{c.event}</div>
-                    <div className="text-xs text-ink-muted mt-0.5 leading-snug">{c.note}</div>
+                    <div className="text-card font-medium text-gray-900">{c.event}</div>
+                    <div className="text-body text-ink-muted mt-0.5 leading-snug">{c.note}</div>
                   </div>
                 ))}
               </div>
@@ -1117,33 +1117,33 @@ export default function Dashboard() {
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* ⏳ 今天在等什么 — 六个一级扳机的距触发读数(HOLD 不再是黑箱) */}
         {snap.waiting_for && (
-          <div className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+          <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
+              <span className="text-section font-semibold text-gray-900">
                 ⏳ 今天在等什么
               </span>
-              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+              <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${
                 snap.waiting_for.n_fired > 0 ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
                 {snap.waiting_for.n_fired > 0 ? `🟢 ${snap.waiting_for.n_fired} 个扳机已触发` : "全部待触发"}
               </span>
             </div>
-            <p className="text-[11px] text-gray-400 mb-3">{snap.waiting_for.summary}
+            <p className="text-meta text-gray-400 mb-3">{snap.waiting_for.summary}
               {snap.waiting_for.gate?.regime === "risk_off" && (
                 <span className="text-down font-medium"> · ⚠️ 大盘 risk-off:即使扳机触发也降档</span>
               )}
             </p>
             <div className="space-y-2">
               {snap.waiting_for.triggers.map(t => (
-                <div key={t.key} className={`rounded-lg px-3 py-2 border ${
+                <div key={t.key} className={`rounded-inner px-3 py-2 border ${
                   t.fired ? "border-emerald-200 bg-emerald-50/60"
                   : t.fired === null ? "border-hairline bg-sunken opacity-60" : "border-hairline"}`}>
-                  <div className="flex items-center gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-body">
                     <span>{t.fired ? "🟢" : t.fired === null ? "⏸" : "⚪"}</span>
                     <span className="font-semibold text-gray-800">{t.name}</span>
-                    <span className="text-[10px] text-gray-400">{t.record}</span>
-                    <span className="ml-auto font-mono text-[11px] text-ink-muted">{t.reading}</span>
+                    <span className="text-meta text-gray-400">{t.record}</span>
+                    <span className="ml-auto font-mono text-meta text-ink-muted">{t.reading}</span>
                   </div>
-                  <div className={`mt-1 text-[11px] leading-snug ${
+                  <div className={`mt-1 text-meta leading-snug ${
                     t.fired ? "text-emerald-700 font-medium" : "text-gray-500"}`}>
                     {t.hint}
                   </div>
@@ -1156,11 +1156,11 @@ export default function Dashboard() {
       </section>
       {/* ══ 0-. 周一开盘·周末BTC 信号(周日夜盘 20:00 ET 起显示;第七轮实证)══ */}
       {live?.btc_weekend && (
-        <div className={`rounded-xl px-5 py-3.5 flex items-start gap-3 shadow-sm border ${
+        <div className={`rounded-inner px-5 py-3.5 flex items-start gap-3 shadow-sm border ${
           live.btc_weekend.green
             ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
-          <span className="text-xl leading-none mt-0.5">🌉</span>
-          <div className="text-sm leading-relaxed">
+          <span className="text-section leading-none mt-0.5">🌉</span>
+          <div className="text-card leading-relaxed">
             <span className="font-bold">周一开盘信号 · 周末 BTC {(live.btc_weekend.weekend_ret * 100) >= 0 ? "+" : ""}{(live.btc_weekend.weekend_ret * 100).toFixed(1)}%</span>
             {live.btc_weekend.green ? (
               <span className="text-emerald-800"> 🟢 → 夜盘/盘前可先建仓(QBTS 现货限价单,点差大勿追),或开盘买 QBTX;周一收盘前全部卖出,不过夜。
@@ -1168,19 +1168,19 @@ export default function Dashboard() {
             ) : (
               <span className="text-red-800"> 🔴 → 周一不做多,夜盘也不(历史此情形周一日内均值 −3.0%)</span>
             )}
-            <span className="text-gray-400 text-xs"> · n=55 验证期,小仓 · 已推送{live.btc_weekend.pushed ? "✅" : "…"}</span>
+            <span className="text-gray-400 text-body"> · n=55 验证期,小仓 · 已推送{live.btc_weekend.pushed ? "✅" : "…"}</span>
           </div>
         </div>
       )}
 
       {/* ══ 5. 今日要闻 + 60日小图 ═══════════════════════════════════════ */}
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
-          <div className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-3">
+        <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+          <div className="text-section font-semibold text-gray-900 mb-3">
             📰 今日要闻
           </div>
           {newsTop.length === 0 ? (
-            <div className="text-xs text-gray-400 py-4">暂无高影响新闻</div>
+            <div className="text-body text-gray-400 py-4">暂无高影响新闻</div>
           ) : (
             <div className="space-y-2.5">
               {newsTop.map((n, i) => (
@@ -1191,10 +1191,10 @@ export default function Dashboard() {
                       ${n.ai.sentiment === "bullish" ? "bg-emerald-500"
                         : n.ai.sentiment === "bearish" ? "bg-down" : "bg-gray-300"}`} />
                     <div className="min-w-0">
-                      <div className="text-sm text-gray-900 group-hover:text-brand transition-colors leading-snug">
+                      <div className="text-card text-gray-900 group-hover:text-brand transition-colors leading-snug">
                         {n.title}
                       </div>
-                      <div className="text-[11px] text-ink-muted mt-0.5">
+                      <div className="text-meta text-ink-muted mt-0.5">
                         {n.ai.reasoning} <span className="text-gray-400">· {n.publisher} · {n.published?.slice(5, 10)}</span>
                       </div>
                     </div>
@@ -1220,7 +1220,7 @@ export default function Dashboard() {
         />
       </section>
 
-      <footer className="text-center text-[10px] text-gray-400 pb-4">
+      <footer className="text-center text-meta text-gray-400 pb-4">
         QBTS Quant Lab · AI 决策由 Claude 基于 8 类数据源综合生成 · 每日 publish.py 更新 · 仅供研究参考，非投资建议
       </footer>
 
@@ -1231,8 +1231,8 @@ export default function Dashboard() {
         <div className="space-y-4">
       {/* CHoCH 早期反转预警 — 结构性格转变但未被 BOS 确认,不发交易信号 */}
       {choch && (
-        <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-xl px-5 py-3 text-sm leading-relaxed flex items-start gap-2">
-          <span className="text-base leading-none mt-0.5">🔭</span>
+        <div className="bg-indigo-50 border border-indigo-200 text-indigo-800 rounded-inner px-5 py-3 text-card leading-relaxed flex items-start gap-2">
+          <span className="text-section leading-none mt-0.5">🔭</span>
           <div>
             <span className="font-semibold">早期{choch.dir === "bullish" ? "见底" : "见顶"}预警</span>
             ：{choch.date} 在 ${choch.level.toFixed(2)} 出现
@@ -1249,22 +1249,22 @@ export default function Dashboard() {
 
         {/* SMC 聪明钱结构 */}
         {smc && (
-          <div className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+          <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider flex items-center gap-2">
+              <span className="text-section font-semibold text-gray-900 flex items-center gap-2">
                 🧠 SMC 聪明钱结构
                 {/* 现价(与 SMC 数据同源:实时新鲜则用 live,否则回退快照)—— 省得上下拉页面 */}
-                <span className="normal-case font-mono font-bold text-gray-900 text-sm">
+                <span className="normal-case font-mono font-bold text-gray-900 text-card">
                   ${(liveCurrent && liveQbts ? liveQbts.price : snap.price).toFixed(2)}
                   {pbLive && <span className="ml-1 inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse align-middle" />}
                   {smcStaleLabel && (
-                    <span className="ml-1.5 text-[10px] font-normal normal-case text-gray-400">
+                    <span className="ml-1.5 text-meta font-normal normal-case text-gray-400">
                       {smcStaleLabel}
                     </span>
                   )}
                 </span>
               </span>
-              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+              <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${
                 smc.signal > 0 ? "bg-emerald-100 text-emerald-700"
                 : smc.signal < 0 ? "bg-red-100 text-red-700"
                 : "bg-gray-100 text-gray-500"}`}>
@@ -1274,32 +1274,32 @@ export default function Dashboard() {
 
             {/* ── 顺势纪律 Playbook(整体评判标准):全局锁 → 降维中继 → 15m 扣扳机 → FVG ── */}
             {pb && (
-              <div className="mb-3 rounded-xl border border-hairline bg-sunken p-3">
+              <div className="mb-3 rounded-inner border border-hairline bg-sunken p-3">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider">
+                  <span className="text-card font-semibold text-gray-800">
                     ⚖️ 顺势纪律 Playbook
                     {pbLive && (
-                      <span className="ml-1.5 inline-flex items-center gap-1 text-[9px] font-bold text-emerald-600 normal-case">
+                      <span className="ml-1.5 inline-flex items-center gap-1 text-meta font-bold text-emerald-600 normal-case">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />盘中实时
                       </span>
                     )}
                     {smcStaleLabel && (
-                      <span className="ml-1.5 inline-flex items-center gap-1 text-[9px] font-bold text-gray-400 normal-case">
+                      <span className="ml-1.5 inline-flex items-center gap-1 text-meta font-bold text-gray-400 normal-case">
                         <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />{smcStaleLabel}
                         <span className="font-normal">（夜盘/休市不重算，只结转）</span>
                       </span>
                     )}
                   </span>
-                  <span className="text-[10px] text-gray-400">满足 {pb.conditions_met}</span>
+                  <span className="text-meta text-gray-400">满足 {pb.conditions_met}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 mb-2">
-                  <span className={`px-2 py-1 rounded-md text-xs font-bold ${
-                    pb.lock === "bull" ? "bg-emerald-600 text-white"
-                    : pb.lock === "bear" ? "bg-red-600 text-white"
+                  <span className={`px-2 py-1 rounded-inner text-body font-bold ${
+                    pb.lock === "bull" ? "bg-emerald-600 text-on-solid"
+                    : pb.lock === "bear" ? "bg-red-600 text-on-solid"
                     : "bg-gray-400 text-white"}`}>
                     {pb.lock === "bull" ? "多头锁定" : pb.lock === "bear" ? "空头锁定" : "无锁定"}
                   </span>
-                  <span className={`px-2 py-1 rounded-md text-xs font-bold ${
+                  <span className={`px-2 py-1 rounded-inner text-body font-bold ${
                     pb.state === "TRIGGER" ? "bg-emerald-100 text-emerald-800 ring-1 ring-emerald-300"
                     : pb.state === "ARMED" ? "bg-amber-100 text-amber-800 ring-1 ring-amber-300"
                     : pb.state === "WAIT" ? "bg-blue-50 text-blue-700"
@@ -1307,23 +1307,23 @@ export default function Dashboard() {
                     {pb.state === "TRIGGER" ? "🎯 " : pb.state === "ARMED" ? "⏳ " : ""}{pb.state_cn}
                   </span>
                   {pb.lock_reason && (
-                    <span className="text-[10px] text-gray-400 font-mono">{pb.lock_reason}</span>
+                    <span className="text-meta text-gray-400 font-mono">{pb.lock_reason}</span>
                   )}
                 </div>
-                <p className="text-[11px] text-ink-muted leading-snug mb-2">{pb.bias_note}</p>
+                <p className="text-meta text-ink-muted leading-snug mb-2">{pb.bias_note}</p>
                 {pb.risk_note && (
-                  <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5 mb-2 leading-snug">
+                  <div className="text-meta text-amber-700 bg-amber-50 border border-amber-200 rounded-inner px-2.5 py-1.5 mb-2 leading-snug">
                     {pb.risk_note}
                   </div>
                 )}
                 {/* 扣扳机清单(AND 逻辑,全 ✓ 才进场) */}
                 <div className="space-y-1 mb-2">
                   {pb.checklist.map((c) => (
-                    <div key={c.key} className="flex items-start gap-1.5 text-[11px] leading-snug">
+                    <div key={c.key} className="flex items-start gap-1.5 text-meta leading-snug">
                       <span className={c.ok ? "text-emerald-600 font-bold" : "text-gray-300"}>
                         {c.ok ? "✓" : "○"}
                       </span>
-                      <span className={c.ok ? "text-[#1A1A1E] font-medium shrink-0" : "text-gray-400 shrink-0"}>
+                      <span className={c.ok ? "text-ink font-medium shrink-0" : "text-gray-400 shrink-0"}>
                         {c.label}
                       </span>
                       <span className="text-gray-400 ml-auto text-right">{c.detail}</span>
@@ -1332,12 +1332,12 @@ export default function Dashboard() {
                 </div>
                 {/* 交易计划:共振入场 / 止损 / FVG 磁吸止盈 */}
                 {(pb.entry_zone || pb.tp1) && (
-                  <div className="grid grid-cols-2 gap-1.5 text-[11px] pt-2 border-t border-hairline">
+                  <div className="grid grid-cols-2 gap-1.5 text-meta pt-2 border-t border-hairline">
                     {pb.entry_zone && (
-                      <div className="col-span-2 flex items-center justify-between px-2 py-1 rounded-md bg-violet-50 text-violet-700">
+                      <div className="col-span-2 flex items-center justify-between px-2 py-1 rounded-inner bg-violet-50 text-violet-700">
                         <span className="font-medium">
                           🎯 共振入场
-                          <span className={`mx-1 px-1 py-0.5 rounded text-[10px] font-bold ${
+                          <span className={`mx-1 px-1 py-0.5 rounded-inner text-meta font-bold ${
                             pb.lock === "bear" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
                             {pb.lock === "bear" ? "做空↓" : "做多↑"}
                           </span>
@@ -1348,7 +1348,7 @@ export default function Dashboard() {
                     )}
                     {/* 💱 实际下单标的换算:QBTS 反弹到入场区时,对应 ETF 大约在这些价位 */}
                     {pbEtf && (pbEtf.entryLo != null || pbEtf.tp1 != null) && (
-                      <div className="col-span-2 px-2 py-1.5 rounded-md bg-indigo-50 text-indigo-800 leading-snug">
+                      <div className="col-span-2 px-2 py-1.5 rounded-inner bg-indigo-50 text-indigo-800 leading-snug">
                         <span className="font-semibold">💱 实际下单 · {pbEtf.ticker}</span>
                         <span className="font-mono">
                           {pbEtf.entryLo != null && <>：买入 ≈${pbEtf.entryLo.toFixed(2)}{pbEtf.entryHi != null ? `–$${pbEtf.entryHi.toFixed(2)}` : ""}</>}
@@ -1356,29 +1356,29 @@ export default function Dashboard() {
                           {pbEtf.tp1 != null && <> · 止盈 ≈${pbEtf.tp1.toFixed(2)}</>}
                           {pbEtf.tp2 != null && <>/${pbEtf.tp2.toFixed(2)}</>}
                         </span>
-                        <div className="text-[10px] opacity-70 mt-0.5">
+                        <div className="text-meta opacity-70 mt-0.5">
                           由左侧 QBTS 价位按 2× 实时换算(近似);ETF 每日再平衡,隔夜/多日会漂移,以当日盘中为准
                         </div>
                       </div>
                     )}
                     {pb.stop != null && (
-                      <div className="flex items-center justify-between px-2 py-1 rounded-md bg-red-50 text-red-700">
+                      <div className="flex items-center justify-between px-2 py-1 rounded-inner bg-red-50 text-red-700">
                         <span className="font-medium">止损</span><span className="font-mono">${pb.stop.toFixed(2)}</span>
                       </div>
                     )}
                     {pb.rr != null && (
-                      <div className="flex items-center justify-between px-2 py-1 rounded-md bg-gray-50 text-gray-600">
+                      <div className="flex items-center justify-between px-2 py-1 rounded-inner bg-gray-50 text-gray-600">
                         <span className="font-medium">盈亏比</span><span className="font-mono">{pb.rr.toFixed(1)}</span>
                       </div>
                     )}
                     {pb.tp1 && (
-                      <div className="col-span-2 flex items-center justify-between px-2 py-1 rounded-md bg-emerald-50 text-emerald-700">
+                      <div className="col-span-2 flex items-center justify-between px-2 py-1 rounded-inner bg-emerald-50 text-emerald-700">
                         <span className="font-medium">TP1 · {pb.tp1.basis}</span>
                         <span className="font-mono">${pb.tp1.price.toFixed(2)}</span>
                       </div>
                     )}
                     {pb.tp2 && (
-                      <div className="col-span-2 flex items-center justify-between px-2 py-1 rounded-md bg-emerald-50/50 text-emerald-600">
+                      <div className="col-span-2 flex items-center justify-between px-2 py-1 rounded-inner bg-emerald-50/50 text-emerald-600">
                         <span className="font-medium">TP2 · {pb.tp2.basis}</span>
                         <span className="font-mono">${pb.tp2.price.toFixed(2)}</span>
                       </div>
@@ -1387,24 +1387,24 @@ export default function Dashboard() {
                 )}
               </div>
             )}
-            <div className="flex flex-wrap gap-2 mb-3 text-xs">
-              <span className={`px-2 py-1 rounded-md font-medium ${
+            <div className="flex flex-wrap gap-2 mb-3 text-body">
+              <span className={`px-2 py-1 rounded-inner font-medium ${
                 smc.trend === "bullish" ? "bg-emerald-50 text-emerald-700"
                 : smc.trend === "bearish" ? "bg-red-50 text-red-700"
                 : "bg-gray-50 text-gray-600"}`}>
                 结构 {smc.trend === "bullish" ? "看多" : smc.trend === "bearish" ? "看空" : "中性"}
               </span>
               {smc.last_event && (
-                <span className="px-2 py-1 rounded-md bg-violet-50 text-violet-700 font-medium">
+                <span className="px-2 py-1 rounded-inner bg-violet-50 text-violet-700 font-medium">
                   {smc.last_event.date} {smc.last_event.dir === "bullish" ? "↗" : "↘"} {smc.last_event.kind} @ ${smc.last_event.level.toFixed(2)}
                 </span>
               )}
-              <span className="px-2 py-1 rounded-md bg-blue-50 text-blue-700 font-medium">
+              <span className="px-2 py-1 rounded-inner bg-blue-50 text-blue-700 font-medium">
                 {smc.zone} {typeof smc.range_position === "number" ? `${(smc.range_position * 100).toFixed(0)}%` : "—"}
               </span>
               {/* 多周期共振 (1h vs 日线) */}
               {smc.ltf && smc.confluence && (
-                <span className={`px-2 py-1 rounded-md font-medium ${
+                <span className={`px-2 py-1 rounded-inner font-medium ${
                   smc.confluence === "aligned" ? "bg-emerald-50 text-emerald-700"
                   : smc.confluence === "conflict" ? "bg-amber-50 text-amber-700"
                   : "bg-gray-50 text-gray-500"}`}>
@@ -1415,13 +1415,13 @@ export default function Dashboard() {
             </div>
             {/* 相对强度 — 一行(prompt 已用，此处只给用户一个语境标注) */}
             {snap.relative_strength?.rationale && (
-              <div className="text-[11px] text-ink-muted bg-sunken rounded-md px-2.5 py-1.5 mb-2 leading-snug">
+              <div className="text-meta text-ink-muted bg-sunken rounded-inner px-2.5 py-1.5 mb-2 leading-snug">
                 📊 {snap.relative_strength.rationale}
               </div>
             )}
             {/* 散户情绪 — 弱信号小条(Adanos Reddit)。同步性>预测性,仅背景参考 */}
             {snap.sentiment?.sentiment_score != null && (
-              <div className={`text-[11px] rounded-md px-2.5 py-1.5 mb-2 leading-snug ${
+              <div className={`text-meta rounded-inner px-2.5 py-1.5 mb-2 leading-snug ${
                 snap.sentiment.signal > 0 ? "bg-emerald-50 text-emerald-700"
                 : snap.sentiment.signal < 0 ? "bg-red-50 text-red-700"
                 : "bg-sunken text-ink-muted"}`}>
@@ -1430,22 +1430,22 @@ export default function Dashboard() {
               </div>
             )}
             {/* 关键区域 —— playbook 自己的口径（订单块=破位前最后一根反向 K）。 */}
-            <div className="text-[10px] text-gray-400 mb-1">关键区域 · playbook 口径</div>
-            <div className="space-y-1.5 text-xs">
+            <div className="text-meta text-gray-400 mb-1">关键区域 · playbook 口径</div>
+            <div className="space-y-1.5 text-body">
               {smc.supply_zones.map((z, i) => (
-                <div key={`s${i}`} className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-red-50/60 border border-red-100">
+                <div key={`s${i}`} className="flex items-center justify-between px-2.5 py-1.5 rounded-inner bg-red-50/60 border border-red-100">
                   <span className="text-red-700 font-medium">▼ 供给区 [{z.kind}]</span>
                   <span className="font-mono text-gray-700">${z.low.toFixed(2)} – ${z.high.toFixed(2)}</span>
                 </div>
               ))}
               {smc.demand_zones.map((z, i) => (
-                <div key={`d${i}`} className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-emerald-50/60 border border-emerald-100">
+                <div key={`d${i}`} className="flex items-center justify-between px-2.5 py-1.5 rounded-inner bg-emerald-50/60 border border-emerald-100">
                   <span className="text-emerald-700 font-medium">▲ 需求区 [{z.kind}]</span>
                   <span className="font-mono text-gray-700">${z.low.toFixed(2)} – ${z.high.toFixed(2)}</span>
                 </div>
               ))}
               {smc.sweeps.slice(-2).map((s, i) => (
-                <div key={`w${i}`} className="text-[11px] text-ink-muted px-2.5 py-1">
+                <div key={`w${i}`} className="text-meta text-ink-muted px-2.5 py-1">
                   💧 {s.note}
                 </div>
               ))}
@@ -1456,12 +1456,12 @@ export default function Dashboard() {
 
         {/* 成交量画像 / POC */}
         {snap.volume_profile?.poc != null && (
-          <div className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+          <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
+              <span className="text-section font-semibold text-gray-900">
                 📊 成交量画像 / POC
               </span>
-              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+              <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${
                 snap.volume_profile.price_vs_value === "above" ? "bg-emerald-100 text-emerald-700"
                 : snap.volume_profile.price_vs_value === "below" ? "bg-red-100 text-red-700"
                 : "bg-gray-100 text-gray-500"}`}>
@@ -1470,15 +1470,15 @@ export default function Dashboard() {
               </span>
             </div>
             {/* 价值区刻度 */}
-            <div className="flex items-center justify-between text-xs mb-3 px-1">
+            <div className="flex items-center justify-between text-body mb-3 px-1">
               <span className="text-red-600 font-mono">VAL {fmtPx(snap.volume_profile.val)}</span>
               <span className="font-mono font-bold text-violet-700">POC {fmtPx(snap.volume_profile.poc)}</span>
               <span className="text-emerald-600 font-mono">VAH {fmtPx(snap.volume_profile.vah)}</span>
             </div>
             {/* 操作提示 — 把磁吸位翻译成明确的突破/跌破触发 */}
             {snap.volume_profile.action_hint && (
-              <div className="flex items-start gap-2 text-xs bg-indigo-50/70 border border-indigo-100 rounded-lg px-3 py-2 mb-3 leading-snug">
-                <span className={`shrink-0 px-1.5 py-0.5 rounded font-bold ${
+              <div className="flex items-start gap-2 text-body bg-indigo-50/70 border border-indigo-100 rounded-inner px-3 py-2 mb-3 leading-snug">
+                <span className={`shrink-0 px-1.5 py-0.5 rounded-inner font-bold ${
                   snap.volume_profile.stance === "偏多" ? "bg-emerald-100 text-emerald-700"
                   : snap.volume_profile.stance === "偏空" ? "bg-red-100 text-red-700"
                   : "bg-gray-100 text-gray-500"}`}>
@@ -1487,28 +1487,28 @@ export default function Dashboard() {
                 <span className="text-gray-700">{snap.volume_profile.action_hint}</span>
               </div>
             )}
-            <div className="space-y-1.5 text-xs">
+            <div className="space-y-1.5 text-body">
               {snap.volume_profile.nearest_magnet_up != null && (
-                <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-emerald-50/60 border border-emerald-100">
+                <div className="flex items-center justify-between px-2.5 py-1.5 rounded-inner bg-emerald-50/60 border border-emerald-100">
                   <span className="text-emerald-700 font-medium">▲ 上方磁吸</span>
                   <span className="font-mono text-gray-700">${snap.volume_profile.nearest_magnet_up.toFixed(2)}</span>
                 </div>
               )}
               {snap.volume_profile.nearest_magnet_down != null && (
-                <div className="flex items-center justify-between px-2.5 py-1.5 rounded-md bg-red-50/60 border border-red-100">
+                <div className="flex items-center justify-between px-2.5 py-1.5 rounded-inner bg-red-50/60 border border-red-100">
                   <span className="text-red-700 font-medium">▼ 下方磁吸</span>
                   <span className="font-mono text-gray-700">${snap.volume_profile.nearest_magnet_down.toFixed(2)}</span>
                 </div>
               )}
               {snap.volume_profile.naked_pocs_above.length + snap.volume_profile.naked_pocs_below.length > 0 && (
-                <div className="text-[11px] text-ink-muted px-2.5 py-1 leading-snug">
+                <div className="text-meta text-ink-muted px-2.5 py-1 leading-snug">
                   🧲 未回补 POC：
                   {[...snap.volume_profile.naked_pocs_above, ...snap.volume_profile.naked_pocs_below]
                     .map(x => `$${x.toFixed(2)}`).join("、")}
                 </div>
               )}
               {snap.volume_profile.lvn.length > 0 && (
-                <div className="text-[11px] text-gray-400 px-2.5 leading-snug">
+                <div className="text-meta text-gray-400 px-2.5 leading-snug">
                   LVN 真空带(勿设止损)：{snap.volume_profile.lvn.map(x => `$${x.toFixed(2)}`).join("、")}
                 </div>
               )}
@@ -1518,19 +1518,19 @@ export default function Dashboard() {
 
         {/* Intrabar Profile — 单根日线 bar 内部:吸收/投降/派发(辅助地图) */}
         {intrabar?.available && (
-          <div className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+          <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
+              <span className="text-section font-semibold text-gray-900">
                 🔬 K线内画像 · Intrabar
               </span>
-              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+              <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${
                 intrabar.stance === "偏多" ? "bg-emerald-100 text-emerald-700"
                 : intrabar.stance === "偏空" ? "bg-red-100 text-red-700"
                 : "bg-gray-100 text-gray-500"}`}>
                 {intrabar.read}
               </span>
             </div>
-            <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-gray-400 mb-3">
+            <div className="flex items-center gap-1.5 flex-wrap text-meta text-gray-400 mb-3">
               {ibLive && (
                 <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />盘中实时
@@ -1544,7 +1544,7 @@ export default function Dashboard() {
               )}
               <span>{intrabar.bar_date} 单日 · {intrabar.n_subbars}根{intrabar.tf ?? "1h"} 重构</span>
               {intrabar.in_progress && (
-                <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">
+                <span className="px-1.5 py-0.5 rounded-inner bg-amber-100 text-amber-700 font-semibold">
                   进行中 · 未收盘
                 </span>
               )}
@@ -1552,7 +1552,7 @@ export default function Dashboard() {
             </div>
             {/* 买卖 delta 条 */}
             <div className="mb-2">
-              <div className="flex h-5 rounded-md overflow-hidden text-[10px] font-bold text-white">
+              <div className="flex h-5 rounded-inner overflow-hidden text-meta font-bold text-white">
                 <div className="bg-emerald-500 flex items-center justify-center"
                      style={{ width: `${Math.max((intrabar.up_vol_pct ?? 0) * 100, 6)}%` }}>
                   买{Math.round((intrabar.up_vol_pct ?? 0) * 100)}%
@@ -1562,7 +1562,7 @@ export default function Dashboard() {
                   卖{Math.round((intrabar.down_vol_pct ?? 0) * 100)}%
                 </div>
               </div>
-              <div className="flex justify-between text-[11px] text-ink-muted mt-1 px-0.5">
+              <div className="flex justify-between text-meta text-ink-muted mt-1 px-0.5">
                 <span>净delta <span className={`font-mono font-semibold ${
                   (intrabar.net_delta_pct ?? 0) > 0 ? "text-emerald-600" : "text-red-600"}`}>
                   {(intrabar.net_delta_pct ?? 0) > 0 ? "+" : ""}{Math.round((intrabar.net_delta_pct ?? 0) * 100)}%</span></span>
@@ -1571,8 +1571,8 @@ export default function Dashboard() {
               </div>
             </div>
             {/* 读数 */}
-            <div className="flex items-start gap-2 text-xs bg-indigo-50/70 border border-indigo-100 rounded-lg px-3 py-2 mb-2 leading-snug">
-              <span className={`shrink-0 px-1.5 py-0.5 rounded font-bold ${
+            <div className="flex items-start gap-2 text-body bg-indigo-50/70 border border-indigo-100 rounded-inner px-3 py-2 mb-2 leading-snug">
+              <span className={`shrink-0 px-1.5 py-0.5 rounded-inner font-bold ${
                 intrabar.stance === "偏多" ? "bg-emerald-100 text-emerald-700"
                 : intrabar.stance === "偏空" ? "bg-red-100 text-red-700"
                 : "bg-gray-100 text-gray-500"}`}>
@@ -1581,19 +1581,19 @@ export default function Dashboard() {
               <span className="text-gray-700">{intrabar.read_note}</span>
             </div>
             {intrabar.delta_disagree && (
-              <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1 mb-2 leading-snug">
+              <div className="text-meta text-amber-700 bg-amber-50 border border-amber-100 rounded-inner px-2.5 py-1 mb-2 leading-snug">
                 ⚠️ 净 delta 方向与读数背离,降级参考
               </div>
             )}
             {/* 近N日 delta 趋势条 */}
             {(intrabar.delta_strip?.length ?? 0) > 0 && (
-              <div className="flex items-center gap-2 text-[11px] text-ink-muted">
+              <div className="flex items-center gap-2 text-meta text-ink-muted">
                 <span className="shrink-0">近{intrabar.delta_strip!.length}日抛压/承接</span>
                 <div className="flex gap-1">
                   {intrabar.delta_strip!.map((s) => (
                     <div key={s.date}
                          title={`${s.date}: 净delta ${s.delta_pct > 0 ? "+" : ""}${Math.round(s.delta_pct * 100)}%`}
-                         className={`w-4 h-4 rounded-sm ${s.sign > 0 ? "bg-emerald-400" : "bg-red-400"}`} />
+                         className={`w-4 h-4 rounded-inner ${s.sign > 0 ? "bg-emerald-400" : "bg-red-400"}`} />
                   ))}
                 </div>
                 <span className="text-gray-400">🟢买 / 🔴卖</span>
@@ -1604,12 +1604,12 @@ export default function Dashboard() {
 
         {/* 空头动向(原挤空燃料,2026-07-04 依第五轮实证翻转:空头=聪明钱) */}
         {snap.squeeze?.short_z != null && (
-          <div className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+          <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
+              <span className="text-section font-semibold text-gray-900">
                 🩳 空头动向
               </span>
-              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+              <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${
                 snap.squeeze.stance === "crowded" ? "bg-red-100 text-red-700"
                 : snap.squeeze.stance === "retreat" ? "bg-emerald-100 text-emerald-700"
                 : "bg-gray-100 text-gray-500"}`}>
@@ -1617,21 +1617,21 @@ export default function Dashboard() {
               </span>
             </div>
             <div className="flex items-baseline gap-3 mb-2">
-              <span className="text-lg font-bold font-mono text-gray-800">
+              <span className="text-section font-bold font-mono text-gray-800">
                 {snap.squeeze.short_ratio != null ? `${(snap.squeeze.short_ratio * 100).toFixed(0)}%` : "—"}
               </span>
-              <span className="text-[10px] text-gray-400">空量比</span>
-              <span className={`text-sm font-mono font-semibold ${
+              <span className="text-meta text-gray-400">空量比</span>
+              <span className={`text-card font-mono font-semibold ${
                 snap.squeeze.short_z > 1 ? "text-red-600"
                 : snap.squeeze.short_z < -1 ? "text-emerald-600" : "text-gray-500"}`}>
                 60日 z {snap.squeeze.short_z >= 0 ? "+" : ""}{snap.squeeze.short_z.toFixed(1)}
               </span>
             </div>
-            <div className="text-[11px] text-ink-muted leading-snug">{snap.squeeze.rationale}</div>
+            <div className="text-meta text-ink-muted leading-snug">{snap.squeeze.rationale}</div>
             {snap.squeeze.context && (
-              <div className="mt-1.5 text-[10px] text-gray-400">{snap.squeeze.context}</div>
+              <div className="mt-1.5 text-meta text-gray-400">{snap.squeeze.context}</div>
             )}
-            <div className="mt-1.5 text-[10px] text-gray-400">
+            <div className="mt-1.5 text-meta text-gray-400">
               实证:空量比飙升后 5 日均值 +2.7% vs 平时 +5.2%(空头=聪明钱,第五轮 mining.md)· 证据弱,只当风向
             </div>
           </div>
@@ -1644,22 +1644,22 @@ export default function Dashboard() {
         <div className="space-y-4">
       {/* ══ 4.5 宏观日历（原始数据直显，独立于 AI 决策）═══════════════════ */}
       {snap.macro && snap.macro.events.length > 0 && (
-        <section className={`rounded-2xl border p-5 ${
+        <section className={`rounded-card border p-5 ${
           snap.macro.risk_window
             ? "bg-red-50/60 border-red-200"
             : "bg-surface border-hairline"}`}>
           <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
-            <div className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
+            <div className="text-section font-semibold text-gray-900">
               🌐 宏观日历 · 未来14天
             </div>
-            <div className={`text-xs font-medium ${snap.macro.risk_window ? "text-red-700" : "text-gray-400"}`}>
+            <div className={`text-body font-medium ${snap.macro.risk_window ? "text-red-700" : "text-gray-400"}`}>
               {snap.macro.risk_window ? `⚠️ ${snap.macro.risk_note}` : snap.macro.risk_note}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {snap.macro.events.map((e, i) => (
               <div key={i}
-                   className={`rounded-lg border px-3 py-2 text-xs ${
+                   className={`rounded-inner border px-3 py-2 text-body ${
                      e.nuclear
                        ? "bg-surface border-red-300"
                        : "bg-surface border-hairline"}`}>
@@ -1670,7 +1670,7 @@ export default function Dashboard() {
                   </span>
                   <span className="font-medium text-gray-800">{e.title}</span>
                   {e.coef && e.coef.spy >= 1.3 && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-orange-100 text-orange-700"
+                    <span className="text-meta px-1.5 py-0.5 rounded-inner font-semibold bg-orange-100 text-orange-700"
                           title={`实测事件日波动放大倍数(2022-08~2026-07): 大盘×${e.coef.spy} · 量子ETF×${e.coef.qtum} · QBTS单票×${e.coef.qbts}(宏观日对QBTS单票无额外波动,系数看大盘方向背景)`}>
                       大盘×{e.coef.spy}
                     </span>
@@ -1686,31 +1686,31 @@ export default function Dashboard() {
                     const past = typeof hu === "number" && hu < 0 && hu > -24;
                     if (isSpeech) {
                       if (future) return (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-red-500 text-white">
+                        <span className="text-meta px-1.5 py-0.5 rounded-inner font-bold bg-red-500 text-white">
                           {hu! < 1 ? "即将开始" : `${Math.round(hu!)}小时后`}
                         </span>);
                       return (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-violet-100 text-violet-600">
+                        <span className="text-meta px-1.5 py-0.5 rounded-inner font-semibold bg-violet-100 text-violet-600">
                           🎤 演讲{past ? "已结束" : ""}
                         </span>);
                     }
                     if (future) return (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-red-500 text-white">
+                      <span className="text-meta px-1.5 py-0.5 rounded-inner font-bold bg-red-500 text-white">
                         {hu! < 1 ? "即将发布" : `${Math.round(hu!)}小时后`}
                       </span>);
                     if (past) {
                       if (e.actual) return (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-gray-200 text-gray-600">已公布</span>);
+                        <span className="text-meta px-1.5 py-0.5 rounded-inner font-semibold bg-gray-200 text-gray-600">已公布</span>);
                       // 「会来」和「永远不会来」必须分开说 —— 用户 2026-07-30 报
                       // "显示已出结果但没数据",根子就是这两种情况共用一个徽章:
                       // 等一个永远不来的值,看起来永远像 bug。
                       if (e.actual_status === "no_source") return (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-gray-100 text-gray-500"
+                        <span className="text-meta px-1.5 py-0.5 rounded-inner font-semibold bg-gray-100 text-gray-500"
                               title="这一项免费数据源(FRED)没有对得上口径的序列 —— 不会再补上，不是故障">
                           已公布·无免费数据源
                         </span>);
                       return (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-amber-100 text-amber-700"
+                        <span className="text-meta px-1.5 py-0.5 rounded-inner font-semibold bg-amber-100 text-amber-700"
                               title="发布时间已过，FRED 通常滞后几小时才更新；下一次发布会自动补上">
                           已公布·等数据回填
                         </span>);
@@ -1724,14 +1724,14 @@ export default function Dashboard() {
                               : s.tone === "good" ? "bg-green-100 text-green-700"
                               : "bg-gray-100 text-gray-500";
                     return (
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${cls}`}>
+                      <span className={`text-meta px-1.5 py-0.5 rounded-inner font-semibold ${cls}`}>
                         {s.label}
                       </span>
                     );
                   })()}
                 </div>
                 {(e.forecast || e.previous || e.actual) && (
-                  <div className="text-[10px] text-gray-500 mt-0.5 font-mono">
+                  <div className="text-meta text-gray-500 mt-0.5 font-mono">
                     预测 {e.forecast || "—"} · 前值 {e.previous || "—"}
                     {e.actual && ` · 实际 ${e.actual}`}
                   </div>
@@ -1744,16 +1744,16 @@ export default function Dashboard() {
 
       {/* ══ 4.95 🌍 地缘政治雷达 — 伊朗战局/川普政策/量子政策(07-07 暴跌的驱动)═══ */}
       {geo && (
-        <section className={`rounded-3xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] border ${
+        <section className={`rounded-card p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] border ${
           geo.risk_level === "alert" ? "bg-red-50/70 border-red-200"
             : geo.risk_level === "watch" ? "bg-amber-50/50 border-amber-200"
             : "bg-surface border-transparent"}`}>
           <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
+            <span className="text-section font-semibold text-gray-900">
               🌍 地缘政治雷达 · 伊朗战局 / 川普政策 / 量子政策
             </span>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-              geo.risk_level === "alert" ? "bg-red-600 text-white"
+            <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${
+              geo.risk_level === "alert" ? "bg-red-600 text-on-solid"
                 : geo.risk_level === "watch" ? "bg-amber-400 text-amber-950"
                 // unknown = 分级挂了 → 画灰,绝不能落到绿色(那是「平静」的意思)
                 : geo.risk_level === "unknown" ? "bg-gray-200 text-gray-600"
@@ -1761,18 +1761,18 @@ export default function Dashboard() {
               {geo.risk_cn}
             </span>
             {geoLive && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-semibold animate-pulse">
+              <span className="text-meta px-1.5 py-0.5 rounded-inner bg-sky-100 text-sky-700 font-semibold animate-pulse">
                 盘中实时
               </span>
             )}
-            <span className="ml-auto text-[10px] text-gray-400 font-mono">
+            <span className="ml-auto text-meta text-gray-400 font-mono">
               {fmtLocalDateTime(geo.as_of) ?? ""}
             </span>
           </div>
 
-          <div className="text-[15px] font-bold text-gray-900 mb-1.5">{geo.headline_cn}</div>
+          <div className="text-card font-bold text-gray-900 mb-1.5">{geo.headline_cn}</div>
           {geo.summary_cn && (
-            <p className="text-sm leading-relaxed text-gray-700 mb-3">{geo.summary_cn}</p>
+            <p className="text-card leading-relaxed text-gray-700 mb-3">{geo.summary_cn}</p>
           )}
 
           {geoItems.length > 0 && (
@@ -1785,8 +1785,8 @@ export default function Dashboard() {
                       g.stance === "risk_off" ? "bg-down"
                         : g.stance === "risk_on" ? "bg-emerald-500" : "bg-gray-300"}`} />
                     <div className="min-w-0">
-                      <div className="text-sm text-gray-900 group-hover:text-brand transition-colors leading-snug">
-                        <span className={`mr-1.5 text-[10px] px-1.5 py-0.5 rounded font-semibold align-[1px] ${
+                      <div className="text-card text-gray-900 group-hover:text-brand transition-colors leading-snug">
+                        <span className={`mr-1.5 text-meta px-1.5 py-0.5 rounded-inner font-semibold align-[1px] ${
                           g.track === "iran" ? "bg-red-100 text-red-700"
                             : g.track === "trump" ? "bg-indigo-100 text-indigo-700"
                             : "bg-violet-100 text-violet-700"}`}>
@@ -1794,10 +1794,10 @@ export default function Dashboard() {
                         </span>
                         {g.title}
                         {g.relevance === "high" && (
-                          <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-red-600 text-white font-bold">高影响</span>
+                          <span className="ml-1.5 text-meta px-1 py-0.5 rounded-inner bg-red-600 text-on-solid font-bold">高影响</span>
                         )}
                       </div>
-                      <div className="text-[11px] text-ink-muted mt-0.5">
+                      <div className="text-meta text-ink-muted mt-0.5">
                         {g.note_cn} <span className="text-gray-400">· {g.source} · {g.published?.slice(5, 16)} UTC</span>
                       </div>
                     </div>
@@ -1807,7 +1807,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          <div className="mt-3 text-[10px] text-gray-400">
+          <div className="mt-3 text-meta text-gray-400">
             Google News 每~30分钟盘中自动扫描(伊朗谈判/停火/空袭 · 川普关税/行政令 · 量子国防/出口管制)
             · 出现新高影响条目或风险级别翻转 → ntfy 手机推送 · AI 分级仅供参考
           </div>
@@ -1816,16 +1816,16 @@ export default function Dashboard() {
 
       {/* ══ 4.5 公司催化剂雷达（D-Wave 自身消息 + 板块同行）══════════════ */}
       {cat && (
-        <section className={`rounded-3xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] border ${
+        <section className={`rounded-card p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] border ${
           cat.impact_level === "breaking" ? "bg-red-50/70 border-red-200"
             : cat.impact_level === "watch" ? "bg-amber-50/50 border-amber-200"
             : "bg-surface border-transparent"}`}>
           <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
+            <span className="text-section font-semibold text-gray-900">
               📣 公司催化剂雷达 · D-Wave 自身 / 板块同行
             </span>
-            <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-              cat.impact_level === "breaking" ? "bg-red-600 text-white"
+            <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${
+              cat.impact_level === "breaking" ? "bg-red-600 text-on-solid"
                 : cat.impact_level === "watch" ? "bg-amber-400 text-amber-950"
                 // unknown = 分级挂了 → 画灰,绝不能落到绿色(那是「无事」的意思)
                 : cat.impact_level === "unknown" ? "bg-gray-200 text-gray-600"
@@ -1833,18 +1833,18 @@ export default function Dashboard() {
               {cat.impact_cn}
             </span>
             {catLive && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-700 font-semibold animate-pulse">
+              <span className="text-meta px-1.5 py-0.5 rounded-inner bg-sky-100 text-sky-700 font-semibold animate-pulse">
                 盘中实时
               </span>
             )}
-            <span className="ml-auto text-[10px] text-gray-400 font-mono">
+            <span className="ml-auto text-meta text-gray-400 font-mono">
               {fmtLocalDateTime(cat.as_of) ?? ""}
             </span>
           </div>
 
-          <div className="text-[15px] font-bold text-gray-900 mb-1.5">{cat.headline_cn}</div>
+          <div className="text-card font-bold text-gray-900 mb-1.5">{cat.headline_cn}</div>
           {cat.summary_cn && (
-            <p className="text-sm leading-relaxed text-gray-700 mb-3">{cat.summary_cn}</p>
+            <p className="text-card leading-relaxed text-gray-700 mb-3">{cat.summary_cn}</p>
           )}
 
           {catItems.length > 0 && (
@@ -1857,18 +1857,18 @@ export default function Dashboard() {
                       c.direction === "bullish" ? "bg-emerald-500"
                         : c.direction === "bearish" ? "bg-down" : "bg-gray-300"}`} />
                     <div className="min-w-0">
-                      <div className="text-sm text-gray-900 group-hover:text-brand transition-colors leading-snug">
-                        <span className={`mr-1.5 text-[10px] px-1.5 py-0.5 rounded font-semibold align-[1px] ${
+                      <div className="text-card text-gray-900 group-hover:text-brand transition-colors leading-snug">
+                        <span className={`mr-1.5 text-meta px-1.5 py-0.5 rounded-inner font-semibold align-[1px] ${
                           c.track === "company" ? "bg-sky-100 text-sky-700"
                             : "bg-violet-100 text-violet-700"}`}>
                           {c.track_cn}
                         </span>
                         {c.title}
                         {c.impact === "high" && (
-                          <span className="ml-1.5 text-[10px] px-1 py-0.5 rounded bg-red-600 text-white font-bold">催化剂</span>
+                          <span className="ml-1.5 text-meta px-1 py-0.5 rounded-inner bg-red-600 text-on-solid font-bold">催化剂</span>
                         )}
                       </div>
-                      <div className="text-[11px] text-ink-muted mt-0.5">
+                      <div className="text-meta text-ink-muted mt-0.5">
                         {c.note_cn} <span className="text-gray-400">
                           · {c.source}
                           {typeof c.age_h === "number" && ` · ${c.age_h}h前`}
@@ -1881,7 +1881,7 @@ export default function Dashboard() {
             </div>
           )}
 
-          <div className="mt-3 text-[10px] text-gray-400">
+          <div className="mt-3 text-meta text-gray-400">
             Google News 每~10分钟盘中自动扫描(D-Wave 合同/订单/产品/融资/上市变更 · 量子板块同行)
             · 出现新的高影响催化剂 → ntfy 手机推送(同一条 PR 的多家转载只推一次)
             · 零决策权,只做事件背景 · AI 分级仅供参考
@@ -1896,30 +1896,30 @@ export default function Dashboard() {
         <div className="space-y-4">
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* 历史战绩 */}
-        <div className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+        <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
+            <span className="text-section font-semibold text-gray-900">
               📒 历史决策战绩
             </span>
             <div className="flex flex-col items-end gap-0.5">
               {snap.journal?.accuracy != null && (
-                <span className={`text-sm font-bold font-mono ${
+                <span className={`text-card font-bold font-mono ${
                   snap.journal.accuracy >= 0.55 ? "text-emerald-600"
                   : snap.journal.accuracy >= 0.45 ? "text-amber-500" : "text-down"}`}>
                   实盘命中 {(snap.journal.accuracy * 100).toFixed(0)}%
-                  <span className="text-[10px] text-gray-400 ml-1">
+                  <span className="text-meta text-gray-400 ml-1">
                     ({snap.journal.n_correct}/{snap.journal.n_graded})
                   </span>
                 </span>
               )}
               {snap.journal?.shadow_accuracy != null && (
-                <span className="text-[10px] text-gray-400 font-mono" title="含观望日的方向影子判断 — 即使空仓也评判当时的多空倾向是否正确">
+                <span className="text-meta text-gray-400 font-mono" title="含观望日的方向影子判断 — 即使空仓也评判当时的多空倾向是否正确">
                   含观望影子 {(snap.journal.shadow_accuracy * 100).toFixed(0)}%
                   ({snap.journal.n_shadow_correct}/{snap.journal.n_shadow})
                 </span>
               )}
               {snap.journal?.hold_accuracy != null && (
-                <span className="text-[10px] text-gray-400 font-mono" title="观望判读:决策日 |QBTS| ≥3% 却观望 = 漏判(双向工具在架,错过任一方向都算)— 观望不是免费的">
+                <span className="text-meta text-gray-400 font-mono" title="观望判读:决策日 |QBTS| ≥3% 却观望 = 漏判(双向工具在架,错过任一方向都算)— 观望不是免费的">
                   观望判读 {(snap.journal.hold_accuracy * 100).toFixed(0)}%
                   ({snap.journal.n_hold_correct}/{snap.journal.n_hold_graded})
                 </span>
@@ -1927,10 +1927,10 @@ export default function Dashboard() {
             </div>
           </div>
           {jPaper && (
-            <div className="mb-3 rounded-lg bg-sunken px-3 py-2.5 text-xs">
+            <div className="mb-3 rounded-inner bg-sunken px-3 py-2.5 text-body">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-gray-700">📊 模拟持仓 · 每次 ${jPaper.trade_usd.toLocaleString()} 跟随决策</span>
-                <span className="text-[10px] text-gray-400">假钱 · 按标的方向,未计 2× 杠杆</span>
+                <span className="text-meta text-gray-400">假钱 · 按标的方向,未计 2× 杠杆</span>
               </div>
               <div className="mt-1.5 font-mono">
                 已实现累计{" "}
@@ -1954,7 +1954,7 @@ export default function Dashboard() {
                 <div className="mt-1 text-gray-400">当前空仓（最近决策为观望或已平）</div>
               )}
               {jPaper.n_trades < 10 && (
-                <div className="mt-1 text-[10px] text-amber-600">⚠️ 样本极少（{jPaper.n_trades} 笔）——系统多数日子观望、方向单稀少,这个数字还说明不了问题</div>
+                <div className="mt-1 text-meta text-amber-600">⚠️ 样本极少（{jPaper.n_trades} 笔）——系统多数日子观望、方向单稀少,这个数字还说明不了问题</div>
               )}
               {/* 规避回撤(2026-07-30 用户拍板):上面那行"胜率"只会显示没赚到钱,
                   而观望躲开的亏损从不出现在任何一栏。这里补上,零决策权。 */}
@@ -1964,7 +1964,7 @@ export default function Dashboard() {
                     <span className="font-semibold text-gray-700">
                       🛡️ 规避回撤 · 那 {jAvoided.n_hold_days} 天观望
                     </span>
-                    <span className="text-[10px] text-gray-400">2× 反事实 · 零决策权</span>
+                    <span className="text-meta text-gray-400">2× 反事实 · 零决策权</span>
                   </div>
                   <div className="mt-1 font-mono">
                     若那些天满仓 QBTX：{" "}
@@ -1980,7 +1980,7 @@ export default function Dashboard() {
                   </div>
                   {/* 渲染的是纯文本,不能写 markdown 的 ** —— 会原样印出来
                       (2026-07-29 超买超卖卡踩过同一个坑)。强调走 className。 */}
-                  <div className="mt-1 text-[10px] text-gray-400 leading-snug">
+                  <div className="mt-1 text-meta text-gray-400 leading-snug">
                     口径：{jAvoided.basis}。对照 2× 空 {jAvoided.short_2x_pct >= 0 ? "+" : ""}
                     {jAvoided.short_2x_pct.toFixed(1)}% —— 做空家族四轮判死，
                     <span className="font-semibold text-[#B45309]">这个数字不是建议</span>。
@@ -1990,7 +1990,7 @@ export default function Dashboard() {
             </div>
           )}
           {!snap.journal || snap.journal.records.length === 0 ? (
-            <div className="text-xs text-gray-400 py-6 text-center">
+            <div className="text-body text-gray-400 py-6 text-center">
               暂无记录 — 从下一次决策开始，每个判断都会被记录并在 5 个交易日后评判
             </div>
           ) : (
@@ -1999,8 +1999,8 @@ export default function Dashboard() {
                 const res = r.result;
                 const actionLabel = r.action === "LONG_QBTX" ? "做多" : r.action === "SHORT_QBTZ" ? "做空" : "观望";
                 return (
-                  <div key={r.id} className="border border-hairline rounded-lg px-3 py-2">
-                    <div className="flex items-center gap-2 text-xs">
+                  <div key={r.id} className="border border-hairline rounded-inner px-3 py-2">
+                    <div className="flex items-center gap-2 text-body">
                       <span className="font-mono text-gray-500">{r.date.slice(5)}</span>
                       <span className={`font-semibold ${
                         r.action === "LONG_QBTX" ? "text-emerald-700"
@@ -2010,25 +2010,25 @@ export default function Dashboard() {
                       <span className="text-gray-400">信心{r.conviction} · ${r.price}</span>
                       <span className="ml-auto">
                         {r.status === "pending" ? (
-                          <span className="text-[10px] text-gray-400">⏳ 待评判</span>
+                          <span className="text-meta text-gray-400">⏳ 待评判</span>
                         ) : r.action === "HOLD" && res?.correct === false ? (
                           // 观望漏判(07-22 起):✗ 判的是"决策日 ≥3% 却观望",展示当日波动
-                          <span className="text-xs font-bold text-down" title="决策日 |QBTS| ≥3% 却观望 = 漏判">
+                          <span className="text-body font-bold text-down" title="决策日 |QBTS| ≥3% 却观望 = 漏判">
                             ✗ 漏判 {res.day0_ret_pct != null ? `当日${(res.day0_ret_pct*100).toFixed(1)}%` : ""}
                           </span>
                         ) : r.action === "HOLD" && res?.correct === true ? (
-                          <span className="text-[10px] text-gray-400" title="决策日波动 <3%,观望合理">— 观望✓</span>
+                          <span className="text-meta text-gray-400" title="决策日波动 <3%,观望合理">— 观望✓</span>
                         ) : res?.correct === true ? (
-                          <span className="text-xs font-bold text-emerald-600">✓ {res.ret_pct != null ? `${(res.ret_pct*100).toFixed(1)}%` : ""}</span>
+                          <span className="text-body font-bold text-emerald-600">✓ {res.ret_pct != null ? `${(res.ret_pct*100).toFixed(1)}%` : ""}</span>
                         ) : res?.correct === false ? (
-                          <span className="text-xs font-bold text-down">✗ {res.ret_pct != null ? `${(res.ret_pct*100).toFixed(1)}%` : ""}</span>
+                          <span className="text-body font-bold text-down">✗ {res.ret_pct != null ? `${(res.ret_pct*100).toFixed(1)}%` : ""}</span>
                         ) : (
-                          <span className="text-[10px] text-gray-400">— 观望</span>
+                          <span className="text-meta text-gray-400">— 观望</span>
                         )}
                       </span>
                     </div>
                     {res?.reflection && (
-                      <div className="mt-1.5 text-[11px] text-amber-700 bg-amber-50 rounded px-2 py-1 leading-snug">
+                      <div className="mt-1.5 text-meta text-amber-700 bg-amber-50 rounded-inner px-2 py-1 leading-snug">
                         💡 反思：{res.reflection}
                       </div>
                     )}
@@ -2045,12 +2045,12 @@ export default function Dashboard() {
       </section>
       {/* ══ 4.8 恐慌深坑报警器 — 跌20%于20日高抄底(纸面测量,策略动物园胜率冠军但未验证) ═══ */}
       {snap.dip_buy && (
-        <section className={`rounded-2xl border p-4 text-sm leading-relaxed ${
+        <section className={`rounded-card border p-4 text-card leading-relaxed ${
           snap.dip_buy.open ? "bg-emerald-50 border-emerald-200"
           : snap.dip_buy.triggered ? "bg-amber-50 border-amber-300"
           : "bg-surface border-hairline"}`}>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">🕳️ 恐慌深坑报警器</span>
+            <span className="text-section font-semibold text-gray-900">🕳️ 恐慌深坑报警器</span>
             {snap.dip_buy.open ? (
               <span className="text-emerald-700">
                 虚拟持仓中:{snap.dip_buy.open.entry_date} 入 ${snap.dip_buy.open.entry.toFixed(2)} →
@@ -2065,13 +2065,13 @@ export default function Dashboard() {
                 (还差 {(Math.abs(snap.dip_buy.distance_pct) * 100).toFixed(0)}%)
               </span>
             )}
-            <span className="ml-auto text-[11px] text-gray-400">
+            <span className="ml-auto text-meta text-gray-400">
               战绩 {snap.dip_buy.n_win}/{snap.dip_buy.n_closed}
               {snap.dip_buy.win_rate != null && ` (${(snap.dip_buy.win_rate * 100).toFixed(0)}%)`}
               {" · 落袋 "}{snap.dip_buy.realized >= 0 ? "+" : ""}${snap.dip_buy.realized.toFixed(0)}
             </span>
           </div>
-          <div className="mt-1 text-[10px] text-gray-400">
+          <div className="mt-1 text-meta text-gray-400">
             规则:收盘跌破 20日高×0.80 虚拟买 $1000,回 95% 止盈 / 15 天到期 · 回测 64%@25 但近一年平庸+多重比较嫌疑 —— 纯纸面测量,不进决策,30 笔后见真章
           </div>
         </section>
@@ -2079,30 +2079,30 @@ export default function Dashboard() {
 
       {/* ══ 4.85 冠军策略陪跑 — 35套动物园前两名的实时纸面成绩(测量,不进决策) ═══ */}
       {snap.champs && (
-        <section className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-4">
+        <section className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-4">
           <div className="flex items-center justify-between mb-2.5">
-            <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
+            <span className="text-section font-semibold text-gray-900">
               🐎 策略马厩 — 7 套策略的实盘模拟(每套虚拟 $1000)
             </span>
-            <span className="text-[10px] text-gray-400">谁真赚钱,数字说话</span>
+            <span className="text-meta text-gray-400">谁真赚钱,数字说话</span>
           </div>
-          <div className="space-y-2 text-sm leading-relaxed">
+          <div className="space-y-2 text-card leading-relaxed">
             {/* ① QQQ50 × 波动率目标:虚拟净值 vs 死拿 */}
             {snap.champs.volreg && (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-sunken rounded-lg px-3 py-2">
-                <span className="text-xs font-semibold text-gray-700">🥇 QQQ50×波动率目标</span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-sunken rounded-inner px-3 py-2">
+                <span className="text-body font-semibold text-gray-700">🥇 QQQ50×波动率目标</span>
                 <span className={snap.champs.volreg.ret_pct >= 0 ? "text-emerald-700" : "text-down"}>
                   ${snap.champs.volreg.nav.toFixed(0)}({snap.champs.volreg.ret_pct >= 0 ? "+" : ""}{(snap.champs.volreg.ret_pct * 100).toFixed(1)}%)
                 </span>
-                <span className="text-gray-400 text-xs">
+                <span className="text-gray-400 text-body">
                   vs 死拿 ${snap.champs.volreg.bh_nav.toFixed(0)}({snap.champs.volreg.bh_ret_pct >= 0 ? "+" : ""}{(snap.champs.volreg.bh_ret_pct * 100).toFixed(1)}%)
                   · 当前敞口 {(snap.champs.volreg.exposure * 100).toFixed(0)}% · {snap.champs.volreg.start_date} 起 $1000
                 </span>
               </div>
             )}
             {/* ② 5日swing × QQQ50 */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-sunken rounded-lg px-3 py-2">
-              <span className="text-xs font-semibold text-gray-700">🥈 5日swing×QQQ50</span>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-sunken rounded-inner px-3 py-2">
+              <span className="text-body font-semibold text-gray-700">🥈 5日swing×QQQ50</span>
               {snap.champs.swing.open ? (
                 <span className="text-emerald-700">
                   持仓中:{snap.champs.swing.open.entry_date} 入 ${snap.champs.swing.open.entry.toFixed(2)} →
@@ -2116,7 +2116,7 @@ export default function Dashboard() {
                   等待 · 现 ${snap.champs.swing.close.toFixed(2)},触发线 <b className="font-mono">${snap.champs.swing.lo5.toFixed(2)}</b>(5日新低)
                 </span>
               )}
-              <span className="ml-auto text-[11px] text-gray-400">
+              <span className="ml-auto text-meta text-gray-400">
                 战绩 {snap.champs.swing.n_win}/{snap.champs.swing.n_closed}
                 {snap.champs.swing.win_rate != null && ` (${(snap.champs.swing.win_rate * 100).toFixed(0)}%)`}
                 · 落袋 {snap.champs.swing.realized >= 0 ? "+" : ""}${snap.champs.swing.realized.toFixed(0)}
@@ -2124,12 +2124,12 @@ export default function Dashboard() {
             </div>
             {/* ③ BTC昨日绿 × QQQ50 × 波目(第四轮新增) */}
             {snap.champs.btc && (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-sunken rounded-lg px-3 py-2">
-                <span className="text-xs font-semibold text-gray-700">🆕 BTC昨日绿×QQQ50</span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-sunken rounded-inner px-3 py-2">
+                <span className="text-body font-semibold text-gray-700">🆕 BTC昨日绿×QQQ50</span>
                 <span className={snap.champs.btc.ret_pct >= 0 ? "text-emerald-700" : "text-down"}>
                   ${snap.champs.btc.nav.toFixed(0)}({snap.champs.btc.ret_pct >= 0 ? "+" : ""}{(snap.champs.btc.ret_pct * 100).toFixed(1)}%)
                 </span>
-                <span className="text-gray-400 text-xs">
+                <span className="text-gray-400 text-body">
                   BTC 昨日{snap.champs.btc.btc_green == null ? "?" : snap.champs.btc.btc_green ? "🟢 涨 → 持仓" : "🔴 跌 → 空仓"}
                   · 当前敞口 {(snap.champs.btc.exposure * 100).toFixed(0)}% · {snap.champs.btc.start_date} 起 $1000
                 </span>
@@ -2137,12 +2137,12 @@ export default function Dashboard() {
             )}
             {/* ④ CLV强收盘 × QQQ50 × 波目(第六轮新增) */}
             {snap.champs.clv && (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-sunken rounded-lg px-3 py-2">
-                <span className="text-xs font-semibold text-gray-700">🆕 CLV强收盘×QQQ50</span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-sunken rounded-inner px-3 py-2">
+                <span className="text-body font-semibold text-gray-700">🆕 CLV强收盘×QQQ50</span>
                 <span className={snap.champs.clv.ret_pct >= 0 ? "text-emerald-700" : "text-down"}>
                   ${snap.champs.clv.nav.toFixed(0)}({snap.champs.clv.ret_pct >= 0 ? "+" : ""}{(snap.champs.clv.ret_pct * 100).toFixed(1)}%)
                 </span>
-                <span className="text-gray-400 text-xs">
+                <span className="text-gray-400 text-body">
                   今日收盘位置 {snap.champs.clv.clv != null
                     ? `${snap.champs.clv.clv >= 0 ? "+" : ""}${snap.champs.clv.clv.toFixed(2)}${snap.champs.clv.clv > 0.3 ? " 💪 强 → 明日持仓" : " 弱 → 空仓"}`
                     : "?"}
@@ -2152,12 +2152,12 @@ export default function Dashboard() {
             )}
             {/* ⑤ 配对超涨 veto(第八轮新增) */}
             {snap.champs.veto && (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-sunken rounded-lg px-3 py-2">
-                <span className="text-xs font-semibold text-gray-700">🆕 配对超涨veto</span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-sunken rounded-inner px-3 py-2">
+                <span className="text-body font-semibold text-gray-700">🆕 配对超涨veto</span>
                 <span className={snap.champs.veto.ret_pct >= 0 ? "text-emerald-700" : "text-down"}>
                   ${snap.champs.veto.nav.toFixed(0)}({snap.champs.veto.ret_pct >= 0 ? "+" : ""}{(snap.champs.veto.ret_pct * 100).toFixed(1)}%)
                 </span>
-                <span className="text-gray-400 text-xs">
+                <span className="text-gray-400 text-body">
                   vs IONQ 价差 z {snap.champs.veto.z40 != null ? `${snap.champs.veto.z40 >= 0 ? "+" : ""}${snap.champs.veto.z40.toFixed(1)}` : "?"}
                   {snap.champs.veto.vetoed ? " 🚫 贵1σ+ → 清仓等" : " ✓ 不贵 → 照常持有"}
                   · 敞口 {(snap.champs.veto.exposure * 100).toFixed(0)}% · {snap.champs.veto.start_date} 起 $1000
@@ -2166,12 +2166,12 @@ export default function Dashboard() {
             )}
             {/* ⑥ QTUM昨日绿(第八轮新增) */}
             {snap.champs.qtum && (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-sunken rounded-lg px-3 py-2">
-                <span className="text-xs font-semibold text-gray-700">🆕 QTUM板块绿×QQQ50</span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-sunken rounded-inner px-3 py-2">
+                <span className="text-body font-semibold text-gray-700">🆕 QTUM板块绿×QQQ50</span>
                 <span className={snap.champs.qtum.ret_pct >= 0 ? "text-emerald-700" : "text-down"}>
                   ${snap.champs.qtum.nav.toFixed(0)}({snap.champs.qtum.ret_pct >= 0 ? "+" : ""}{(snap.champs.qtum.ret_pct * 100).toFixed(1)}%)
                 </span>
-                <span className="text-gray-400 text-xs">
+                <span className="text-gray-400 text-body">
                   量子ETF昨日{snap.champs.qtum.qtum_green == null ? "?" : snap.champs.qtum.qtum_green ? "🟢 涨 → 持仓" : "🔴 跌 → 空仓"}
                   · 敞口 {(snap.champs.qtum.exposure * 100).toFixed(0)}% · {snap.champs.qtum.start_date} 起 $1000
                 </span>
@@ -2179,8 +2179,8 @@ export default function Dashboard() {
             )}
             {/* ⑦ 特调双腿(用户自创,第十轮新增) */}
             {snap.champs.tj && (
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-sunken rounded-lg px-3 py-2">
-                <span className="text-xs font-semibold text-gray-700">🎯 特调双腿(你的作品)</span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 bg-sunken rounded-inner px-3 py-2">
+                <span className="text-body font-semibold text-gray-700">🎯 特调双腿(你的作品)</span>
                 {snap.champs.tj.open ? (
                   <span className="text-emerald-700">
                     持仓中:{snap.champs.tj.open.entry_date} 抄底 ${snap.champs.tj.open.entry.toFixed(2)} →
@@ -2194,14 +2194,14 @@ export default function Dashboard() {
                     等待 · 快%R {snap.champs.tj.sig?.fast ?? "?"} / 慢%R {snap.champs.tj.sig?.slow ?? "?"}(快线上穿-80 且慢线弱才买)
                   </span>
                 )}
-                <span className="ml-auto text-[11px] text-gray-400">
+                <span className="ml-auto text-meta text-gray-400">
                   战绩 {snap.champs.tj.n_win}/{snap.champs.tj.n_closed}
                   · 落袋 {snap.champs.tj.realized >= 0 ? "+" : ""}${snap.champs.tj.realized.toFixed(0)}
                 </span>
               </div>
             )}
           </div>
-          <div className="mt-2 text-[10px] text-gray-400">
+          <div className="mt-2 text-meta text-gray-400">
             回测出身(近1年/最大回撤):🥇+113%/-40% · 🥈胜率72% · BTC +120%/-20% · CLV +189%/-18% · veto +176%/-22% · QTUM +228%/-19% · 🎯抄底腿5天+17.4%(254套十轮)—— 纯纸面陪跑,不进决策;跑赢真实记录才算数
           </div>
         </section>
@@ -2222,11 +2222,11 @@ export default function Dashboard() {
           2026-07-29 上游把 07-24 的收盘贴进了 07-28 那行（比当日最低价还低），
           静默剔除会让 as_of 倒退一天而页面照常正常。 */}
       {snap.data_health && !snap.data_health.ok && (
-        <div className="bg-yellow-50 border border-yellow-400 text-yellow-900 rounded-xl px-5 py-3 text-sm">
+        <div className="bg-yellow-50 border border-yellow-400 text-yellow-900 rounded-inner px-5 py-3 text-card">
           <div className="font-bold mb-1">🧪 数据源异常 — 本页读的是校验后的缓存</div>
           <ul className="space-y-0.5">
             {snap.data_health.issues.map((s, i) => (
-              <li key={i} className="text-[12px] font-mono leading-relaxed">· {s}</li>
+              <li key={i} className="text-body font-mono leading-relaxed">· {s}</li>
             ))}
           </ul>
         </div>
@@ -2236,16 +2236,16 @@ export default function Dashboard() {
           ⚠️，HTTP 头装不下 → 从 07-29 建成起每分钟静默失败、一次都没推成功过，
           07-30 夜盘 +10.2% 又漏了。日志不是监控 —— 推送坏了必须在页面上说。 */}
       {live?.ntfy_health?.err_at && (
-        <div className="bg-red-50 border border-down text-red-900 rounded-xl px-5 py-3 text-sm">
+        <div className="bg-red-50 border border-down text-red-900 rounded-inner px-5 py-3 text-card">
           <div className="font-bold mb-1">🔔 推送通道故障 — 手机收不到提醒</div>
-          <div className="text-[12px] leading-relaxed">
+          <div className="text-body leading-relaxed">
             最近一次推送失败于 {fmtLocalDateTime(live.ntfy_health.err_at)}
             {live.ntfy_health.title && <>（标题「{live.ntfy_health.title}」）</>}
           </div>
-          <div className="text-[11px] font-mono text-red-700 mt-1 break-all">
+          <div className="text-meta font-mono text-red-700 mt-1 break-all">
             {live.ntfy_health.err}
           </div>
-          <div className="text-[11px] text-red-700 mt-1">
+          <div className="text-meta text-red-700 mt-1">
             扳机/事件日/催化剂这些提醒此刻都发不出去 —— 别指望手机响，盯页面。
           </div>
         </div>
@@ -2253,17 +2253,17 @@ export default function Dashboard() {
 
       {/* ══ 4.9 AI 系统自检 — 决策模型以审计者身份报告的数据问题/改进建议(给维护者) ═══ */}
       {(d?.system_notes?.length ?? 0) > 0 && (
-        <section className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+        <section className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
+            <span className="text-section font-semibold text-gray-900">
               🔬 AI 系统自检 · 今日发现
             </span>
-            {d?.model && <span className="text-[10px] text-gray-400 font-mono">{d.model}</span>}
+            {d?.model && <span className="text-meta text-gray-400 font-mono">{d.model}</span>}
           </div>
           <div className="space-y-2">
             {d!.system_notes!.map((n, i) => (
-              <div key={i} className="flex items-start gap-2 text-sm leading-relaxed">
-                <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-semibold mt-0.5 ${
+              <div key={i} className="flex items-start gap-2 text-card leading-relaxed">
+                <span className={`shrink-0 text-meta px-1.5 py-0.5 rounded-inner font-semibold mt-0.5 ${
                   n.kind === "数据问题" ? "bg-amber-100 text-amber-700" : "bg-sky-100 text-sky-700"}`}>
                   {n.kind}
                 </span>
@@ -2271,7 +2271,7 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
-          <div className="mt-2.5 text-[10px] text-gray-400">
+          <div className="mt-2.5 text-meta text-gray-400">
             决策模型顺带审计当日数据后主动提出,不影响交易决定 · 修不修由你定
           </div>
         </section>
@@ -2285,7 +2285,7 @@ export default function Dashboard() {
 
       {/* 右下角版本号 — 连点 3 次(1.5s 内)打开隐藏的点击审计查看窗 */}
       <div
-        className="fixed bottom-2 right-3 z-10 text-[10px] font-mono text-gray-300 select-none cursor-default"
+        className="fixed bottom-2 right-3 z-10 text-meta font-mono text-gray-300 select-none cursor-default"
         onClick={() => {
           const now = Date.now();
           versionClicks.current = [...versionClicks.current.filter(t => now - t < 1500), now];

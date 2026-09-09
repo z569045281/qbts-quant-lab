@@ -53,15 +53,15 @@ export default function PositionsCard({ initial, prices, advice, adviceAsOf }: {
   }
 
   return (
-    <section className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+    <section className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
+        <span className="text-section font-semibold text-gray-900">
           💼 当前持仓(真金)· AI 每日给操作建议
         </span>
         {WATCH_EDITABLE && (
           <button
             onClick={() => { setOpen(!open); setErr(null); }}
-            className="text-[12px] font-semibold rounded-full px-3 py-1.5 bg-[#007AFF] text-white shadow-[0_1px_3px_rgba(0,122,255,0.4)] active:opacity-70">
+            className="text-body font-semibold rounded-full px-3 py-1.5 bg-brand text-on-solid shadow-[0_1px_3px_rgba(0,122,255,0.4)] active:opacity-70">
             {open ? "收起" : "＋ 记一笔"}
           </button>
         )}
@@ -69,7 +69,7 @@ export default function PositionsCard({ initial, prices, advice, adviceAsOf }: {
 
       {/* 持仓行 */}
       {list.length === 0 ? (
-        <div className="text-[13px] text-gray-400 bg-sunken rounded-xl px-4 py-3">
+        <div className="text-body text-gray-400 bg-sunken rounded-inner px-4 py-3">
           还没有记录持仓。买入后点「＋ 记一笔」——之后每天生成决策时,AI 会对每笔持仓给出
           持有 / 加仓 / 减仓 / 清仓的建议(并核对执行军规,比如 QBTZ 不许过周末)。
         </div>
@@ -80,12 +80,12 @@ export default function PositionsCard({ initial, prices, advice, adviceAsOf }: {
             const pnl = px && p.cost ? px / p.cost - 1 : null;
             const a = advice?.find(x => x.ticker === p.ticker);
             return (
-              <div key={p.ticker} className="bg-sunken rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed">
+              <div key={p.ticker} className="bg-sunken rounded-inner px-3.5 py-2.5 text-body leading-relaxed">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span>
                     <b>{p.ticker}</b>
                     <span className="text-gray-500"> {p.qty}股 @ ${p.cost.toFixed(2)}</span>
-                    {p.date && <span className="text-[11px] text-gray-400"> · {p.date} 买入</span>}
+                    {p.date && <span className="text-meta text-gray-400"> · {p.date} 买入</span>}
                   </span>
                   <span className="flex items-center gap-2">
                     {px != null && pnl != null && (
@@ -96,19 +96,19 @@ export default function PositionsCard({ initial, prices, advice, adviceAsOf }: {
                     )}
                     {WATCH_EDITABLE && (
                       <button onClick={() => remove(p.ticker)} disabled={busy}
-                        className="text-gray-300 hover:text-red-500 text-sm px-1" title="删除这笔记录">✕</button>
+                        className="text-gray-300 hover:text-red-500 text-card px-1" title="删除这笔记录">✕</button>
                     )}
                   </span>
                 </div>
                 {a ? (
                   <div className="mt-1.5 flex items-start gap-2">
-                    <span className={`shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full ${ADVICE_STYLE[a.advice] ?? ADVICE_STYLE["持有"]}`}>
+                    <span className={`shrink-0 text-meta font-bold px-2 py-0.5 rounded-full ${ADVICE_STYLE[a.advice] ?? ADVICE_STYLE["持有"]}`}>
                       {a.advice}
                     </span>
-                    <span className="text-[12px] text-gray-500">{a.reason}</span>
+                    <span className="text-body text-gray-500">{a.reason}</span>
                   </div>
                 ) : (
-                  <div className="mt-1.5 text-[11px] text-gray-400">
+                  <div className="mt-1.5 text-meta text-gray-400">
                     ⏳ 本笔还没有 AI 建议 —— 下次「生成今日决策」时会带上
                   </div>
                 )}
@@ -116,39 +116,39 @@ export default function PositionsCard({ initial, prices, advice, adviceAsOf }: {
             );
           })}
           {adviceAsOf && advice && advice.length > 0 && (
-            <div className="text-[11px] text-gray-400 px-1">建议生成于 {adviceAsOf} · 随每日决策更新,不是实时盯盘</div>
+            <div className="text-meta text-gray-400 px-1">建议生成于 {adviceAsOf} · 随每日决策更新,不是实时盯盘</div>
           )}
         </div>
       )}
 
       {/* 记一笔表单 */}
       {open && WATCH_EDITABLE && (
-        <div className="mt-3 bg-sunken rounded-xl px-3.5 py-3 flex items-end gap-2 flex-wrap text-[13px]">
+        <div className="mt-3 bg-sunken rounded-inner px-3.5 py-3 flex items-end gap-2 flex-wrap text-body">
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] text-gray-400">代码</span>
+            <span className="text-meta text-gray-400">代码</span>
             <select value={form.ticker} onChange={e => setForm({ ...form, ticker: e.target.value })}
-              className="rounded-lg border border-gray-200 bg-surface px-2 py-1.5">
+              className="rounded-inner border border-gray-200 bg-surface px-2 py-1.5">
               {TICKERS.map(t => <option key={t}>{t}</option>)}
             </select>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] text-gray-400">数量(股)</span>
+            <span className="text-meta text-gray-400">数量(股)</span>
             <input inputMode="decimal" value={form.qty} onChange={e => setForm({ ...form, qty: e.target.value })}
-              placeholder="如 42" className="w-24 rounded-lg border border-gray-200 bg-surface px-2 py-1.5" />
+              placeholder="如 42" className="w-24 rounded-inner border border-gray-200 bg-surface px-2 py-1.5" />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] text-gray-400">成本价($)</span>
+            <span className="text-meta text-gray-400">成本价($)</span>
             <input inputMode="decimal" value={form.cost} onChange={e => setForm({ ...form, cost: e.target.value })}
-              placeholder="如 4.74" className="w-24 rounded-lg border border-gray-200 bg-surface px-2 py-1.5" />
+              placeholder="如 4.74" className="w-24 rounded-inner border border-gray-200 bg-surface px-2 py-1.5" />
           </label>
           <button onClick={save} disabled={busy}
-            className="rounded-full bg-[#007AFF] text-white font-semibold px-4 py-1.5 disabled:opacity-50 active:opacity-70">
+            className="rounded-full bg-brand text-on-solid font-semibold px-4 py-1.5 disabled:opacity-50 active:opacity-70">
             {busy ? "保存中…" : "保存"}
           </button>
-          <span className="text-[11px] text-gray-400 basis-full">
+          <span className="text-meta text-gray-400 basis-full">
             只支持 QBTS / QBTX / QBTZ(决策系统只认识它们);同代码再记 = 覆盖更新。
           </span>
-          {err && <span className="text-[12px] text-red-600 basis-full">{err}</span>}
+          {err && <span className="text-body text-red-600 basis-full">{err}</span>}
         </div>
       )}
     </section>

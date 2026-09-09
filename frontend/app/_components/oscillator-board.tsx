@@ -41,9 +41,9 @@ export function OscillatorStrip({ osc, onOpen }: { osc: Oscillators; onOpen: () 
   const ext = osc.rows.reduce((a, r) =>
     Math.min(r.pos, 1 - r.pos) < Math.min(a.pos, 1 - a.pos) ? r : a, osc.rows[0]);
   return (
-    <div className="bg-surface rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 py-2
-                    flex items-center gap-x-3 gap-y-1 flex-wrap text-[12px]">
-      <span className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider shrink-0">
+    <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 py-2
+                    flex items-center gap-x-3 gap-y-1 flex-wrap text-body">
+      <span className="text-card font-semibold text-gray-800 shrink-0">
         🌡️ 超买/超卖
       </span>
       <span className={`px-2 py-0.5 rounded-full font-bold ${STATE_CHIP[osc.state]}`}>
@@ -73,7 +73,7 @@ export function OscillatorStrip({ osc, onOpen }: { osc: Oscillators; onOpen: () 
         {osc.fired.length ? `扳机已触发:${osc.fired.join("、")}` : "无在册扳机触发"}
       </span>
       <button onClick={onOpen}
-              className="ml-auto shrink-0 text-[11px] text-brand hover:underline
+              className="ml-auto shrink-0 text-meta text-brand hover:underline
                          focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
         逐项看 ›
       </button>
@@ -86,15 +86,15 @@ function Row({ r }: { r: OscRow }) {
   return (
     <div className="py-2 border-b border-hairline last:border-0">
       <div className="flex items-baseline gap-2 flex-wrap mb-1.5">
-        <span className="text-[12px] font-medium text-gray-800">{r.name}</span>
-        <span className="font-mono text-[13px] font-semibold text-gray-900 tabular-nums">{r.value_cn}</span>
-        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${b.chip}`}>{b.label}</span>
+        <span className="text-body font-medium text-gray-800">{r.name}</span>
+        <span className="font-mono text-body font-semibold text-gray-900 tabular-nums">{r.value_cn}</span>
+        <span className={`text-meta px-1.5 py-0.5 rounded-inner font-bold ${b.chip}`}>{b.label}</span>
         {r.fired === true && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-emerald-600 text-white">
+          <span className="text-meta px-1.5 py-0.5 rounded-inner font-bold bg-emerald-600 text-on-solid">
             扳机已触发
           </span>
         )}
-        <span className="ml-auto text-[10px] text-gray-400">{r.source}</span>
+        <span className="ml-auto text-meta text-gray-400">{r.source}</span>
       </div>
       {/* 轨道:左便宜右贵。刻度线是该指标**自己的**阈值,不是统一分档 */}
       <div className="relative h-4">
@@ -104,7 +104,7 @@ function Row({ r }: { r: OscRow }) {
           <div key={m.label} className="absolute top-0 h-4 flex flex-col items-center"
                style={{ left: `${m.at * 100}%` }}>
             <div className="w-px h-2.5 bg-gray-400/70" />
-            <span className="text-[8px] text-gray-400 leading-none whitespace-nowrap
+            <span className="text-meta text-gray-400 leading-none whitespace-nowrap
                              absolute top-2.5 -translate-x-1/2 left-0">{m.label}</span>
           </div>
         ))}
@@ -113,9 +113,9 @@ function Row({ r }: { r: OscRow }) {
                          ring-2 ring-white shadow-sm ${b.dot}`}
              style={{ left: `${r.pos * 100}%` }} />
       </div>
-      <div className="mt-2.5 text-[10px] text-gray-400 leading-snug">{r.threshold_cn}</div>
+      <div className="mt-2.5 text-meta text-gray-400 leading-snug">{r.threshold_cn}</div>
       {r.hint_cn && (
-        <div className="mt-1 text-[11px] text-emerald-700 bg-emerald-50 rounded px-2 py-1 leading-snug">
+        <div className="mt-1 text-meta text-emerald-700 bg-emerald-50 rounded-inner px-2 py-1 leading-snug">
           → {r.hint_cn}
         </div>
       )}
@@ -126,41 +126,41 @@ function Row({ r }: { r: OscRow }) {
 /** 「结构」标签里的完整卡 */
 export function OscillatorBoard({ osc }: { osc: Oscillators }) {
   return (
-    <div className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+    <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
       <div className="flex items-baseline justify-between gap-2 mb-1 flex-wrap">
-        <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
+        <span className="text-section font-semibold text-gray-900">
           🌡️ 超买 / 超卖逐项
         </span>
         <span className="flex items-center gap-2">
-          <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${STATE_CHIP[osc.state]}`}>
+          <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${STATE_CHIP[osc.state]}`}>
             {osc.state_cn}
           </span>
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
+          <span className="text-meta px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
             零决策权
           </span>
         </span>
       </div>
-      <p className="text-[12px] text-ink-muted leading-relaxed">{osc.summary_cn}</p>
-      <p className={`text-[12px] leading-relaxed mb-2 font-medium ${
+      <p className="text-body text-ink-muted leading-relaxed">{osc.summary_cn}</p>
+      <p className={`text-body leading-relaxed mb-2 font-medium ${
         osc.fired.length ? "text-emerald-700" : "text-[#B45309]"}`}>
         {osc.caveat_cn}
       </p>
-      <div className="flex justify-between text-[10px] text-gray-400 mb-1">
+      <div className="flex justify-between text-meta text-gray-400 mb-1">
         <span>← 便宜(超卖)</span><span>贵(超买) →</span>
       </div>
       {osc.rows.map(r => <Row key={r.key} r={r} />)}
-      <div className="mt-3 text-[10px] text-gray-400 bg-sunken rounded-lg px-2.5 py-2 leading-relaxed">
+      <div className="mt-3 text-meta text-gray-400 bg-sunken rounded-inner px-2.5 py-2 leading-relaxed">
         ⓘ {osc.discipline_cn}
       </div>
       {/* 色觉/打印/强制配色下颜色可能失效 —— 表格视图保证信息不丢 */}
       <details className="group mt-2">
         <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden
-                            text-[11px] text-brand hover:underline">
+                            text-meta text-brand hover:underline">
           <span className="group-open:hidden">看表格版(不依赖颜色) ›</span>
           <span className="hidden group-open:inline">收起表格</span>
         </summary>
         <div className="mt-2 overflow-x-auto">
-          <table className="w-full text-[11px]">
+          <table className="w-full text-meta">
             <thead>
               <tr className="text-gray-400 text-left">
                 <th className="py-1 pr-3 font-medium">读数</th>

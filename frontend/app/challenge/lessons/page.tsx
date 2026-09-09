@@ -70,17 +70,17 @@ export default function ChallengeLessonsPage() {
       {/* ── Hero ── */}
       <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-5">
         <div className="flex items-start justify-between flex-wrap gap-2">
-          <h1 className="text-lg font-bold text-gray-900">🧠 千元挑战 · 复盘与心法</h1>
-          <Link href="/challenge" className="text-xs text-[#006FFF] hover:underline">← 返回挑战看板</Link>
+          <h1 className="text-section font-bold text-gray-900">🧠 千元挑战 · 复盘与心法</h1>
+          <Link href="/challenge" className="text-body text-[#006FFF] hover:underline">← 返回挑战看板</Link>
         </div>
-        <p className="text-sm text-[#525461] mt-2 leading-relaxed">
+        <p className="text-card text-[#525461] mt-2 leading-relaxed">
           第一期(2026-07):$1,000 → <b className="text-emerald-600">$1,106.97(+10.7%)</b>,
           2 笔交易、6 个交易日,提前 24 天达标。
           这一页把这次赢拆开:<b>哪些是可以每月照做的纪律,哪些只是运气</b> ——
           以及按同一套纪律,今天该做什么。
         </p>
         {chal && (
-          <p className="text-[11px] text-gray-400 mt-2 font-mono">
+          <p className="text-meta text-gray-400 mt-2 font-mono">
             live:状态 {chal.status} · 权益 {money(chal.equity)} · 更新于 {chal.updated_at}
           </p>
         )}
@@ -88,22 +88,22 @@ export default function ChallengeLessonsPage() {
 
       {/* ── 复盘:钱是怎么来的 ── */}
       <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4">
-        <h2 className="text-sm font-semibold text-gray-900 mb-3">复盘 · 这 +10.7% 是怎么来的</h2>
-        <ol className="space-y-2 text-sm text-[#525461]">
+        <h2 className="text-card font-semibold text-gray-900 mb-3">复盘 · 这 +10.7% 是怎么来的</h2>
+        <ol className="space-y-2 text-card text-[#525461]">
           <li className="flex gap-2">
-            <span className="shrink-0 font-mono text-[11px] text-gray-400 pt-0.5">07-01</span>
+            <span className="shrink-0 font-mono text-meta text-gray-400 pt-0.5">07-01</span>
             <span>进场 <b>LABU</b>(3× 生科多头)3 股 @ $289.90,随单挂 bracket(TP $323.23 / STOP $255.11),然后<b>什么都不做</b>。</span>
           </li>
           <li className="flex gap-2">
-            <span className="shrink-0 font-mono text-[11px] text-gray-400 pt-0.5">07-07</span>
+            <span className="shrink-0 font-mono text-meta text-gray-400 pt-0.5">07-07</span>
             <span>持有 6 天后止盈单自己成交:<b className="text-emerald-600">+$86.97</b> —— 占全部利润的 <b>81%</b>。</span>
           </li>
           <li className="flex gap-2">
-            <span className="shrink-0 font-mono text-[11px] text-gray-400 pt-0.5">07-07</span>
+            <span className="shrink-0 font-mono text-meta text-gray-400 pt-0.5">07-07</span>
             <span>按规则立刻再进 LABU;30 分钟后权益摸到 +$100 赢线,<b className="text-emerald-600">+$20</b> 全清收手。🏆</span>
           </li>
         </ol>
-        <div className="mt-4 text-[13px] bg-amber-50 border border-amber-200 rounded-md px-3 py-2.5 text-amber-800 leading-relaxed">
+        <div className="mt-4 text-body bg-amber-50 border border-amber-200 rounded-md px-3 py-2.5 text-amber-800 leading-relaxed">
           ⚠️ <b>不可复制的部分(诚实账):</b>挑战期恰逢 LABU 史诗级行情
           {typeof pickEtf?.mom20 === "number" && pickEtf.ticker === "LABU"
             ? <>(至今 20 日动量 <b>{pct(pickEtf.mom20)}</b>)</>
@@ -116,13 +116,13 @@ export default function ChallengeLessonsPage() {
 
       {/* ── 六条可复制的纪律 ── */}
       <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4">
-        <h2 className="text-sm font-semibold text-gray-900 mb-3">可以复制的六条纪律</h2>
+        <h2 className="text-card font-semibold text-gray-900 mb-3">可以复制的六条纪律</h2>
         <div className="grid sm:grid-cols-2 gap-3">
           {RULES.map(r => (
             <div key={r.title} className="rounded-lg border border-[#EDEDF0] bg-[#FAFAFB] px-4 py-3">
-              <div className="text-sm font-semibold text-gray-900">{r.icon} {r.title}</div>
-              <div className="text-[13px] text-gray-700 mt-1">{r.rule}</div>
-              <div className="text-[12px] text-[#8A8A8E] mt-1.5 leading-relaxed">{r.why}</div>
+              <div className="text-card font-semibold text-gray-900">{r.icon} {r.title}</div>
+              <div className="text-body text-gray-700 mt-1">{r.rule}</div>
+              <div className="text-body text-[#8A8A8E] mt-1.5 leading-relaxed">{r.why}</div>
             </div>
           ))}
         </div>
@@ -131,30 +131,30 @@ export default function ChallengeLessonsPage() {
       {/* ── 今日照做面板 ── */}
       <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4">
         <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
-          <h2 className="text-sm font-semibold text-gray-900">今日照做 · 同一套纪律现在怎么看</h2>
-          {basket?.as_of && <span className="text-[11px] text-gray-400 font-mono">数据截至 {basket.as_of} · 每日发布刷新</span>}
+          <h2 className="text-card font-semibold text-gray-900">今日照做 · 同一套纪律现在怎么看</h2>
+          {basket?.as_of && <span className="text-meta text-gray-400 font-mono">数据截至 {basket.as_of} · 每日发布刷新</span>}
         </div>
 
         {!loaded ? (
-          <p className="text-sm text-[#525461]">加载中…</p>
+          <p className="text-card text-[#525461]">加载中…</p>
         ) : !basket ? (
-          <p className="text-sm text-[#525461]">篮子读数还没随每日发布生成 —— 下次 09:00 ET publish 后这里会亮起来。</p>
+          <p className="text-card text-[#525461]">篮子读数还没随每日发布生成 —— 下次 09:00 ET publish 后这里会亮起来。</p>
         ) : (
           <>
             <EtfTable rows={basket.etfs} pick={basket.pick} />
 
             {basket.pick && pickEtf ? (
-              <div className="mt-3 rounded-md bg-emerald-50 border border-emerald-200 px-3 py-2.5 text-[13px] text-emerald-800">
+              <div className="mt-3 rounded-md bg-emerald-50 border border-emerald-200 px-3 py-2.5 text-body text-emerald-800">
                 按第一期同款纪律,今天合格 {basket.n_qualified} 只,之选 <b>{basket.pick}</b>:
                 进场参考 ≈ {money(pickEtf.close)},随单挂 TP <b>{money(pickEtf.tp)}</b>(+10%)
                 / STOP <b>{money(pickEtf.stop)}</b>(−12%),权益 +$100 收手、−15% 停手。
               </div>
             ) : (
-              <div className="mt-3 rounded-md bg-[#F6F6F8] border border-[#EDEDF0] px-3 py-2.5 text-[13px] text-[#525461]">
+              <div className="mt-3 rounded-md bg-[#F6F6F8] border border-[#EDEDF0] px-3 py-2.5 text-body text-[#525461]">
                 今天<b>没有合格标的</b> —— 按纪律应该空仓等待。不硬凑单,这也是这套打法的一部分。
               </div>
             )}
-            <p className="text-[11px] text-gray-400 mt-2">{basket.note}</p>
+            <p className="text-meta text-gray-400 mt-2">{basket.note}</p>
           </>
         )}
       </section>
@@ -163,8 +163,8 @@ export default function ChallengeLessonsPage() {
       {basket?.market && (
         <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4">
           <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
-            <h2 className="text-sm font-semibold text-gray-900">全场扫描 · 同一套门槛看整个杠杆 ETF 宇宙</h2>
-            <span className="text-[11px] text-gray-400 font-mono">
+            <h2 className="text-card font-semibold text-gray-900">全场扫描 · 同一套门槛看整个杠杆 ETF 宇宙</h2>
+            <span className="text-meta text-gray-400 font-mono">
               扫 {basket.market.n_scanned} 只 · 合格 {basket.market.n_qualified} 只
             </span>
           </div>
@@ -175,7 +175,7 @@ export default function ChallengeLessonsPage() {
               {(() => {
                 const mp = basket.market.top.find(e => e.ticker === basket.market!.pick);
                 return mp ? (
-                  <div className="mt-3 rounded-md bg-blue-50 border border-blue-200 px-3 py-2.5 text-[13px] text-blue-800">
+                  <div className="mt-3 rounded-md bg-blue-50 border border-blue-200 px-3 py-2.5 text-body text-blue-800">
                     全场动量之王 <b>{mp.ticker}</b>{mp.label ? `(${mp.label})` : ""}:
                     进场参考 ≈ {money(mp.close)},TP <b>{money(mp.tp)}</b> / STOP <b>{money(mp.stop)}</b>。
                     合格名单本身也是<b>轮动地图</b> —— 哪些板块站上 50 日线,钱就在往哪儿去。
@@ -184,11 +184,11 @@ export default function ChallengeLessonsPage() {
               })()}
             </>
           ) : (
-            <div className="rounded-md bg-[#F6F6F8] border border-[#EDEDF0] px-3 py-2.5 text-[13px] text-[#525461]">
+            <div className="rounded-md bg-[#F6F6F8] border border-[#EDEDF0] px-3 py-2.5 text-body text-[#525461]">
               全场 {basket.market.n_scanned} 只里今天<b>零合格</b> —— 大盘级别的逆风,按纪律这个月看戏。
             </div>
           )}
-          <div className="mt-2.5 text-[12px] bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-amber-800 leading-relaxed">
+          <div className="mt-2.5 text-body bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-amber-800 leading-relaxed">
             ⚠️ {basket.market.note} 挑战 bot 本身仍只交易 4 只篮子。
           </div>
         </section>
@@ -198,23 +198,23 @@ export default function ChallengeLessonsPage() {
       {rot && (
         <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4">
           <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
-            <h2 className="text-sm font-semibold text-gray-900">🧭 板块轮动地图 · 钱正在往哪儿去</h2>
-            <span className="text-[11px] text-gray-400 font-mono">vs {rot.benchmark} · 截至 {rot.as_of}</span>
+            <h2 className="text-card font-semibold text-gray-900">🧭 板块轮动地图 · 钱正在往哪儿去</h2>
+            <span className="text-meta text-gray-400 font-mono">vs {rot.benchmark} · 截至 {rot.as_of}</span>
           </div>
-          <p className="text-[12px] text-[#8A8A8E] mb-2 leading-relaxed">
+          <p className="text-body text-[#8A8A8E] mb-2 leading-relaxed">
             每条尾巴是一个板块最近 8 周的轨迹,箭头指向最新;顺时针轮回:
             转强↖ → 领涨↗ → 转弱↘ → 落后↙。挑战纪律「只押顺风」翻译到这张图上就是:
             <b className="text-gray-700">只碰右上,盯着左上找下一个</b>。⚛️ 量子板块带虚线光环。
           </p>
           <RotationMap data={rot} />
-          <p className="text-[11px] text-gray-400 mt-2">{rot.note} · 每日发布刷新 · 非投资建议</p>
+          <p className="text-meta text-gray-400 mt-2">{rot.note} · 每日发布刷新 · 非投资建议</p>
         </section>
       )}
 
       {/* ── 诚实的数学 ── */}
       <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4">
-        <h2 className="text-sm font-semibold text-gray-900 mb-3">诚实的数学 · 这个游戏的期望值</h2>
-        <div className="grid sm:grid-cols-2 gap-3 text-[13px]">
+        <h2 className="text-card font-semibold text-gray-900 mb-3">诚实的数学 · 这个游戏的期望值</h2>
+        <div className="grid sm:grid-cols-2 gap-3 text-body">
           <div className="rounded-lg border border-[#EDEDF0] px-4 py-3">
             <div className="font-semibold text-gray-900 mb-1">🧚 童话版(不会发生)</div>
             <p className="text-[#525461] leading-relaxed">
@@ -231,7 +231,7 @@ export default function ChallengeLessonsPage() {
             </p>
           </div>
         </div>
-        <p className="text-[13px] text-[#525461] mt-3 leading-relaxed">
+        <p className="text-body text-[#525461] mt-3 leading-relaxed">
           结论:这套打法的<b>数学优势很薄</b>。它真正值钱的是两样东西:
           ①亏损有上限的生存结构(地板 + bracket),②不靠盯盘和意志力的执行纪律。
           想让 edge 变厚,路径只有一条:<b>多做几期攒样本</b>,证实(或证伪)那个 60%,
@@ -241,8 +241,8 @@ export default function ChallengeLessonsPage() {
 
       {/* ── 下一步 ── */}
       <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4">
-        <h2 className="text-sm font-semibold text-gray-900 mb-2">下一步 · 如果想让它替你赚真钱</h2>
-        <ol className="list-decimal list-inside space-y-1.5 text-[13px] text-[#525461] leading-relaxed">
+        <h2 className="text-card font-semibold text-gray-900 mb-2">下一步 · 如果想让它替你赚真钱</h2>
+        <ol className="list-decimal list-inside space-y-1.5 text-body text-[#525461] leading-relaxed">
           <li>先跑<b>挑战 #2、#3(纸面)</b>攒样本:n=2 → n≥10,才知道 60% 赔率是真是假。</li>
           <li>要上真钱:从 <b>$100–200</b> 起步,永远 ≤ 总资产 10%(军规⓪),
               规则<b>一字不改</b>照做 —— 改了规则,就是另一个没验证过的系统。</li>
@@ -250,7 +250,7 @@ export default function ChallengeLessonsPage() {
         </ol>
       </section>
 
-      <div className="text-center text-[10px] text-gray-400">
+      <div className="text-center text-meta text-gray-400">
         纸面模拟复盘 · 今日面板为机械读数,不构成投资建议
       </div>
     </main>
@@ -264,9 +264,9 @@ function EtfTable({ rows, pick, showLabel }: {
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-[13px]">
+      <table className="w-full text-body">
         <thead>
-          <tr className="text-left text-[11px] uppercase tracking-wider text-gray-500 border-b border-[#EDEDF0]">
+          <tr className="text-left text-meta uppercase tracking-wider text-gray-500 border-b border-[#EDEDF0]">
             <th className="py-1.5 pr-3">标的</th>
             {showLabel && <th className="py-1.5 pr-3">板块</th>}
             <th className="py-1.5 pr-3">收盘</th>
@@ -283,9 +283,9 @@ function EtfTable({ rows, pick, showLabel }: {
               <tr key={e.ticker}
                   className={`border-b border-[#F4F4F6] last:border-0 ${isPick ? "bg-emerald-50/60" : ""}`}>
                 <td className="py-2 pr-3 font-mono font-semibold text-gray-900">
-                  {e.ticker}{isPick && <span className="ml-1.5 text-[10px] text-emerald-600 font-sans font-medium">之选</span>}
+                  {e.ticker}{isPick && <span className="ml-1.5 text-meta text-emerald-600 font-sans font-medium">之选</span>}
                 </td>
-                {showLabel && <td className="py-2 pr-3 text-gray-500 text-[12px] whitespace-nowrap">{e.label || "—"}</td>}
+                {showLabel && <td className="py-2 pr-3 text-gray-500 text-body whitespace-nowrap">{e.label || "—"}</td>}
                 {e.error ? (
                   <td colSpan={5} className="py-2 text-gray-400">{e.error}</td>
                 ) : (

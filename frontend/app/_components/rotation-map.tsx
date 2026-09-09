@@ -171,7 +171,7 @@ export function RotationMap({ data }: { data: SectorRotation }) {
         const q = QUAD[(hovered.quadrant as QuadKey) ?? "lagging"] ?? QUAD.lagging;
         const left = (sx(hovered.x) / W) * 100, top = (sy(hovered.y) / H) * 100;
         return (
-          <div className="absolute z-10 pointer-events-none rounded-lg border border-hairline bg-surface shadow-lg px-3 py-2 text-[12px] leading-relaxed"
+          <div className="absolute z-10 pointer-events-none rounded-inner border border-hairline bg-surface shadow-lg px-3 py-2 text-body leading-relaxed"
                style={{ left: `${left}%`, top: `${top}%`,
                         transform: `translate(${left > 72 ? "-105%" : "8px"}, ${top > 75 ? "-115%" : "-40%"})` }}>
             <div className="font-semibold text-gray-900">{hovered.emoji} {hovered.label} <span className="font-mono text-gray-500">{hovered.ticker}</span></div>
@@ -187,7 +187,7 @@ export function RotationMap({ data }: { data: SectorRotation }) {
       {/* 图例(色点 + 墨字) */}
       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
         {(Object.keys(QUAD) as QuadKey[]).map(q => (
-          <span key={q} className="inline-flex items-center gap-1.5 text-[12px] text-[#52514e]">
+          <span key={q} className="inline-flex items-center gap-1.5 text-body text-[#52514e]">
             <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: QUAD[q].color }} />
             {QUAD[q].label}{QUAD[q].glyph}<span className="text-gray-400">{QUAD[q].hint}</span>
           </span>
@@ -200,7 +200,7 @@ export function RotationMap({ data }: { data: SectorRotation }) {
           const members = data.sectors.filter(s => (s.quadrant ?? "lagging") === q);
           if (members.length === 0) return null;
           return (
-            <div key={q} className="text-[12px] leading-relaxed">
+            <div key={q} className="text-body leading-relaxed">
               <span className="font-semibold" style={{ color: QUAD[q].color }}>
                 {QUAD[q].label}{QUAD[q].glyph}
               </span>
@@ -214,10 +214,10 @@ export function RotationMap({ data }: { data: SectorRotation }) {
 
       {/* 数据表(可及性兜底) */}
       <details className="mt-2">
-        <summary className="text-[11px] text-gray-400 cursor-pointer hover:text-gray-600">数据表</summary>
+        <summary className="text-meta text-gray-400 cursor-pointer hover:text-gray-600">数据表</summary>
         <div className="overflow-x-auto mt-1">
-          <table className="text-[12px] w-full">
-            <thead><tr className="text-left text-[10px] uppercase tracking-wider text-gray-500 border-b border-hairline">
+          <table className="text-body w-full">
+            <thead><tr className="text-left text-meta text-gray-500 border-b border-hairline">
               <th className="py-1 pr-3">板块</th><th className="py-1 pr-3">象限</th>
               <th className="py-1 pr-3">相对强度</th><th className="py-1 pr-3">相对动量</th><th className="py-1">20日</th>
             </tr></thead>

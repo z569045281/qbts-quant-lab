@@ -110,7 +110,7 @@ export function NavBar() {
             the bottom bar); on md+ the full tab row shows here. ── */}
       <header className="bg-gradient-to-r from-[#0F1B2E] via-[#1A2942] to-[#0F1B2E] border-b border-blue-900/40">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-2.5 sm:py-3 flex items-center gap-3 sm:gap-6">
-          <div className="font-bold text-white text-sm tracking-wide shrink-0 whitespace-nowrap">
+          <div className="font-bold text-white text-card tracking-wide shrink-0 whitespace-nowrap">
             QBTS <span className="text-[#3B82F6]">Quant Lab</span>
           </div>
           <nav className="hidden md:flex flex-wrap gap-1">
@@ -118,17 +118,17 @@ export function NavBar() {
               const active = isActive(path, t.href);
               return (
                 <Link key={t.href} href={t.href}
-                      className={`whitespace-nowrap px-3.5 py-1.5 rounded-md text-sm font-medium transition-all
+                      className={`whitespace-nowrap px-3.5 py-1.5 rounded-inner text-card font-medium transition-all
                         ${active
-                          ? "bg-brand text-white shadow-md shadow-blue-500/30"
-                          : "text-blue-100 hover:bg-white/10"}`}>
+                          ? "bg-brand text-on-solid shadow-md shadow-blue-500/30"
+                          : "text-on-navy hover:bg-white/10"}`}>
                   {t.label}
                 </Link>
               );
             })}
           </nav>
           <div className="ml-auto flex items-center gap-3">
-            <span className="hidden lg:block text-xs text-blue-200/60 font-mono shrink-0">QBTS · D-Wave Quantum Inc.</span>
+            <span className="hidden lg:block text-body text-on-navy/60 font-mono shrink-0">QBTS · D-Wave Quantum Inc.</span>
             <ThemeToggle />
           </div>
         </div>
@@ -151,7 +151,7 @@ export function NavBar() {
                     className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors active:opacity-50
                       ${active ? "text-brand" : "text-[#8A8A8E]"}`}>
                 <t.Icon />
-                <span className="text-[10px] font-medium leading-none tracking-wide">{t.short}</span>
+                <span className="text-meta font-medium leading-none tracking-wide">{t.short}</span>
               </Link>
             );
           })}

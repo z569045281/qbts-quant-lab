@@ -74,28 +74,28 @@ export function DcaCalculator({
   }
 
   return (
-    <section className="bg-surface rounded-2xl border border-hairline p-5 shadow-sm space-y-4">
+    <section className="bg-surface rounded-card border border-hairline p-5 shadow-sm space-y-4">
       <div className="flex items-center gap-2">
-        <span className="text-base">💰</span>
-        <span className="text-sm font-semibold text-gray-800">定投计算器 · 复利希望机</span>
-        <span className="ml-auto text-[10px] text-gray-400">数据存在本机浏览器</span>
+        <span className="text-section">💰</span>
+        <span className="text-card font-semibold text-gray-800">定投计算器 · 复利希望机</span>
+        <span className="ml-auto text-meta text-gray-400">数据存在本机浏览器</span>
       </div>
 
       {/* 输入本次金额 */}
       <div className="flex items-end gap-2 flex-wrap">
         <label className="flex flex-col gap-1">
-          <span className="text-[11px] text-gray-500">本次要定投多少钱($)</span>
+          <span className="text-meta text-gray-500">本次要定投多少钱($)</span>
           <input
             type="number" inputMode="decimal" min={0} placeholder="例如 500"
             value={amount} onChange={e => setAmount(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") addOne(); }}
-            className="w-36 px-3 py-2 rounded-lg border border-gray-300 font-mono text-sm
+            className="w-36 px-3 py-2 rounded-inner border border-gray-300 font-mono text-card
                        focus:outline-none focus:ring-2 focus:ring-brand/40"
           />
         </label>
         <button
           onClick={addOne} disabled={amt <= 0}
-          className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold
+          className="px-4 py-2 rounded-inner bg-brand text-on-solid text-card font-semibold
                      disabled:opacity-40 hover:bg-[#0060DB] transition-colors"
         >
           记一笔 ✓
@@ -104,18 +104,18 @@ export function DcaCalculator({
 
       {/* 本次拆分到每只 ETF */}
       {amt > 0 && split.length > 0 && (
-        <div className="rounded-xl border border-black/5 bg-gray-50/60 p-3">
-          <div className="text-[11px] text-gray-500 mb-1.5">这笔 {usd(amt)} 按建议权重应该这样买:</div>
+        <div className="rounded-inner border border-black/5 bg-gray-50/60 p-3">
+          <div className="text-meta text-gray-500 mb-1.5">这笔 {usd(amt)} 按建议权重应该这样买:</div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {split.map(s => (
-              <div key={s.t} className="bg-surface rounded-lg px-2.5 py-2 border border-black/5">
+              <div key={s.t} className="bg-surface rounded-inner px-2.5 py-2 border border-black/5">
                 <div className="flex items-center gap-1">
-                  <span className="text-sm font-bold text-gray-900">{s.t}</span>
-                  <span className="text-[10px] text-gray-400">{s.w}%</span>
+                  <span className="text-card font-bold text-gray-900">{s.t}</span>
+                  <span className="text-meta text-gray-400">{s.w}%</span>
                 </div>
-                <div className="font-mono font-semibold text-brand text-sm">{usd(s.money)}</div>
+                <div className="font-mono font-semibold text-brand text-card">{usd(s.money)}</div>
                 {s.shares != null && (
-                  <div className="text-[10px] text-gray-400 font-mono">≈{s.shares.toFixed(2)} 股 @${s.price!.toFixed(0)}</div>
+                  <div className="text-meta text-gray-400 font-mono">≈{s.shares.toFixed(2)} 股 @${s.price!.toFixed(0)}</div>
                 )}
               </div>
             ))}
@@ -124,18 +124,18 @@ export function DcaCalculator({
       )}
 
       {/* 累计 + 复利投影 */}
-      <div className="rounded-xl bg-gradient-to-br from-blue-50 to-emerald-50 border border-blue-100 p-4">
+      <div className="rounded-inner bg-gradient-to-br from-blue-50 to-emerald-50 border border-blue-100 p-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
           <div>
-            <div className="text-[11px] text-gray-500">累计已投入({list.length} 笔)</div>
-            <div className="text-2xl font-bold text-gray-900 font-mono">{usd(totalInvested)}</div>
+            <div className="text-meta text-gray-500">累计已投入({list.length} 笔)</div>
+            <div className="text-price font-bold text-gray-900 font-mono">{usd(totalInvested)}</div>
           </div>
-          <label className="flex items-center gap-1.5 text-[11px] text-gray-500">
+          <label className="flex items-center gap-1.5 text-meta text-gray-500">
             假设年化
             <input
               type="number" inputMode="decimal" value={rate}
               onChange={e => setRate(e.target.value)}
-              className="w-14 px-2 py-1 rounded border border-gray-300 font-mono text-sm text-center
+              className="w-14 px-2 py-1 rounded-inner border border-gray-300 font-mono text-card text-center
                          focus:outline-none focus:ring-2 focus:ring-brand/40"
             />
             %
@@ -147,18 +147,18 @@ export function DcaCalculator({
             {horizons.map(y => {
               const v = fv(y);
               return (
-                <div key={y} className="bg-surface/80 rounded-lg px-2 py-2.5 text-center">
-                  <div className="text-[11px] text-gray-500">{y} 年后</div>
-                  <div className="text-base font-bold text-emerald-600 font-mono leading-tight">{usd(v)}</div>
-                  <div className="text-[10px] text-gray-400 font-mono">×{(v / totalInvested).toFixed(1)}</div>
+                <div key={y} className="bg-surface/80 rounded-inner px-2 py-2.5 text-center">
+                  <div className="text-meta text-gray-500">{y} 年后</div>
+                  <div className="text-section font-bold text-emerald-600 font-mono leading-tight">{usd(v)}</div>
+                  <div className="text-meta text-gray-400 font-mono">×{(v / totalInvested).toFixed(1)}</div>
                 </div>
               );
             })}
           </div>
         ) : (
-          <p className="mt-2 text-[11px] text-gray-400">记一笔、并填个年化%,这里就会显示复利后的样子。</p>
+          <p className="mt-2 text-meta text-gray-400">记一笔、并填个年化%,这里就会显示复利后的样子。</p>
         )}
-        <p className="mt-2.5 text-[10px] text-gray-400 leading-relaxed">
+        <p className="mt-2.5 text-meta text-gray-400 leading-relaxed">
           按【已投入总额】从今天起复利 {rate || "?"}% 计算(未含你以后还会继续投的钱——那是额外的希望)。
           这只是数学外推、不是承诺:真实市场会大起大落,7% 是全球股票长期名义回报的保守参考。
         </p>
@@ -166,7 +166,7 @@ export function DcaCalculator({
 
       {/* 历史记录 */}
       {list.length > 0 && (
-        <details className="text-[12px]">
+        <details className="text-body">
           <summary className="cursor-pointer text-gray-500 select-none">定投记录({list.length} 笔) ▾</summary>
           <ul className="mt-2 space-y-1">
             {[...list].reverse().map((c, i) => {
@@ -176,7 +176,7 @@ export function DcaCalculator({
                   <span className="font-mono text-gray-400">{c.date}</span>
                   <span className="font-mono font-semibold text-gray-800">{usd(c.amount)}</span>
                   <button onClick={() => removeAt(realIdx)}
-                    className="ml-auto text-[11px] text-gray-300 hover:text-red-500 transition-colors">删除</button>
+                    className="ml-auto text-meta text-gray-300 hover:text-red-500 transition-colors">删除</button>
                 </li>
               );
             })}

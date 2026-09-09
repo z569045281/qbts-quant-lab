@@ -144,11 +144,11 @@ const logPrefix: Record<string, string> = {
 /* Metric badges — dark text for white card backgrounds */
 function WinBadge({ v }: { v: number }) {
   const c = v > 0.55 ? "text-emerald-600" : v > 0.45 ? "text-amber-500" : "text-red-500";
-  return <span className={`font-mono font-semibold text-xs ${c}`}>{fmt(v, true)}</span>;
+  return <span className={`font-mono font-semibold text-body ${c}`}>{fmt(v, true)}</span>;
 }
 function DDBadge({ v }: { v: number }) {
   const c = v > -0.2 ? "text-emerald-600" : v > -0.4 ? "text-amber-500" : "text-red-500";
-  return <span className={`font-mono font-semibold text-xs ${c}`}>{fmt(v, true)}</span>;
+  return <span className={`font-mono font-semibold text-body ${c}`}>{fmt(v, true)}</span>;
 }
 
 /* IC decay sparkline — blue positive, red negative, light baseline */
@@ -156,7 +156,7 @@ function IcSparkline({ decay }: { decay: Record<string, number> }) {
   const vals = Object.entries(decay)
     .sort((a, b) => +a[0] - +b[0])
     .map(([, v]) => v);
-  if (!vals.length) return <span className="text-gray-300 text-xs">—</span>;
+  if (!vals.length) return <span className="text-gray-300 text-body">—</span>;
   const W = 56, H = 18, peak = Math.max(...vals.map(Math.abs), 0.05);
   const bw = Math.floor(W / vals.length) - 1;
   return (
@@ -310,8 +310,8 @@ function FactorChart({ factorId, factorName, onClose }: {
       {/* Chart header */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-hairline">
         <div>
-          <span className="font-semibold text-gray-900 text-sm">{factorName}</span>
-          <span className="ml-3 text-xs text-ink-muted">
+          <span className="font-semibold text-gray-900 text-card">{factorName}</span>
+          <span className="ml-3 text-body text-ink-muted">
             黄色虚线 = IS/OOS 分割点 &nbsp;·&nbsp;
             <span className="text-brand font-medium">▲ 蓝色 = 买入</span>
             &nbsp;·&nbsp;
@@ -320,7 +320,7 @@ function FactorChart({ factorId, factorName, onClose }: {
         </div>
         <button
           onClick={onClose}
-          className="text-ink-muted hover:text-gray-900 text-lg leading-none px-2 transition-colors"
+          className="text-ink-muted hover:text-gray-900 text-section leading-none px-2 transition-colors"
         >
           ✕
         </button>
@@ -330,11 +330,11 @@ function FactorChart({ factorId, factorName, onClose }: {
       <div className="relative">
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-surface/80 z-10">
-            <span className="text-sm text-ink-muted">加载图表数据...</span>
+            <span className="text-card text-ink-muted">加载图表数据...</span>
           </div>
         )}
         {error && (
-          <div className="py-16 text-center text-down text-sm">{error}</div>
+          <div className="py-16 text-center text-down text-card">{error}</div>
         )}
         <div ref={containerRef} className="w-full" />
       </div>
@@ -345,7 +345,7 @@ function FactorChart({ factorId, factorName, onClose }: {
 /* Reusable card shell */
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-surface rounded-xl border border-hairline shadow-sm ${className}`}>
+    <div className={`bg-surface rounded-inner border border-hairline shadow-sm ${className}`}>
       {children}
     </div>
   );
@@ -355,7 +355,7 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
 function CardHeader({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   return (
     <div className="px-5 py-3.5 border-b border-hairline flex items-center justify-between">
-      <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">{children}</span>
+      <span className="text-section font-semibold text-gray-900">{children}</span>
       {right && <div className="flex items-center gap-2">{right}</div>}
     </div>
   );
@@ -384,7 +384,7 @@ function TodaySignalsPanel() {
   if (!data) {
     return (
       <Card className="px-5 py-5">
-        <div className="text-sm text-ink-muted">
+        <div className="text-card text-ink-muted">
           {loading ? "正在拉取今日信号..." : "无数据 — 先在下方挖矿生成因子"}
         </div>
       </Card>
@@ -401,13 +401,13 @@ function TodaySignalsPanel() {
       <CardHeader
         right={
           <>
-            <span className="text-xs text-gray-400">
+            <span className="text-body text-gray-400">
               基准价 ${data.close?.toFixed(2) ?? "—"} · 截至 {data.as_of?.slice(0, 10) ?? "—"}
             </span>
             <button
               onClick={refresh}
               disabled={loading}
-              className="px-2.5 py-1 text-xs text-brand hover:bg-blue-50 rounded transition-colors disabled:opacity-50"
+              className="px-2.5 py-1 text-body text-brand hover:bg-blue-50 rounded-inner transition-colors disabled:opacity-50"
             >
               {loading ? "刷新中…" : "刷新"}
             </button>
@@ -419,8 +419,8 @@ function TodaySignalsPanel() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5 p-5">
         {/* Big ensemble verdict */}
-        <div className={`rounded-xl border-2 ${ensColor} p-5 flex flex-col items-center justify-center text-center`}>
-          <div className="text-xs uppercase tracking-widest opacity-75 mb-2">综合判定</div>
+        <div className={`rounded-inner border-2 ${ensColor} p-5 flex flex-col items-center justify-center text-center`}>
+          <div className="text-meta opacity-75 mb-2">综合判定</div>
           <div className="text-5xl font-bold mb-2">
             {ens?.label === "BUY"  ? "↗ 多" :
              ens?.label === "SELL" ? "↘ 空" :
@@ -428,10 +428,10 @@ function TodaySignalsPanel() {
           </div>
           {ens && (
             <>
-              <div className="text-xs font-mono opacity-75">
+              <div className="text-body font-mono opacity-75">
                 混合强度 {ens.raw_blend > 0 ? "+" : ""}{(ens.raw_blend * 100).toFixed(0)}%
               </div>
-              <div className="mt-3 flex gap-3 text-xs">
+              <div className="mt-3 flex gap-3 text-body">
                 <span className="text-emerald-700">▲{ens.n_buy}</span>
                 <span className="text-gray-500">●{ens.n_hold}</span>
                 <span className="text-down">▼{ens.n_sell}</span>
@@ -443,27 +443,27 @@ function TodaySignalsPanel() {
         {/* Per-factor cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
           {data.factors.length === 0 ? (
-            <div className="col-span-full text-sm text-ink-muted">无可用因子</div>
+            <div className="col-span-full text-card text-ink-muted">无可用因子</div>
           ) : data.factors.map(f => {
             const sigColor = f.signal === 1   ? "text-emerald-600 border-emerald-200 bg-emerald-50"
                            : f.signal === -1  ? "text-down   border-red-200      bg-red-50"
                            : f.label === "ERROR" ? "text-down border-red-200    bg-red-50"
                            :                     "text-ink-muted   border-hairline   bg-sunken";
             return (
-              <div key={f.id} className={`rounded-lg border ${sigColor} px-3 py-2.5`}>
+              <div key={f.id} className={`rounded-inner border ${sigColor} px-3 py-2.5`}>
                 <div className="flex items-start justify-between mb-1.5">
-                  <div className="text-xs font-medium text-gray-900 truncate flex-1" title={f.name}>
+                  <div className="text-body font-medium text-gray-900 truncate flex-1" title={f.name}>
                     {f.name.length > 26 ? f.name.slice(0, 26) + "…" : f.name}
                   </div>
                   {f.type === "ml" && (
-                    <span className="ml-1.5 shrink-0 px-1 py-0.5 text-[9px] font-bold rounded bg-violet-100 text-violet-700">ML</span>
+                    <span className="ml-1.5 shrink-0 px-1 py-0.5 text-meta font-bold rounded-inner bg-violet-100 text-violet-700">ML</span>
                   )}
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-lg font-bold">
+                  <span className="text-section font-bold">
                     {f.signal === 1 ? "↗ 多" : f.signal === -1 ? "↘ 空" : f.label === "ERROR" ? "⚠" : "—"}
                   </span>
-                  <div className="text-right text-[10px] font-mono text-gray-500">
+                  <div className="text-right text-meta font-mono text-gray-500">
                     <div>S {f.oos_sharpe.toFixed(1)}</div>
                     <div>权重 {((f.weight ?? 0) * 100).toFixed(0)}%</div>
                   </div>
@@ -487,7 +487,7 @@ export default function MinePage() {
   useEffect(() => { if (READONLY) router.replace("/"); }, [router]);
   if (READONLY) {
     return (
-      <main className="max-w-[1600px] mx-auto px-6 py-16 text-center text-sm text-ink-muted">
+      <main className="max-w-[1600px] mx-auto px-6 py-16 text-center text-card text-ink-muted">
         因子挖矿控制台仅在本地可用，正在跳转到决策仪表盘…
       </main>
     );
@@ -614,7 +614,7 @@ function MineConsole() {
     return (
       <th
         onClick={() => toggleSort(k)}
-        className={`px-3 py-3 text-right text-xs font-medium cursor-pointer select-none transition-colors
+        className={`px-3 py-3 text-right text-body font-medium cursor-pointer select-none transition-colors
           ${active
             ? accent ? "text-brand" : "text-gray-900"
             : "text-ink-muted hover:text-gray-700"}`}
@@ -725,12 +725,12 @@ function MineConsole() {
     <div className="min-h-screen bg-sunken font-sans">
 
       {/* ── Top nav ── */}
-      <header className="bg-brand text-white px-6 py-0 flex items-center h-14 shadow-md">
+      <header className="bg-brand text-on-solid px-6 py-0 flex items-center h-14 shadow-md">
         <div className="max-w-6xl w-full mx-auto flex items-center gap-4">
-          <span className="font-bold text-base tracking-tight">QBTS Factor Miner</span>
+          <span className="font-bold text-section tracking-tight">QBTS Factor Miner</span>
           <span className="h-4 w-px bg-white/20" />
-          <span className="text-xs text-blue-200">Autonomous AI Quant Lab · Walk-Forward OOS · IC/ICIR · Ensemble</span>
-          <div className="ml-auto flex items-center gap-2 text-xs">
+          <span className="text-body text-on-navy/80">Autonomous AI Quant Lab · Walk-Forward OOS · IC/ICIR · Ensemble</span>
+          <div className="ml-auto flex items-center gap-2 text-body">
             {mining && (
               <span className="flex items-center gap-1.5 bg-white/10 rounded-full px-3 py-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
@@ -753,8 +753,8 @@ function MineConsole() {
               { label: "运行时长",      val: fmtElapsed(elapsed), unit: "", blue: false, pulse: mining },
             ].map(({ label, val, unit, blue, pulse }) => (
               <Card key={label} className="px-5 py-4 text-center">
-                <p className="text-xs text-ink-muted mb-1">{label}</p>
-                <p className={`font-bold text-xl ${blue ? "text-brand" : pulse ? "text-amber-500" : "text-gray-900"} ${pulse ? "animate-pulse" : ""}`}>
+                <p className="text-body text-ink-muted mb-1">{label}</p>
+                <p className={`font-bold text-section ${blue ? "text-brand" : pulse ? "text-amber-500" : "text-gray-900"} ${pulse ? "animate-pulse" : ""}`}>
                   {val}{unit}
                 </p>
               </Card>
@@ -767,22 +767,22 @@ function MineConsole() {
           <div className="flex items-center gap-4 flex-wrap">
             {/* Rounds input */}
             <div className="flex items-center gap-2">
-              <label className="text-sm text-ink-muted">挖矿轮数</label>
+              <label className="text-card text-ink-muted">挖矿轮数</label>
               <input
                 type="number" min={1} max={50} value={rounds}
                 onChange={e => setRounds(Math.max(1, Math.min(50, +e.target.value)))}
                 disabled={mining}
-                className="w-16 border border-hairline rounded-lg px-2.5 py-1.5 text-sm text-center
+                className="w-16 border border-hairline rounded-inner px-2.5 py-1.5 text-card text-center
                            text-gray-900 bg-surface focus:outline-none focus:ring-2 focus:ring-brand/30
                            focus:border-brand disabled:opacity-40 disabled:bg-gray-50 transition"
               />
-              <span className="text-xs text-gray-400">/ 50</span>
+              <span className="text-body text-gray-400">/ 50</span>
             </div>
 
             {/* Auto-loop toggle */}
             <button
               onClick={() => setAutoLoop(v => !v)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all
+              className={`flex items-center gap-2 px-4 py-2 rounded-inner border text-card font-medium transition-all
                 ${autoLoop
                   ? "border-amber-300 bg-amber-50 text-amber-700"
                   : "border-hairline bg-surface text-ink-muted hover:border-gray-300 hover:text-gray-700"}`}
@@ -798,7 +798,7 @@ function MineConsole() {
                 onClick={handleReset}
                 disabled={mining}
                 title="清空排行榜，重置所有状态"
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg font-medium text-sm
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-inner font-medium text-card
                   border border-hairline bg-surface text-ink-muted hover:text-down
                   hover:border-red-200 hover:bg-red-50 transition-all disabled:opacity-40
                   disabled:cursor-not-allowed"
@@ -809,7 +809,7 @@ function MineConsole() {
               {/* Main action button */}
               <button
                 onClick={handleMainBtn}
-                className={`flex items-center gap-2.5 px-8 py-2.5 rounded-lg font-semibold text-sm
+                className={`flex items-center gap-2.5 px-8 py-2.5 rounded-inner font-semibold text-card
                   text-white transition-all duration-200 shadow-sm
                   ${mining
                     ? "bg-down hover:bg-red-500"
@@ -829,11 +829,11 @@ function MineConsole() {
           const bull = sentiment.sentiment_label === "BULLISH";
           const bear = sentiment.sentiment_label === "BEARISH";
           return (
-            <div className={`flex items-center gap-4 px-5 py-3 rounded-xl border text-sm
+            <div className={`flex items-center gap-4 px-5 py-3 rounded-inner border text-card
               ${bull ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                 : bear ? "border-red-200 bg-red-50 text-red-800"
                 : "border-hairline bg-surface text-ink-muted"}`}>
-              <span className="text-base">{bull ? "📈" : bear ? "📉" : "➡️"}</span>
+              <span className="text-section">{bull ? "📈" : bear ? "📉" : "➡️"}</span>
               <span className="font-semibold">{sentiment.sentiment_label}</span>
               <span className="opacity-30">|</span>
               <span>多头 {(sentiment.bull_ratio * 100).toFixed(0)}%</span>
@@ -841,7 +841,7 @@ function MineConsole() {
               <span>{sentiment.message_count} 条消息</span>
               <span className="opacity-30">|</span>
               <span>{typeof sentiment.watchers === "number" ? sentiment.watchers.toLocaleString() : sentiment.watchers} 关注</span>
-              <span className="ml-auto text-xs opacity-40">StockTwits · {sentiment.fetched_at}</span>
+              <span className="ml-auto text-body opacity-40">StockTwits · {sentiment.fetched_at}</span>
             </div>
           );
         })()}
@@ -853,15 +853,15 @@ function MineConsole() {
               <span className="w-3 h-3 rounded-full bg-down" />
               <span className="w-3 h-3 rounded-full bg-amber-400" />
               <span className="w-3 h-3 rounded-full bg-emerald-500" />
-              <span className="ml-2 text-xs text-gray-500 font-mono">qbts-miner — activity log</span>
+              <span className="ml-2 text-body text-gray-500 font-mono">qbts-miner — activity log</span>
               {mining && (
-                <span className="ml-auto flex items-center gap-1.5 text-xs text-amber-400 font-mono">
+                <span className="ml-auto flex items-center gap-1.5 text-body text-amber-400 font-mono">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                   LIVE · {fmtElapsed(elapsed)}
                 </span>
               )}
             </div>
-            <div className="bg-[#0f0f12] h-60 overflow-y-auto p-4 space-y-0.5 font-mono text-xs">
+            <div className="bg-[#0f0f12] h-60 overflow-y-auto p-4 space-y-0.5 font-mono text-body">
               {logs.map(line => (
                 <div key={line.id} className="flex gap-3 leading-5">
                   <span className="shrink-0 text-gray-600 w-16">{line.ts}</span>
@@ -888,12 +888,12 @@ function MineConsole() {
           <CardHeader
             right={
               <>
-                <span className="text-xs text-gray-400">点列头排序</span>
+                <span className="text-body text-gray-400">点列头排序</span>
                 {factors.length > 0 && (
                   <button
                     onClick={() => exportCSV(factors)}
-                    className="text-xs text-ink-muted hover:text-gray-900 border border-hairline
-                               hover:border-gray-300 rounded-lg px-3 py-1.5 transition-colors bg-surface"
+                    className="text-body text-ink-muted hover:text-gray-900 border border-hairline
+                               hover:border-gray-300 rounded-inner px-3 py-1.5 transition-colors bg-surface"
                   >
                     导出 CSV
                   </button>
@@ -911,11 +911,11 @@ function MineConsole() {
                 <button
                   key={key}
                   onClick={() => setFilter(key)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors
+                  className={`px-3 py-1 rounded-inner text-body font-medium transition-colors
                     ${filter === key
                       ? key === "starred"
                         ? "bg-amber-400 text-white"
-                        : "bg-brand text-white"
+                        : "bg-brand text-on-solid"
                       : "text-ink-muted hover:text-gray-900 hover:bg-sunken"}`}
                 >
                   {label}
@@ -925,27 +925,27 @@ function MineConsole() {
           </CardHeader>
 
           {visible.length === 0 ? (
-            <div className="py-16 text-center text-ink-muted text-sm">
+            <div className="py-16 text-center text-ink-muted text-card">
               {factors.length === 0 ? "暂无因子 — 点击「启动全自动 AI 挖矿」开始" : "当前筛选无结果"}
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <table className="w-full text-body">
                 <thead>
                   <tr className="border-b border-hairline bg-sunken">
-                    <th className="px-3 py-3 text-center text-xs font-medium text-ink-muted">★</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-ink-muted">#</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-ink-muted">因子名称</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-ink-muted">周期</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-gray-400">IS Sharpe</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-ink-muted">止损/单日最大亏</th>
+                    <th className="px-3 py-3 text-center text-body font-medium text-ink-muted">★</th>
+                    <th className="px-4 py-3 text-left text-body font-medium text-ink-muted">#</th>
+                    <th className="px-4 py-3 text-left text-body font-medium text-ink-muted">因子名称</th>
+                    <th className="px-3 py-3 text-center text-body font-medium text-ink-muted">周期</th>
+                    <th className="px-3 py-3 text-right text-body font-medium text-gray-400">IS Sharpe</th>
+                    <th className="px-3 py-3 text-right text-body font-medium text-ink-muted">止损/单日最大亏</th>
                     <th className="px-1 py-3 text-center text-gray-300">→</th>
                     <SortTh k="oos_sharpe_ratio" label="OOS Sharpe" accent />
                     <SortTh k="oos_win_rate"      label="OOS 胜率/次数"   accent />
                     <SortTh k="oos_total_return"  label="OOS 盈利 ($1w)"  accent />
                     <SortTh k="oos_max_drawdown"  label="OOS 回撤"        accent />
                     <SortTh k="q_hit_rate"       label="命中率/信号" accent />
-                    <th className="px-3 py-3 text-right text-xs font-medium text-ink-muted">IC 衰减</th>
+                    <th className="px-3 py-3 text-right text-body font-medium text-ink-muted">IC 衰减</th>
                     <SortTh k="score" label="评分" accent />
                   </tr>
                 </thead>
@@ -964,7 +964,7 @@ function MineConsole() {
                       <td className="px-3 py-3 text-center">
                         <button
                           onClick={ev => toggleFavorite(ev, f.id)}
-                          className={`text-base leading-none transition-colors
+                          className={`text-section leading-none transition-colors
                             ${f.favorited ? "text-amber-400 hover:text-amber-300" : "text-gray-300 hover:text-amber-400"}`}
                           title={f.favorited ? "取消收藏" : "收藏"}
                         >
@@ -980,25 +980,25 @@ function MineConsole() {
                               <p className="text-gray-900 font-medium truncate max-w-[180px]">{f.name}</p>
                               {f.type === "ml" && (
                                 <span title="LightGBM ML 因子"
-                                      className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold tracking-wider rounded
+                                      className="shrink-0 px-1.5 py-0.5 text-meta font-bold tracking-wider rounded-inner
                                                  bg-violet-100 text-violet-700 border border-violet-200">
                                   ML
                                 </span>
                               )}
                               {f.type === "rule" && (
                                 <span title="if-then 规则因子"
-                                      className="shrink-0 px-1.5 py-0.5 text-[10px] font-bold tracking-wider rounded
+                                      className="shrink-0 px-1.5 py-0.5 text-meta font-bold tracking-wider rounded-inner
                                                  bg-slate-100 text-slate-600 border border-slate-200">
                                   规则
                                 </span>
                               )}
                             </div>
-                            <p className="text-ink-muted truncate max-w-[180px] mt-0.5 text-xs">{f.description}</p>
+                            <p className="text-ink-muted truncate max-w-[180px] mt-0.5 text-body">{f.description}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-3 py-3 text-center">
-                        <span className="text-ink-muted bg-sunken border border-hairline px-2 py-0.5 rounded-md text-xs font-mono">
+                        <span className="text-ink-muted bg-sunken border border-hairline px-2 py-0.5 rounded-inner text-body font-mono">
                           {f.freq}
                         </span>
                       </td>
@@ -1008,7 +1008,7 @@ function MineConsole() {
                           const nStops = f.oos_n_stops;
                           const worst  = f.oos_worst_bar_loss;
                           if (nStops === undefined || worst === undefined) {
-                            return <span className="text-gray-300 font-mono text-xs">—</span>;
+                            return <span className="text-gray-300 font-mono text-body">—</span>;
                           }
                           const ratio  = (f.oos_n_trades ?? 0) > 0 ? nStops / (f.oos_n_trades ?? 1) : 0;
                           const stopColor = ratio <= 0.15 ? "text-emerald-600"
@@ -1018,7 +1018,7 @@ function MineConsole() {
                           return (
                             <div className="flex flex-col items-end gap-0.5">
                               <span className={`font-mono ${stopColor}`}>{nStops}次</span>
-                              <span className={`font-mono text-xs ${lossColor}`}>{(worst * 100).toFixed(1)}%</span>
+                              <span className={`font-mono text-body ${lossColor}`}>{(worst * 100).toFixed(1)}%</span>
                             </div>
                           );
                         })()}
@@ -1034,7 +1034,7 @@ function MineConsole() {
                       <td className="px-3 py-3 text-right">
                         <div className="flex flex-col items-end gap-0.5">
                           <WinBadge v={f.oos_win_rate} />
-                          <span className={`font-mono text-xs ${
+                          <span className={`font-mono text-body ${
                             (f.oos_n_trades ?? 0) >= 10 ? "text-ink-muted"
                             : "text-down"
                           }`}>{f.oos_n_trades ?? 0}笔</span>
@@ -1051,7 +1051,7 @@ function MineConsole() {
                               <span className={`font-mono font-semibold ${color}`}>
                                 {pos ? "+" : ""}${pnl.toLocaleString()}
                               </span>
-                              <span className={`font-mono text-xs ${color} opacity-75`}>
+                              <span className={`font-mono text-body ${color} opacity-75`}>
                                 {pos ? "+" : ""}{pct}%
                               </span>
                             </div>
@@ -1081,7 +1081,7 @@ function MineConsole() {
                               <span className={`font-mono font-semibold ${hrColor}`}>
                                 {(hr * 100).toFixed(1)}%
                               </span>
-                              <span className={`font-mono text-xs ${nsColor}`}>{ns ?? 0}信号</span>
+                              <span className={`font-mono text-body ${nsColor}`}>{ns ?? 0}信号</span>
                             </div>
                           );
                         })()}
@@ -1114,7 +1114,7 @@ function MineConsole() {
           <Card className="overflow-hidden">
             <CardHeader
               right={
-                <span className="text-xs text-ink-muted">
+                <span className="text-body text-ink-muted">
                   {ensemble.kept_count} 正交因子合并 · {ensemble.dropped_count} 相关因子已过滤
                 </span>
               }
@@ -1128,9 +1128,9 @@ function MineConsole() {
                 { label: "OOS 最大回撤", v: fmt(ensemble.ens_max_drawdown, true),  good: ensemble.ens_max_drawdown > -0.3 },
                 { label: "OOS 总收益",   v: fmt(ensemble.ens_total_return, true),  good: ensemble.ens_total_return > 0 },
               ].map(({ label, v, good }) => (
-                <div key={label} className="bg-sunken rounded-lg px-4 py-4 text-center border border-hairline">
-                  <p className="text-xs text-ink-muted mb-1.5">{label}</p>
-                  <p className={`font-mono font-bold text-xl ${good ? "text-brand" : "text-down"}`}>{v}</p>
+                <div key={label} className="bg-sunken rounded-inner px-4 py-4 text-center border border-hairline">
+                  <p className="text-body text-ink-muted mb-1.5">{label}</p>
+                  <p className={`font-mono font-bold text-section ${good ? "text-brand" : "text-down"}`}>{v}</p>
                 </div>
               ))}
             </div>
@@ -1146,13 +1146,13 @@ function MineConsole() {
                   {trading.configured && (
                     <button
                       onClick={fetchTradingStatus}
-                      className="text-xs text-ink-muted hover:text-gray-900 border border-hairline
-                                 hover:border-gray-300 rounded-lg px-3 py-1.5 transition-colors bg-surface"
+                      className="text-body text-ink-muted hover:text-gray-900 border border-hairline
+                                 hover:border-gray-300 rounded-inner px-3 py-1.5 transition-colors bg-surface"
                     >
                       刷新
                     </button>
                   )}
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium border
+                  <span className={`text-body px-2.5 py-1 rounded-full font-medium border
                     ${trading.configured
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                       : "bg-red-50 text-down border-red-200"}`}>
@@ -1167,14 +1167,14 @@ function MineConsole() {
             {/* not configured */}
             {!trading.configured && (
               <div className="p-6 space-y-4">
-                <p className="text-sm text-gray-700">
-                  Alpaca Paper Trading 未配置。在项目根目录 <code className="bg-sunken border border-hairline px-1.5 py-0.5 rounded text-xs font-mono">.env</code> 中添加：
+                <p className="text-card text-gray-700">
+                  Alpaca Paper Trading 未配置。在项目根目录 <code className="bg-sunken border border-hairline px-1.5 py-0.5 rounded-inner text-body font-mono">.env</code> 中添加：
                 </p>
-                <pre className="bg-[#0f0f12] text-emerald-400 rounded-xl p-4 text-xs font-mono leading-6 overflow-x-auto">
+                <pre className="bg-[#0f0f12] text-emerald-400 rounded-inner p-4 text-body font-mono leading-6 overflow-x-auto">
 {`ALPACA_API_KEY=your_paper_api_key
 ALPACA_SECRET_KEY=your_paper_secret_key`}
                 </pre>
-                <p className="text-xs text-ink-muted">
+                <p className="text-body text-ink-muted">
                   前往 <span className="text-brand font-medium">alpaca.markets</span> 注册免费账户，切换到 Paper Trading 后生成 API Key。
                 </p>
               </div>
@@ -1200,14 +1200,14 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
                       },
                       { label: "购买力", val: `$${trading.account.buying_power.toLocaleString("en-US", { minimumFractionDigits: 2 })}`, highlight: false },
                     ].map(({ label, val, sub, good, pnl }) => (
-                      <div key={label} className="bg-sunken border border-hairline rounded-xl px-4 py-4 text-center">
-                        <p className="text-xs text-ink-muted mb-1">{label}</p>
-                        <p className={`font-semibold text-base font-mono
+                      <div key={label} className="bg-sunken border border-hairline rounded-inner px-4 py-4 text-center">
+                        <p className="text-body text-ink-muted mb-1">{label}</p>
+                        <p className={`font-semibold text-section font-mono
                           ${pnl ? (good ? "text-emerald-600" : "text-down") : "text-gray-900"}`}>
                           {val}
                         </p>
                         {sub && (
-                          <p className={`text-xs font-mono mt-0.5 ${good ? "text-emerald-500" : "text-down"}`}>{sub}</p>
+                          <p className={`text-body font-mono mt-0.5 ${good ? "text-emerald-500" : "text-down"}`}>{sub}</p>
                         )}
                       </div>
                     ))}
@@ -1217,8 +1217,8 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
                 {/* position + signal */}
                 <div className="grid grid-cols-2 gap-4">
                   {/* position */}
-                  <div className="border border-hairline rounded-xl p-4 bg-surface space-y-2.5">
-                    <p className="text-xs font-semibold text-ink-muted uppercase tracking-wider">当前持仓 · QBTS</p>
+                  <div className="border border-hairline rounded-inner p-4 bg-surface space-y-2.5">
+                    <p className="text-section font-semibold text-gray-900">当前持仓 · QBTS</p>
                     {trading.position ? (
                       <div className="space-y-2">
                         {[
@@ -1228,35 +1228,35 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
                           { k: "均价",     v: `$${trading.position.avg_entry_price}` },
                           { k: "现价",     v: `$${trading.position.current_price}` },
                         ].map(({ k, v, color }) => (
-                          <div key={k} className="flex justify-between items-center text-sm">
+                          <div key={k} className="flex justify-between items-center text-card">
                             <span className="text-ink-muted">{k}</span>
                             <span className={`font-mono font-medium ${color ?? "text-gray-900"}`}>{v}</span>
                           </div>
                         ))}
-                        <div className="flex justify-between items-center text-sm pt-2 border-t border-hairline">
+                        <div className="flex justify-between items-center text-card pt-2 border-t border-hairline">
                           <span className="text-ink-muted">浮动盈亏</span>
                           <div className="text-right">
                             <p className={`font-mono font-semibold ${trading.position.unrealized_pl >= 0 ? "text-emerald-600" : "text-down"}`}>
                               {trading.position.unrealized_pl >= 0 ? "+" : ""}${trading.position.unrealized_pl.toFixed(2)}
                             </p>
-                            <p className={`text-xs font-mono ${trading.position.unrealized_plpc >= 0 ? "text-emerald-500" : "text-down"}`}>
+                            <p className={`text-body font-mono ${trading.position.unrealized_plpc >= 0 ? "text-emerald-500" : "text-down"}`}>
                               {trading.position.unrealized_plpc >= 0 ? "+" : ""}{trading.position.unrealized_plpc.toFixed(2)}%
                             </p>
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="py-6 text-center text-ink-muted text-sm">空仓</div>
+                      <div className="py-6 text-center text-ink-muted text-card">空仓</div>
                     )}
                   </div>
 
                   {/* signal + execute */}
-                  <div className="border border-hairline rounded-xl p-4 bg-surface space-y-3">
-                    <p className="text-xs font-semibold text-ink-muted uppercase tracking-wider">最佳因子信号</p>
+                  <div className="border border-hairline rounded-inner p-4 bg-surface space-y-3">
+                    <p className="text-section font-semibold text-gray-900">最佳因子信号</p>
                     {trading.signal ? (
                       <>
                         <div className="flex justify-center py-3">
-                          <span className={`text-2xl font-black px-8 py-3 rounded-xl
+                          <span className={`text-price font-black px-8 py-3 rounded-inner
                             ${trading.signal.label === "BUY"  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                               : trading.signal.label === "SELL" ? "bg-red-50 text-down border border-red-200"
                               : "bg-sunken text-ink-muted border border-hairline"}`}>
@@ -1268,25 +1268,25 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
                           { k: "OOS评分", v: trading.signal.factor_score.toFixed(3), mono: true, blue: true },
                           { k: "周期",    v: trading.signal.freq, mono: true },
                         ].map(({ k, v, mono, blue }) => (
-                          <div key={k} className="flex justify-between items-center text-sm">
+                          <div key={k} className="flex justify-between items-center text-card">
                             <span className="text-ink-muted">{k}</span>
                             <span className={`${mono ? "font-mono" : ""} ${blue ? "text-brand font-semibold" : "text-gray-900"} truncate max-w-[180px] text-right`}>{v}</span>
                           </div>
                         ))}
                       </>
                     ) : (
-                      <div className="py-6 text-center text-ink-muted text-sm">先挖矿生成因子</div>
+                      <div className="py-6 text-center text-ink-muted text-card">先挖矿生成因子</div>
                     )}
 
                     <button
                       onClick={executeSignal}
                       disabled={tradeExecuting || !trading.signal}
-                      className={`w-full py-2.5 rounded-lg font-semibold text-sm transition-all duration-200
+                      className={`w-full py-2.5 rounded-inner font-semibold text-card transition-all duration-200
                         ${tradeExecuting
                           ? "bg-amber-50 text-amber-700 border border-amber-200 cursor-wait"
                           : !trading.signal
                           ? "bg-sunken text-gray-400 border border-hairline cursor-not-allowed"
-                          : "bg-brand hover:bg-[#338CFF] text-white shadow-sm"}`}
+                          : "bg-brand hover:bg-[#338CFF] text-on-solid shadow-sm"}`}
                     >
                       {tradeExecuting
                         ? <span className="flex items-center justify-center gap-2">
@@ -1300,13 +1300,13 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
 
                 {/* execution log */}
                 {tradeLogs.length > 0 && (
-                  <div className="rounded-xl overflow-hidden border border-hairline">
-                    <div className="px-4 py-2.5 bg-[#1a1a1e] border-b border-white/5 text-xs text-gray-500 font-mono flex items-center gap-2">
+                  <div className="rounded-inner overflow-hidden border border-hairline">
+                    <div className="px-4 py-2.5 bg-[#1a1a1e] border-b border-white/5 text-body text-gray-500 font-mono flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-brand" />
                       执行日志
                       {tradeExecuting && <span className="ml-auto text-amber-400 animate-pulse">● LIVE</span>}
                     </div>
-                    <div className="bg-[#0f0f12] max-h-40 overflow-y-auto p-4 space-y-0.5 font-mono text-xs">
+                    <div className="bg-[#0f0f12] max-h-40 overflow-y-auto p-4 space-y-0.5 font-mono text-body">
                       {tradeLogs.map(line => (
                         <div key={line.id} className="flex gap-3 leading-5">
                           <span className="shrink-0 text-gray-600 w-16">{line.ts}</span>
@@ -1327,16 +1327,16 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
 
                 {/* recent orders */}
                 {trading.orders && trading.orders.length > 0 && (
-                  <div className="rounded-xl overflow-hidden border border-hairline">
-                    <div className="px-5 py-3 bg-sunken border-b border-hairline text-xs font-semibold text-ink-muted uppercase tracking-wider">
+                  <div className="rounded-inner overflow-hidden border border-hairline">
+                    <div className="px-5 py-3 bg-sunken border-b border-hairline text-section font-semibold text-gray-900">
                       最近委托
                     </div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
+                      <table className="w-full text-card">
                         <thead>
                           <tr className="border-b border-hairline">
                             {["时间", "方向", "数量", "成交量", "成交价", "状态"].map((h, i) => (
-                              <th key={h} className={`px-4 py-2.5 text-xs font-medium text-ink-muted
+                              <th key={h} className={`px-4 py-2.5 text-body font-medium text-ink-muted
                                 ${i === 0 ? "text-left" : i === 1 ? "text-center" : "text-right"}`}>
                                 {h}
                               </th>
@@ -1346,9 +1346,9 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
                         <tbody>
                           {trading.orders.map(o => (
                             <tr key={o.id} className="border-t border-hairline hover:bg-sunken transition-colors">
-                              <td className="px-4 py-3 text-ink-muted text-xs">{o.created_at}</td>
+                              <td className="px-4 py-3 text-ink-muted text-body">{o.created_at}</td>
                               <td className="px-4 py-3 text-center">
-                                <span className={`font-semibold text-xs px-2 py-0.5 rounded-md
+                                <span className={`font-semibold text-body px-2 py-0.5 rounded-inner
                                   ${o.side === "BUY"
                                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                     : "bg-red-50 text-down border border-red-200"}`}>
@@ -1361,7 +1361,7 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
                                 {o.filled_avg_price > 0 ? `$${o.filled_avg_price}` : "—"}
                               </td>
                               <td className="px-4 py-3 text-right">
-                                <span className={`text-xs px-2 py-0.5 rounded-md font-medium
+                                <span className={`text-body px-2 py-0.5 rounded-inner font-medium
                                   ${o.status === "filled"   ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                     : o.status === "canceled" ? "bg-sunken text-ink-muted border border-hairline"
                                     : "bg-amber-50 text-amber-700 border border-amber-200"}`}>
@@ -1382,7 +1382,7 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
         )}
 
         {/* footer */}
-        <div className="text-center text-xs text-gray-400 pb-4">
+        <div className="text-center text-body text-gray-400 pb-4">
           QBTS Factor Miner · Walk-Forward OOS Validation · IC/ICIR · Factor Ensemble
         </div>
 

@@ -24,8 +24,8 @@ export function ThemeToggle() {
       onClick={toggle}
       aria-label="切换夜间模式"
       title={dark ? "切到白天" : "切到夜晚"}
-      className="shrink-0 w-8 h-8 flex items-center justify-center rounded-md
-                 text-blue-100 hover:bg-white/10 transition-colors text-base leading-none"
+      className="shrink-0 w-8 h-8 flex items-center justify-center rounded-inner
+                 text-on-navy hover:bg-white/10 transition-colors text-section leading-none"
     >
       {dark ? "☀️" : "🌙"}
     </button>

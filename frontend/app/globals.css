@@ -23,7 +23,7 @@
   --text-card: 15px;          --text-card--line-height: 1.4;    /* 卡片标题 · 关键数字 */
   --text-section: 17px;       --text-section--line-height: 1.35; /* 区块标题(新增,原来这一档不存在) */
   --text-price: 26px;         --text-price--line-height: 1;     /* 报价 */
-  --text-display: 30px;       --text-display--line-height: 1.15; /* 裁决 —— 全页唯一 */
+  --text-display: 30px;       --text-display--line-height: 1.15; /* 每页唯一的头条数字(主页=裁决) */
 
   /* ── 圆角:四档,编码层级而不是随手写 ────────────────────────────────
      原来七种圆角(lg 90 / full 81 / 2xl 47 / xl 46 / md 35 / 3xl 23 / sm 2)
@@ -42,6 +42,16 @@
   --color-ink-muted: #525461;      /* 次级文字 */
   --color-brand: #006FFF;          /* 品牌蓝 · 选中态 · 链接 */
   --color-down: #F03A3E;           /* 跌 —— 与 emerald(涨)成对,别改成通用 red */
+  --color-ink: #1A1A1E;            /* 最强文字(标题 · 关键数字) */
+
+  /* ── 两支「叠在别的颜色上」的文字色,规则和上面相反 ────────────────────
+     on-solid:压在实心填充上(bg-brand / bg-*-600 / bg-gray-900)。这些底色在
+       深色模式下会翻亮,所以压在上面的字必须反向翻暗 —— 写死 white 会白底白字。
+     on-navy:压在顶栏那支写死的海军蓝渐变上。那条渐变**不跟主题翻**,所以它上面
+       的字两套主题都得是浅色,绝不能跟着调色板走(原来用 text-blue-100,深色下被
+       翻成深蓝 = 顶栏导航整排消失)。 */
+  --color-on-solid: #FFFFFF;
+  --color-on-navy: #DCE8FA;
 }
 
 @theme inline {
@@ -91,6 +101,8 @@ html.dark {
   --color-ink-muted: #93A0B5;
   --color-brand: #4D9BFF;
   --color-down: #FF6B6E;
+  --color-ink: #ECF1F8;
+  --color-on-solid: #0C1420;   /* on-navy 故意不覆盖:顶栏渐变不翻,它的字也不能翻 */
 
   /* amber */
   --color-amber-50: #302A12;

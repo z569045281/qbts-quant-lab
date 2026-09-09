@@ -47,10 +47,10 @@ export function TabBar({
                 onClick={() => onChange(t.key)}
                 title={t.hint}
                 aria-current={on ? "page" : undefined}
-                className={`relative shrink-0 px-3 py-1.5 rounded-lg text-[13px] font-medium
+                className={`relative shrink-0 px-3 py-1.5 rounded-inner text-body font-medium
                             transition-colors focus-visible:outline-2 focus-visible:outline-offset-2
                             focus-visible:outline-brand ${
-                  on ? "bg-gray-900 text-white shadow-sm"
+                  on ? "bg-gray-900 text-on-solid shadow-sm"
                      : "text-ink-muted hover:bg-black/[0.05]"}`}
               >
                 {t.label}

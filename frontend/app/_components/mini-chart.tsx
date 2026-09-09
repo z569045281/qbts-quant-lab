@@ -169,12 +169,12 @@ export function MiniChart({
   const hasNw   = !!(nwBands && nwBands.length > 1);
 
   return (
-    <section className="bg-surface rounded-xl border border-hairline overflow-hidden">
+    <section className="bg-surface rounded-inner border border-hairline overflow-hidden">
       <div className="px-5 py-4 border-b border-hairline flex items-center justify-between flex-wrap gap-2">
-        <span className="text-sm font-semibold text-ink-muted uppercase tracking-wider">
+        <span className="text-section font-semibold text-gray-900">
           📈 60 日价格走势{hasPlan ? " · 计划 / 区位 / 战绩" : ""}
         </span>
-        <div className="flex items-center gap-3 text-[11px] font-mono flex-wrap">
+        <div className="flex items-center gap-3 text-meta font-mono flex-wrap">
           <span className="flex items-center gap-1"><span className="w-3.5 h-0.5 bg-[#F59E0B]" />SMA20</span>
           <span className="flex items-center gap-1"><span className="w-3.5 h-0.5 bg-[#8B5CF6]" />SMA200</span>
           {hasNw && <span className="flex items-center gap-1"><span className="w-3.5 h-0.5 bg-[#CA8A04]" />NW买入线</span>}

@@ -33,14 +33,14 @@ export default function ChallengePage() {
   }, []);
 
   if (!loaded) {
-    return <main className="max-w-[900px] mx-auto px-6 py-10 text-sm text-ink-muted">加载挑战状态中…</main>;
+    return <main className="max-w-[900px] mx-auto px-6 py-10 text-card text-ink-muted">加载挑战状态中…</main>;
   }
   if (error) {
     return (
       <main className="max-w-[900px] mx-auto px-6 py-10">
-        <div className="bg-surface rounded-xl border border-red-200 p-6">
-          <div className="text-sm font-semibold text-down mb-2">⚠️ 加载失败</div>
-          <pre className="text-xs font-mono text-ink-muted bg-red-50 rounded-md px-3 py-2 whitespace-pre-wrap">{error}</pre>
+        <div className="bg-surface rounded-inner border border-red-200 p-6">
+          <div className="text-card font-semibold text-down mb-2">⚠️ 加载失败</div>
+          <pre className="text-body font-mono text-ink-muted bg-red-50 rounded-inner px-3 py-2 whitespace-pre-wrap">{error}</pre>
         </div>
       </main>
     );
@@ -48,10 +48,10 @@ export default function ChallengePage() {
   if (!c) {
     return (
       <main className="max-w-[900px] mx-auto px-6 py-10">
-        <div className="bg-surface rounded-xl border border-hairline p-8 text-center">
+        <div className="bg-surface rounded-inner border border-hairline p-8 text-center">
           <div className="text-4xl mb-3">🎰</div>
-          <h1 className="text-lg font-bold text-gray-900">$1000 → +$100 一个月挑战</h1>
-          <p className="text-sm text-ink-muted mt-2">挑战尚未初始化 —— bot 首次推送状态后这里就会亮起来。</p>
+          <h1 className="text-section font-bold text-gray-900">$1000 → +$100 一个月挑战</h1>
+          <p className="text-card text-ink-muted mt-2">挑战尚未初始化 —— bot 首次推送状态后这里就会亮起来。</p>
         </div>
       </main>
     );
@@ -70,51 +70,51 @@ export default function ChallengePage() {
     <main className="max-w-[900px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-5">
       <SelfCheckCard page="challenge" />
       {/* ── Hero: equity + progress toward +$100 ── */}
-      <section className="bg-surface rounded-xl border border-hairline px-6 py-5">
+      <section className="bg-surface rounded-inner border border-hairline px-6 py-5">
         <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-lg font-bold text-gray-900">
+            <h1 className="text-section font-bold text-gray-900">
               {marathon
                 ? <>🏁 {money(c.sleeve_start)} 马拉松挑战 · 跑到 {c.deadline.slice(5).replace("-", "/")}</>
                 : <>🎰 {money(c.sleeve_start)} → +{money(target)} 一个月挑战</>}
-              {(c.round ?? 1) > 1 && <span className="ml-2 text-xs font-medium text-brand bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5 align-middle">第 {c.round} 期</span>}
+              {(c.round ?? 1) > 1 && <span className="ml-2 text-body font-medium text-brand bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5 align-middle">第 {c.round} 期</span>}
             </h1>
-            <p className="text-xs text-ink-muted mt-0.5">
+            <p className="text-body text-ink-muted mt-0.5">
               纸面盘（Alpaca paper）· {c.runner === "cloud"
                 ? <><span className="font-medium">云端 Lambda 全自动</span> · 全场杠杆 ETF 动量</>
                 : <><span className="font-medium">无加密</span> · 杠杆指数 ETF 动量</>} · 触碰即落袋
             </p>
           </div>
-          <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${s.cls}`}>{s.label}</span>
+          <span className={`text-body px-2.5 py-1 rounded-full border font-medium ${s.cls}`}>{s.label}</span>
         </div>
 
         <div className="mt-5 flex items-end gap-6 flex-wrap">
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-gray-500">账本权益</div>
-            <div className="text-3xl font-bold font-mono text-gray-900">{money(c.equity)}</div>
+            <div className="text-meta text-gray-500">账本权益</div>
+            <div className="text-display font-bold font-mono text-gray-900">{money(c.equity)}</div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-gray-500">盈亏</div>
-            <div className={`text-3xl font-bold font-mono ${gainColor}`}>
+            <div className="text-meta text-gray-500">盈亏</div>
+            <div className={`text-display font-bold font-mono ${gainColor}`}>
               {c.pnl >= 0 ? "+" : ""}{money(c.pnl)}
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-gray-500">收益率</div>
-            <div className={`text-2xl font-bold font-mono ${gainColor}`}>{c.pnl_pct >= 0 ? "+" : ""}{c.pnl_pct}%</div>
+            <div className="text-meta text-gray-500">收益率</div>
+            <div className={`text-price font-bold font-mono ${gainColor}`}>{c.pnl_pct >= 0 ? "+" : ""}{c.pnl_pct}%</div>
           </div>
           <div className="ml-auto text-right">
-            <div className="text-[10px] uppercase tracking-wider text-gray-500">剩余天数</div>
-            <div className="text-2xl font-bold font-mono text-gray-900">
+            <div className="text-meta text-gray-500">剩余天数</div>
+            <div className="text-price font-bold font-mono text-gray-900">
               {win ? "—" : daysLeft(c.deadline)}
             </div>
-            <div className="text-[10px] text-gray-400">截止 {c.deadline}</div>
+            <div className="text-meta text-gray-400">截止 {c.deadline}</div>
           </div>
         </div>
 
         {/* progress bar toward the +10% line(马拉松=里程碑,老规则=达标线) */}
         <div className="mt-5">
-          <div className="flex justify-between text-[11px] text-ink-muted mb-1">
+          <div className="flex justify-between text-meta text-ink-muted mb-1">
             <span>{marathon ? "里程碑" : "目标"}进度 · 赚到 {money(gained)} / {money(target)}
               {marathon && c.milestone_at && <span className="ml-1 text-emerald-600 font-medium">🏆 已达成,继续跑</span>}</span>
             <span className="font-mono">{prog.toFixed(0)}%</span>
@@ -123,7 +123,7 @@ export default function ChallengePage() {
             <div className={`h-full rounded-full transition-all ${(win || (marathon && c.milestone_at)) ? "bg-emerald-500" : "bg-brand"}`}
                  style={{ width: `${Math.max(prog, 2)}%` }} />
           </div>
-          <div className="flex justify-between text-[10px] text-gray-400 mt-1 font-mono">
+          <div className="flex justify-between text-meta text-gray-400 mt-1 font-mono">
             <span>本金 {money(c.sleeve_start)}</span>
             <span>{c.floor_line != null ? `地板 ${money(c.floor_line)}` : "地板：无(跑到期)"}</span>
             <span>{marathon ? "里程碑" : "达标"} {money(c.win_line)}</span>
@@ -133,10 +133,10 @@ export default function ChallengePage() {
 
       {/* ── 📈 资金曲线 ── */}
       {(c.equity_curve?.length ?? 0) >= 2 && (
-        <section className="bg-surface rounded-xl border border-hairline px-6 py-4">
+        <section className="bg-surface rounded-inner border border-hairline px-6 py-4">
           <div className="flex items-baseline justify-between mb-2">
-            <h2 className="text-sm font-semibold text-gray-900">📈 资金曲线</h2>
-            <span className="text-[10px] text-gray-400">每 15 分钟一点 · 峰值 {money(c.peak_equity)}</span>
+            <h2 className="text-card font-semibold text-gray-900">📈 资金曲线</h2>
+            <span className="text-meta text-gray-400">每 15 分钟一点 · 峰值 {money(c.peak_equity)}</span>
           </div>
           <EquityChart curve={c.equity_curve!} start={c.sleeve_start}
                        winLine={c.win_line} floorLine={c.floor_line} />
@@ -145,22 +145,22 @@ export default function ChallengePage() {
 
       {/* ── 复盘与心法入口 ── */}
       <Link href="/challenge/lessons"
-            className="block bg-gradient-to-r from-[#EEF4FF] to-[#F3EEFF] rounded-xl border border-blue-200
+            className="block bg-gradient-to-r from-[#EEF4FF] to-[#F3EEFF] rounded-inner border border-blue-200
                        px-6 py-4 hover:shadow-md transition-shadow">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold text-gray-900">🧠 复盘与心法 · 从这次挑战学到什么</div>
-            <div className="text-xs text-ink-muted mt-0.5">
+            <div className="text-card font-semibold text-gray-900">🧠 复盘与心法 · 从这次挑战学到什么</div>
+            <div className="text-body text-ink-muted mt-0.5">
               哪些能每月照做、哪些是运气、赔率的诚实数学 —— 以及按同一套纪律,<b>今天</b>该做什么
             </div>
           </div>
-          <span className="text-brand text-lg shrink-0">→</span>
+          <span className="text-brand text-section shrink-0">→</span>
         </div>
       </Link>
 
       {/* ── Current position ── */}
-      <section className="bg-surface rounded-xl border border-hairline px-6 py-4">
-        <h2 className="text-sm font-semibold text-gray-900 mb-3">当前持仓</h2>
+      <section className="bg-surface rounded-inner border border-hairline px-6 py-4">
+        <h2 className="text-card font-semibold text-gray-900 mb-3">当前持仓</h2>
         {pos ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <Stat label="标的" value={pos.symbol} mono />
@@ -173,20 +173,20 @@ export default function ChallengePage() {
             <Stat label="止损 (STOP)" value={money(pos.stop_px)} mono cls="text-down" />
           </div>
         ) : (
-          <p className="text-sm text-ink-muted">
+          <p className="text-card text-ink-muted">
             空仓 —— {c.status === "running"
               ? "等待篮子里出现上升趋势信号（保护本金，不硬凑单）。"
               : "挑战已结束。"}
           </p>
         )}
-        <div className="mt-3 text-[11px] text-gray-400">
+        <div className="mt-3 text-meta text-gray-400">
           篮子：{c.basket.join(" · ")}
         </div>
       </section>
 
       {/* ── Strategy / honest odds ── */}
-      <section className="bg-surface rounded-xl border border-hairline px-6 py-4 space-y-2 text-sm text-ink-muted">
-        <h2 className="text-sm font-semibold text-gray-900">打法与赢面</h2>
+      <section className="bg-surface rounded-inner border border-hairline px-6 py-4 space-y-2 text-card text-ink-muted">
+        <h2 className="text-card font-semibold text-gray-900">打法与赢面</h2>
         <p>只在 <b>上升趋势</b>（收盘价站上 50 日线且近一周上涨）时进场，集中押动量最强的杠杆 ETF
            {(c.round ?? 1) > 1 && <>（第 {c.round} 期起扩到<b>全场 ~40 只宇宙</b>，同款门槛）</>}，
            进场即挂 <b className="text-emerald-600">止盈</b> + <b className="text-down">−12% 止损</b> 的 bracket 单，浮盈触 +10% 即落袋{marathon && <>（落袋当日冷却，次日再进场）</>}。
@@ -194,24 +194,24 @@ export default function ChallengePage() {
              ? <>🏁 <b>马拉松模式</b>：不设收手线，持续交易到 <b>{c.deadline}</b>，到期看 {money(c.sleeve_start)} 滚成多少；{money(c.win_line)} 只是里程碑，
                 {c.floor_line != null ? <>−15% 地板仍<b>硬性停手</b>。</> : <><b>已取消地板</b>，跑到期为止(2026-07-21 触发两次地板停手复盘后拍板)。</>}</>
              : <>权益触碰 <b>+{money(target)} 判赢收手</b>，−15% 触及地板则本期停手。</>}</p>
-        <p className="text-[13px] bg-sunken rounded-md px-3 py-2 border border-hairline">
+        <p className="text-body bg-sunken rounded-inner px-3 py-2 border border-hairline">
           📊 {c.odds_note}
         </p>
       </section>
 
       {/* ── Activity log ── */}
       {c.history?.length > 0 && (
-        <section className="bg-surface rounded-xl border border-hairline px-6 py-4">
-          <h2 className="text-sm font-semibold text-gray-900 mb-2">交易日志</h2>
+        <section className="bg-surface rounded-inner border border-hairline px-6 py-4">
+          <h2 className="text-card font-semibold text-gray-900 mb-2">交易日志</h2>
           <div className="space-y-1 max-h-72 overflow-y-auto">
             {[...c.history].reverse().map((h, i) => (
-              <div key={i} className="text-[11px] font-mono text-ink-muted leading-relaxed">{h}</div>
+              <div key={i} className="text-meta font-mono text-ink-muted leading-relaxed">{h}</div>
             ))}
           </div>
         </section>
       )}
 
-      <div className="text-center text-[10px] text-gray-400">
+      <div className="text-center text-meta text-gray-400">
         状态由{c.runner === "cloud" ? "云端挑战 bot（AWS Lambda）" : "本地挑战 bot "}每 15 分钟推送到 Supabase · 更新于 {c.updated_at} · 纸面模拟, 非投资建议
       </div>
     </main>
@@ -274,7 +274,7 @@ function EquityChart({ curve, start, winLine, floorLine }:
 function Stat({ label, value, mono, cls }: { label: string; value: string; mono?: boolean; cls?: string }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-gray-500">{label}</div>
+      <div className="text-meta text-gray-500">{label}</div>
       <div className={`font-semibold text-gray-900 ${mono ? "font-mono" : ""} ${cls ?? ""}`}>{value}</div>
     </div>
   );
