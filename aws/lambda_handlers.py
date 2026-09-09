@@ -199,25 +199,39 @@ def quote_handler(event, context):
     # (读数会带 synthetic_15m>0,推送层据此不开枪,见 intraday_smc。)
     recompute = (payload.get("session") in ("pre", "regular", "post", "overnight")
                  and now_et.minute % 5 == 0)
+    # 🔬 2026-09-09:intrabar 画像搭同一班车。compute_live_reads 一次拉数据出两份
+    #    读数 —— 此前 intrabar 只有 09:00 ET 全量 publish 跑一次,盘中永远是昨天那张图。
+    prev_ib = prev_data.get("intrabar")
     if recompute:
         try:
-            from dashboard.intraday_smc import compute_smc, maybe_notify_trigger
+            from dashboard.intraday_smc import compute_live_reads, maybe_notify_trigger
             qpx = ((payload.get("quotes") or {}).get("qbts") or {}).get("price")
-            fresh = compute_smc(qpx)
+            reads = compute_live_reads(qpx)
+            fresh = reads.get("smc")
             if fresh:
                 payload["smc"] = fresh
                 prev_state = ((prev_smc or {}).get("playbook") or {}).get("state")
                 maybe_notify_trigger(prev_state, fresh)
             elif prev_smc:
                 payload["smc"] = prev_smc          # keep last good if recompute failed
+            # intrabar 是辅助地图、无推送:算出来就更新,没算出来就结转
+            if reads.get("intrabar"):
+                payload["intrabar"] = reads["intrabar"]
+            elif prev_ib:
+                payload["intrabar"] = prev_ib
         except Exception as e:
             import traceback
             payload["smc_err"] = f"{type(e).__name__}: {e}"   # surfaced for observability
             print("! intraday SMC skipped:\n" + traceback.format_exc())
             if prev_smc:
                 payload["smc"] = prev_smc
-    elif prev_smc:
-        payload["smc"] = prev_smc                  # carry forward on off-minutes
+            if prev_ib:
+                payload["intrabar"] = prev_ib
+    else:
+        if prev_smc:
+            payload["smc"] = prev_smc              # carry forward on off-minutes
+        if prev_ib:
+            payload["intrabar"] = prev_ib
 
     # 🔔 推送通道健康(2026-07-31)。放在**所有推送调用之后** —— 起因是事件日推送
     # 从 07-29 起因标题编码每分钟静默失败,日志里刷了两天没人看见,07-30 夜盘

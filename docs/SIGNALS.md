@@ -171,6 +171,20 @@ HOLD 的真实含义 = 这六个扳机没扣(如"特调蹲守:收盘 ≥$18.16 �
   `decision.py` 代码里强制**(见 [DECISION.md](DECISION.md))。
 - **`sector_rotation.py` 轮动地图 / `volume_profile.py` / `intrabar_profile.py`**:
   **地图非信号**(mining.md 第十七/二十六轮已判:象限做策略输在册马;裸 delta 阈值 t=1.2 判死)。
+  - 🔬 **intrabar 实时化(2026-09-09,用户点单)**:此前它只在 09:00 ET 全量 publish
+    算一次、且吃 1h bar —— 一天 7 根子 bar 喂 24 个价位桶,开盘头一小时直接返回
+    "子 bar 不足" → **一张昨天的图配了个今天的价格**。现在搭 SMC 的同一班车
+    (`intraday_smc.compute_live_reads`,复用它每 5 分钟已 `force_refresh` 的 15m 帧,
+    增量成本≈0):**26 根/日 · 每 5 分钟刷新 · 开盘 30 分钟出画像**。写进
+    `live_quote.intrabar`,前端同 SMC 待遇优先读 live 版。
+    - 坑①**夜盘合成 bar 的 volume 恒为 0**(`overnight_bars` 限制③)。这是成交量模块,
+      合成 bar 不但没量,其高低点还会撑大当日 span、把桶铺到没成交的价格上 →
+      源头喂 attach_overnight **之前**的日盘帧,函数内再剔一道零量 bar(双保险)。
+    - 坑②**按美东日历日分组**:`attach_overnight` 把序列转成 UTC,照 UTC 归一化会
+      把 16:00 后的 ET bar 算进第二天,一天被劈两半 → 函数内先 `tz_convert` 到 ET。
+    - 坑③当日**未收盘**时 VPOC/CLV 都还在动 → 输出 `in_progress`,前端标"进行中"。
+    - **刷新变快不改变判死结论**:第二十六轮判的是裸 delta 的预测力,不是刷新率;
+      它仍不进 edge、不进扫描打分、不驱动交易。
 - **`selfcheck.py`**:全站六页自检(规则层 + Haiku 语义层)→ publish §4.8,回写 `site_check`。
   规则:**自证无矛盾一律不输出**(代码层 `_is_nonfinding` 兜底,不只靠 LLM 合规)。
 

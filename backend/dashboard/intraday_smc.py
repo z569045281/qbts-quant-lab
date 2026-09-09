@@ -51,6 +51,58 @@ def compute_smc(live_price: float | None = None) -> dict | None:
     return smc
 
 
+# ── 🔬 Intrabar 画像实时化(2026-09-09,用户点单)────────────────────────
+# 改之前 intrabar 只在 09:00 ET 全量 publish 跑一次、且吃 1h bar(一天 7 根喂
+# 24 个价位桶,开盘头一小时直接"子 bar 不足")—— 等于一张昨天的图配了个今天的
+# 价格。这里复用上面**已经 force_refresh 过的同一份 15m 帧**:一天 26 根、
+# 开盘 30 分钟出画像、每 5 分钟刷新,增量成本≈0(数据已在内存)。
+#
+# ⚠️ 喂的是 **attach_overnight 之前** 的日盘帧。合成夜盘 bar 的 volume 恒为 0,
+#    而这是个成交量模块 —— analyze_intrabar_profile 内部也会再剔一道零量 bar
+#    (双保险),但从源头不给它才是对的。
+#
+# 仍然是**地图不是信号**:第二十六轮已判死裸 delta 当买信号,本次只改刷新率。
+
+def compute_live_reads(live_price: float | None = None) -> dict:
+    """一次拉数据,产出 SMC + intrabar 两份读数(共用同一份 fresh 15m 帧)。
+
+    返回 `{"smc": ... | None, "intrabar": ... | None}`。任一分项失败只让它自己
+    为 None,不连坐另一个 —— SMC 是有推送的主路,intrabar 只是辅助地图。
+    """
+    from data.fetcher import load_or_fetch, load_15m
+    from dashboard.smc import analyze_smc
+    from dashboard.intrabar_profile import analyze_intrabar_profile
+
+    df_h, df_d = load_or_fetch()
+    df_15m_day = load_15m(force_refresh=True)      # 日盘真 bar(有成交量)
+
+    out: dict = {"smc": None, "intrabar": None}
+
+    # ① intrabar —— 只吃日盘真 bar。15m 一天 26 根 → min_subbars 提到 4
+    #    (约一小时成交)才算画像有意义,否则开盘头两根就敢下"投降"的结论。
+    try:
+        ib = analyze_intrabar_profile(df_15m_day, live_price, tf="15m", min_subbars=4)
+        if ib.get("available"):
+            ib["asof"] = datetime.now(timezone.utc).isoformat()
+            out["intrabar"] = ib
+    except Exception as e:
+        logger.warning("intrabar recompute skipped: %s", e)
+
+    # ② SMC —— 需要接夜盘合成 bar(15m 扳机在夜盘才不是死的)
+    df_15m, n_syn = df_15m_day, 0
+    try:
+        from dashboard.overnight_bars import attach_overnight
+        df_15m, n_syn = attach_overnight(df_15m_day, "QBTS")
+    except Exception as e:
+        logger.warning("overnight bars skipped: %s", e)
+    smc = analyze_smc(df_d, live_price, df_h, df_15m)
+    if smc.get("playbook"):
+        smc["asof"] = datetime.now(timezone.utc).isoformat()
+        smc["synthetic_15m"] = n_syn
+        out["smc"] = smc
+    return out
+
+
 from dashboard.notify import push as _ntfy   # 全仓唯一一份推送
 
 

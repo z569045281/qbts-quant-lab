@@ -255,6 +255,13 @@ export default function Dashboard() {
     ? `结转 · ${new Date(smc.asof).toLocaleTimeString("en-US", {
         timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hour12: false })} ET 读数`
     : null;
+  // 🔬 Intrabar 同 SMC 待遇(2026-09-09):live_quote 那份每 ~5min 用 fresh 15m 重算,
+  // 比日快照(09:00 ET 的 1h 画像)新得多 → 页面优先读它,口径也跟着 liveCurrent 走,
+  // 免得出现"页面价格是实时的、画像却是早上那张"的 cross-source 老毛病。
+  const intrabar = (liveCurrent && live?.intrabar) ? live.intrabar
+                 : (snap.intrabar_profile ?? null);
+  const ibAgeMin = intrabar?.asof ? (Date.now() - new Date(intrabar.asof).getTime()) / 60000 : null;
+  const ibLive = ibAgeMin !== null && ibAgeMin < 11;   // 同 SMC:5min 周期给 2 倍余量
   const choch = smc?.last_event?.kind === "CHoCH" ? smc.last_event : null;
   const pb = smc?.playbook ?? null;
 
@@ -1510,63 +1517,80 @@ export default function Dashboard() {
         )}
 
         {/* Intrabar Profile — 单根日线 bar 内部:吸收/投降/派发(辅助地图) */}
-        {snap.intrabar_profile?.available && (
+        {intrabar?.available && (
           <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
                 🔬 K线内画像 · Intrabar
               </span>
               <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
-                snap.intrabar_profile.stance === "偏多" ? "bg-emerald-100 text-emerald-700"
-                : snap.intrabar_profile.stance === "偏空" ? "bg-red-100 text-red-700"
+                intrabar.stance === "偏多" ? "bg-emerald-100 text-emerald-700"
+                : intrabar.stance === "偏空" ? "bg-red-100 text-red-700"
                 : "bg-gray-100 text-gray-500"}`}>
-                {snap.intrabar_profile.read}
+                {intrabar.read}
               </span>
             </div>
-            <div className="text-[11px] text-gray-400 mb-3">
-              {snap.intrabar_profile.bar_date} 单日 · {snap.intrabar_profile.n_subbars}根1h 重构 · 辅助非信号
+            <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-gray-400 mb-3">
+              {ibLive && (
+                <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />盘中实时
+                </span>
+              )}
+              {!ibLive && intrabar.asof && (
+                <span className="text-gray-400">
+                  结转 · {new Date(intrabar.asof).toLocaleTimeString("en-US", {
+                    timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hour12: false })} ET
+                </span>
+              )}
+              <span>{intrabar.bar_date} 单日 · {intrabar.n_subbars}根{intrabar.tf ?? "1h"} 重构</span>
+              {intrabar.in_progress && (
+                <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-semibold">
+                  进行中 · 未收盘
+                </span>
+              )}
+              <span>· 辅助非信号</span>
             </div>
             {/* 买卖 delta 条 */}
             <div className="mb-2">
               <div className="flex h-5 rounded-md overflow-hidden text-[10px] font-bold text-white">
                 <div className="bg-emerald-500 flex items-center justify-center"
-                     style={{ width: `${Math.max((snap.intrabar_profile.up_vol_pct ?? 0) * 100, 6)}%` }}>
-                  买{Math.round((snap.intrabar_profile.up_vol_pct ?? 0) * 100)}%
+                     style={{ width: `${Math.max((intrabar.up_vol_pct ?? 0) * 100, 6)}%` }}>
+                  买{Math.round((intrabar.up_vol_pct ?? 0) * 100)}%
                 </div>
                 <div className="bg-red-500 flex items-center justify-center"
-                     style={{ width: `${Math.max((snap.intrabar_profile.down_vol_pct ?? 0) * 100, 6)}%` }}>
-                  卖{Math.round((snap.intrabar_profile.down_vol_pct ?? 0) * 100)}%
+                     style={{ width: `${Math.max((intrabar.down_vol_pct ?? 0) * 100, 6)}%` }}>
+                  卖{Math.round((intrabar.down_vol_pct ?? 0) * 100)}%
                 </div>
               </div>
               <div className="flex justify-between text-[11px] text-[#525461] mt-1 px-0.5">
                 <span>净delta <span className={`font-mono font-semibold ${
-                  (snap.intrabar_profile.net_delta_pct ?? 0) > 0 ? "text-emerald-600" : "text-red-600"}`}>
-                  {(snap.intrabar_profile.net_delta_pct ?? 0) > 0 ? "+" : ""}{Math.round((snap.intrabar_profile.net_delta_pct ?? 0) * 100)}%</span></span>
-                <span>VPOC <span className="font-mono">${snap.intrabar_profile.intrabar_poc?.toFixed(2)}</span>
-                  <span className="text-gray-400">（{Math.round((snap.intrabar_profile.poc_position ?? 0) * 100)}%位）</span></span>
+                  (intrabar.net_delta_pct ?? 0) > 0 ? "text-emerald-600" : "text-red-600"}`}>
+                  {(intrabar.net_delta_pct ?? 0) > 0 ? "+" : ""}{Math.round((intrabar.net_delta_pct ?? 0) * 100)}%</span></span>
+                <span>VPOC <span className="font-mono">${intrabar.intrabar_poc?.toFixed(2)}</span>
+                  <span className="text-gray-400">（{Math.round((intrabar.poc_position ?? 0) * 100)}%位）</span></span>
               </div>
             </div>
             {/* 读数 */}
             <div className="flex items-start gap-2 text-xs bg-indigo-50/70 border border-indigo-100 rounded-lg px-3 py-2 mb-2 leading-snug">
               <span className={`shrink-0 px-1.5 py-0.5 rounded font-bold ${
-                snap.intrabar_profile.stance === "偏多" ? "bg-emerald-100 text-emerald-700"
-                : snap.intrabar_profile.stance === "偏空" ? "bg-red-100 text-red-700"
+                intrabar.stance === "偏多" ? "bg-emerald-100 text-emerald-700"
+                : intrabar.stance === "偏空" ? "bg-red-100 text-red-700"
                 : "bg-gray-100 text-gray-500"}`}>
-                {snap.intrabar_profile.read}
+                {intrabar.read}
               </span>
-              <span className="text-gray-700">{snap.intrabar_profile.read_note}</span>
+              <span className="text-gray-700">{intrabar.read_note}</span>
             </div>
-            {snap.intrabar_profile.delta_disagree && (
+            {intrabar.delta_disagree && (
               <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1 mb-2 leading-snug">
                 ⚠️ 净 delta 方向与读数背离,降级参考
               </div>
             )}
             {/* 近N日 delta 趋势条 */}
-            {(snap.intrabar_profile.delta_strip?.length ?? 0) > 0 && (
+            {(intrabar.delta_strip?.length ?? 0) > 0 && (
               <div className="flex items-center gap-2 text-[11px] text-[#525461]">
-                <span className="shrink-0">近{snap.intrabar_profile.delta_strip!.length}日抛压/承接</span>
+                <span className="shrink-0">近{intrabar.delta_strip!.length}日抛压/承接</span>
                 <div className="flex gap-1">
-                  {snap.intrabar_profile.delta_strip!.map((s) => (
+                  {intrabar.delta_strip!.map((s) => (
                     <div key={s.date}
                          title={`${s.date}: 净delta ${s.delta_pct > 0 ? "+" : ""}${Math.round(s.delta_pct * 100)}%`}
                          className={`w-4 h-4 rounded-sm ${s.sign > 0 ? "bg-emerald-400" : "bg-red-400"}`} />

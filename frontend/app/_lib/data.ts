@@ -367,6 +367,14 @@ export interface IntrabarProfile {
   available:      boolean;
   bar_date?:      string;
   n_subbars?:     number;
+  /** 子 bar 周期。2026-09-09 起实时路径喂 15m(一天 26 根);日快照仍是 1h(7 根)。 */
+  tf?:            string;
+  /** 当日尚未收盘 → VPOC/CLV 都还会变,前端必须标出来,别让人当定论。 */
+  in_progress?:   boolean;
+  /** 剔除的零量 bar 数(夜盘合成 bar volume 恒为 0,留着会撑大当日 span)。 */
+  zero_vol_dropped?: number;
+  /** 实时重算时间戳(仅 live_quote 那份有);判"是不是刚算的"用它,别用整行时间。 */
+  asof?:          string;
   day_high?:      number;
   day_low?:       number;
   close?:         number;
@@ -910,6 +918,10 @@ export interface LiveQuote {
   // read (structure/zones/sweeps + playbook) so the page renders the whole SMC card
   // from one live source. Fresher than the daily snapshot, so the page prefers it.
   smc?: (SmcAnalysis & { asof?: string }) | null;
+  // 🔬 Intrabar 画像(2026-09-09):搭 SMC 的同一班车,每 ~5min 用 fresh 15m 帧重算。
+  // 此前它只在 09:00 ET 全量 publish 算一次、且吃 1h bar(一天 7 根喂 24 个价位桶)
+  // —— 等于一张昨天的图配了个今天的价格。页面优先读这份。
+  intrabar?: IntrabarProfile | null;
   // 周一开盘·周末BTC 信号(仅周一有值;mining.md 核心事实 #9,验证期)
   btc_weekend?: {
     date: string; weekend_ret: number; green: boolean;

@@ -17,8 +17,29 @@ Intrabar Profile — 单根日线 bar 内部的成交量画像 + 签名 delta。
   投降 = 低位放量且收在低位(卖盘主导,尚无承接)→ 下跌延续风险
 
 这是**地图不是信号**:不进 edge、不进机械扫描打分、不驱动交易;只展示 + 喂决策
-prompt 作"确认腿"参考(同 POC / NW 待遇)。delta 是 1h 收-开 符号近似,非真实
+prompt 作"确认腿"参考(同 POC / NW 待遇)。delta 是子 bar 收-开 符号近似,非真实
 tick delta —— 当趋势线索,别当精确的主动买卖量。所有计算因果(仅用已完成子 bar)。
+
+## 2026-09-09 实时化(用户点单「把那个 intrabar 改成实时的」)
+
+改之前它是**一张昨天的图配了个今天的价格**:只有 09:00 ET 全量 publish 跑一次,
+盘中 `minute%5` 那个槽位只重算 SMC 没带它;数据源 1h → 一天只有 7 根子 bar,
+却要分 24 个价位桶,开盘头一小时直接返回"子 bar 不足"。
+
+现在:本函数**与周期无关**,喂什么 TF 就用什么。生产路径改喂 `compute_smc`
+每 5 分钟已经 force_refresh 的那份 15m 帧(增量成本≈0,数据已在内存里):
+一天 26 根、开盘 30 分钟就出画像、每 5 分钟刷新。
+
+**两个必须处理的坑(都在下面代码里)**:
+① **夜盘合成 bar 的 volume 恒为 0**(见 overnight_bars 文件头限制③)。这是个
+   *成交量* 模块 —— 合成 bar 不但贡献不了量,它的高低点还会撑大当日 span、
+   把 24 个桶铺到没有成交的价格上,算出一张假画像。**一律先剔除零量 bar。**
+② 当日 bar **未收盘**时,读数会随盘中来回跳(VPOC 位置、CLV 都还在动)。
+   带 `in_progress` 标记一路输出到前端,别让人把进行中的读数当定论。
+
+**判死声明**:第二十六轮已判死"裸 delta ≥40% 当买信号"(中位数归零、t=1.2),
+"突破接受"只有 1 天顺风。刷新变快只让地图更准,**不会让它变成信号** ——
+它仍然不进 edge、不驱动交易。
 """
 
 from __future__ import annotations
@@ -26,8 +47,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-_N_BINS       = 24    # 日内价位分辨率(1h bar 少,bin-spread 会平滑)
+_N_BINS       = 24    # 日内价位分辨率(子 bar 少时 bin-spread 会平滑)
 _CONTEXT_DAYS = 5     # delta 趋势条回看天数
+_MIN_SUBBARS  = 2     # 少于这么多根子 bar,画像无意义
 _LOW_ZONE     = 0.40  # poc_position ≤ 此 = 放量在区间下沿
 _HIGH_ZONE    = 0.60  # poc_position ≥ 此 = 放量在区间上沿
 
@@ -50,20 +72,53 @@ def _day_delta(day: pd.DataFrame) -> tuple[float, float]:
 
 def analyze_intrabar_profile(df_h: pd.DataFrame, live_price: float | None = None,
                              n_bins: int = _N_BINS,
-                             context_days: int = _CONTEXT_DAYS) -> dict:
-    """最近一根日线 bar 的日内成交量画像 + 签名 delta + 吸收/投降/派发读数。"""
+                             context_days: int = _CONTEXT_DAYS,
+                             tf: str = "1h",
+                             min_subbars: int = _MIN_SUBBARS) -> dict:
+    """最近一根日线 bar 的日内成交量画像 + 签名 delta + 吸收/投降/派发读数。
+
+    `df_h` 可以是任意日内周期(1h / 15m / …);`tf` 只用于标注给人看。
+    零成交量的 bar 会被先剔除 —— 夜盘合成 bar 的 volume 恒为 0,留着会撑大
+    当日 span、把价位桶铺到没成交的价格上(见文件头坑①)。
+    """
     if df_h is None or len(df_h) < 8:
-        return {"available": False, "rationale": "1h 数据不足,无法构建日内画像"}
+        return {"available": False, "rationale": f"{tf} 数据不足,无法构建日内画像"}
     d = df_h.rename(columns=str.lower)
     if not {"open", "high", "low", "close", "volume"}.issubset(d.columns):
-        return {"available": False, "rationale": "1h 数据缺 OHLCV 列"}
+        return {"available": False, "rationale": f"{tf} 数据缺 OHLCV 列"}
+    # 坑①:剔除零量/缺量 bar(夜盘合成 bar volume 恒为 0)
+    vol = pd.to_numeric(d["volume"], errors="coerce")
+    n_before = len(d)
+    d = d[vol.fillna(0) > 0]
+    n_dropped = n_before - len(d)
+    if len(d) < min_subbars:
+        return {"available": False,
+                "rationale": f"{tf} 有量子 bar 不足({len(d)}根,剔除{n_dropped}根零量)"}
 
-    dates = pd.DatetimeIndex(d.index).normalize()
+    # 时区:按**美东日历日**分组。attach_overnight 会把序列转成 UTC,若照 UTC
+    # 归一化,16:00 之后的 ET bar 会被算进第二天 —— 一天被劈成两半。
+    idx = pd.DatetimeIndex(d.index)
+    try:
+        idx = idx.tz_convert("America/New_York") if idx.tz is not None \
+              else idx.tz_localize("America/New_York")
+    except Exception:
+        pass
+    d = d.copy(); d.index = idx
+    dates = idx.normalize()
     uniq  = pd.Index(dates.unique()).sort_values()
     last  = uniq[-1]
     day   = d[dates == last]
-    if len(day) < 2:
-        return {"available": False, "rationale": "当日 1h 子 bar 不足(<2),画像无意义"}
+    if len(day) < min_subbars:
+        return {"available": False,
+                "rationale": f"当日 {tf} 子 bar 不足({len(day)}<{min_subbars}),画像无意义"}
+
+    # 坑②:当日尚未收盘 → 读数还会变,标出来别当定论
+    try:
+        from zoneinfo import ZoneInfo
+        now_et = pd.Timestamp.now(tz=ZoneInfo("America/New_York"))
+        in_progress = bool(last.date() == now_et.date() and now_et.hour < 16)
+    except Exception:
+        in_progress = False
 
     lo, hi = float(day["low"].min()), float(day["high"].max())
     span   = (hi - lo) or 1e-6
@@ -133,6 +188,9 @@ def analyze_intrabar_profile(df_h: pd.DataFrame, live_price: float | None = None
         "available":     True,
         "bar_date":      str(last.date()),
         "n_subbars":     int(len(day)),
+        "tf":            tf,               # 子 bar 周期(给人看的标注)
+        "in_progress":   in_progress,      # 当日未收盘 → 读数还会变(坑②)
+        "zero_vol_dropped": int(n_dropped),# 剔除的零量 bar 数(夜盘合成,坑①)
         "day_high":      round(hi, 2),
         "day_low":       round(lo, 2),
         "close":         round(close, 2),
@@ -147,10 +205,13 @@ def analyze_intrabar_profile(df_h: pd.DataFrame, live_price: float | None = None
         "read_note":     note_r,
         "delta_disagree": bool(delta_disagree),
         "delta_strip":   strip,
-        "rationale":     (f"{last.date()} 日内({len(day)}根1h):VPOC ${vpoc:.2f}"
+        "rationale":     (f"{last.date()} 日内({len(day)}根{tf}"
+                          f"{',进行中' if in_progress else ''}):VPOC ${vpoc:.2f}"
                           f"(位置{poc_pos:.0%}), 收盘位置CLV {clv:+.2f}, "
                           f"净delta {delta_pct:+.0%} → {read}"),
-        "note":          "1h 子bar 重构日内画像;delta=收-开 符号近似(无 tick 数据,当趋势不当精确量)",
+        "note":          (f"{tf} 子bar 重构日内画像;delta=收-开 符号近似"
+                          f"(无 tick 数据,当趋势不当精确量)"
+                          + ("；当日未收盘,读数仍会变" if in_progress else "")),
     }
 
 
