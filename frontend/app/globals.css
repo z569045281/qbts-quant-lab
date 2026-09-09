@@ -1,8 +1,47 @@
 @import "tailwindcss";
 
-:root {
-  --background: #F6F6F8;
-  --foreground: #171717;
+/* ═══════════════════════════════════════════════════════════════════════
+   设计系统底座 —— 2026-09-09 重做。
+
+   改之前的两个病:
+   ① 字号只有两端。实测 9-12px 用了 207 次、14-15px 30 次、16-24px **0 次**、
+      然后直接跳到 26/30px。除了裁决卡那一个大字,其余全挤在同一个视觉平面,
+      二三四级信息分不出先后 —— 2026-07-29 那次 tab 重构治了「区块之间」的
+      层级,「区块内部」的层级是同一个病在下一层复发。
+   ② 深色模式是整页 filter: invert(1) hue-rotate(180deg)。这是个红绿即结论
+      的交易界面,把涨跌色交给近似反相是会出真事故的;所有图表、迷你K线、
+      轮动图一并被翻。现在换成按语义重定亮度的真配色(见文件下半部分)。
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@theme {
+  /* ── 字号阶梯 ────────────────────────────────────────────────────────
+     六档,填掉原来 16-24px 那段真空。中文在同等字号下比拉丁字母更难认,
+     所以地板定在 11px(原来有 6 处 9px、74 处 10px,装的还是「信心刻度
+     图例」这种真需要读懂的话)。 */
+  --text-meta: 11px;          --text-meta--line-height: 1.45;   /* 单位 · 时间戳 · 脚注 */
+  --text-body: 13px;          --text-body--line-height: 1.6;    /* 正文 */
+  --text-card: 15px;          --text-card--line-height: 1.4;    /* 卡片标题 · 关键数字 */
+  --text-section: 17px;       --text-section--line-height: 1.35; /* 区块标题(新增,原来这一档不存在) */
+  --text-price: 26px;         --text-price--line-height: 1;     /* 报价 */
+  --text-display: 30px;       --text-display--line-height: 1.15; /* 裁决 —— 全页唯一 */
+
+  /* ── 圆角:四档,编码层级而不是随手写 ────────────────────────────────
+     原来七种圆角(lg 90 / full 81 / 2xl 47 / xl 46 / md 35 / 3xl 23 / sm 2)
+     并存且无规则。现在:顶层卡片用 card,卡内嵌套块和按钮用 inner,
+     药丸/进度条/圆点继续用 rounded-full。 */
+  --radius-card: 16px;
+  --radius-inner: 8px;
+
+  /* ── 语义色 ──────────────────────────────────────────────────────────
+     取代页面里散落的字面 hex(#525461 用了 144 次、#F03A3E 86 次、
+     #EDEDF0 76 次、#006FFF 59 次、#F6F6F8 41 次)。收成 token 之后
+     深色模式只需在下面换一次值,不必逐处加 dark: 变体。 */
+  --color-surface: #FFFFFF;        /* 卡片底(原 bg-white,90 处) */
+  --color-sunken: #F6F6F8;         /* 页面底 · 内嵌块底 */
+  --color-hairline: #EDEDF0;       /* 描边 */
+  --color-ink-muted: #525461;      /* 次级文字 */
+  --color-brand: #006FFF;          /* 品牌蓝 · 选中态 · 链接 */
+  --color-down: #F03A3E;           /* 跌 —— 与 emerald(涨)成对,别改成通用 red */
 }
 
 @theme inline {
@@ -12,24 +51,182 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* 夜间模式:整页 invert + hue-rotate(180°) —— 翻转明暗但近似保留红绿涨跌语义,
-   零改动那上百个字面 hex 颜色类。已是深色的顶栏二次反相还原(否则被翻成浅色)。
-   ponytail: filter-invert dark mode;够用即可,要像素级深色配色再逐元素上 dark: 变体。 */
-html.dark {
-  filter: invert(1) hue-rotate(180deg);
-  background: #0b0b0d;
+:root {
+  --background: #F6F6F8;
+  --foreground: #171717;
 }
-html.dark header { filter: invert(1) hue-rotate(180deg); }
 
-/* Force light theme — this is a financial dashboard, always light. */
 body {
-  background: #F6F6F8;
-  color: #171717;
+  background: var(--color-sunken);
+  color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
-  /* Safety net: a single wide element should never make the whole page
-     scroll sideways on a phone — the nav scrolls its own tab strip instead. */
+  /* 单个超宽元素不该让整页横滚 —— 导航自己滚它那条 tab 带。 */
   overflow-x: hidden;
-  /* Stop iOS Safari from auto-inflating text on rotate. */
+  /* 别让 iOS Safari 在旋转时自动放大正文。 */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   深色模式 —— 重定义 Tailwind 的调色板变量,不是反相。
+
+   Tailwind v4 把每个色阶都编译成 var(--color-<族>-<档>),所以在这里换一次
+   值,全站 1,369 处具名颜色类一起跟着变,不用给每一处写 dark: 变体。
+
+   重定亮度的依据是「这一档在界面里干什么活」:
+     50-300  底色 / 描边   → 压到暗端,并去饱和(否则深色底一片荧光)
+     400-500 实心标记       → 原样不动(进度条、圆点在深色上本来就够跳)
+     600-900 文字           → 提到亮端,保饱和(否则红绿灰扑扑分不出来)
+   色相一律不动。中性档(gray/slate/…)不用灰,改用锚在顶栏 #0F1B2E 的
+   海军蓝中性 ramp,让深色模式属于这块仪表盘而不是通用模板。
+   ═══════════════════════════════════════════════════════════════════════ */
+html.dark {
+  color-scheme: dark;
+  --background: #0C1420;
+  --foreground: #ECF1F8;
+
+  --color-surface: #131E2E;
+  --color-sunken: #0C1420;
+  --color-hairline: #24334A;
+  --color-ink-muted: #93A0B5;
+  --color-brand: #4D9BFF;
+  --color-down: #FF6B6E;
+
+  /* amber */
+  --color-amber-50: #302A12;
+  --color-amber-100: #3F3718;
+  --color-amber-200: #594E22;
+  --color-amber-300: #7A692E;
+  --color-amber-600: #F5A247;
+  --color-amber-700: #F7AA6E;
+  --color-amber-800: #FAC49E;
+  --color-amber-900: #FCDAC5;
+  --color-amber-950: #FDE8DD;
+
+  /* blue */
+  --color-blue-50: #121F30;
+  --color-blue-100: #18293F;
+  --color-blue-200: #223A59;
+  --color-blue-600: #477DF5;
+  --color-blue-700: #7291F3;
+  --color-blue-800: #A5B6F3;
+  --color-blue-900: #CCD6F5;
+
+  /* cyan */
+  --color-cyan-600: #47D4F5;
+
+  /* emerald */
+  --color-emerald-50: #123022;
+  --color-emerald-100: #183F2B;
+  --color-emerald-200: #22593F;
+  --color-emerald-300: #2E7A5E;
+  --color-emerald-600: #47F5BE;
+  --color-emerald-700: #6EF7D0;
+  --color-emerald-800: #9EFAE2;
+
+  /* gray */
+  --color-gray-50: #0F1826;
+  --color-gray-100: #16212F;
+  --color-gray-200: #1F2A39;
+  --color-gray-300: #2B3746;
+  --color-gray-400: #838FA3;
+  --color-gray-500: #95A1B4;
+  --color-gray-600: #AAB5C6;
+  --color-gray-700: #C4CDDA;
+  --color-gray-800: #DBE2EC;
+  --color-gray-900: #ECF1F8;
+
+  /* green */
+  --color-green-100: #183F25;
+  --color-green-700: #6EF7A9;
+
+  /* indigo */
+  --color-indigo-50: #121930;
+  --color-indigo-100: #18213F;
+  --color-indigo-200: #222C59;
+  --color-indigo-600: #5B47F5;
+  --color-indigo-700: #8C7EE7;
+  --color-indigo-800: #B3ACEC;
+  --color-indigo-900: #D0CDF3;
+
+  /* orange */
+  --color-orange-50: #302312;
+  --color-orange-100: #3F2E18;
+  --color-orange-200: #593F22;
+  --color-orange-600: #F58247;
+  --color-orange-700: #F7986E;
+  --color-orange-800: #FAB89E;
+  --color-orange-900: #FAD4C7;
+
+  /* pink */
+  --color-pink-50: #301223;
+
+  /* purple */
+  --color-purple-50: #211230;
+  --color-purple-200: #3C2259;
+  --color-purple-700: #C06EF7;
+
+  /* red */
+  --color-red-50: #301212;
+  --color-red-100: #3F1818;
+  --color-red-200: #592222;
+  --color-red-300: #7A2E2E;
+  --color-red-600: #F54756;
+  --color-red-700: #F76E78;
+  --color-red-800: #FA9EA5;
+  --color-red-900: #F5CBCC;
+
+  /* rose */
+  --color-rose-50: #301214;
+  --color-rose-100: #3F181B;
+  --color-rose-200: #592229;
+  --color-rose-300: #7A2E38;
+  --color-rose-600: #F5477A;
+  --color-rose-700: #F76E96;
+
+  /* sky */
+  --color-sky-50: #122430;
+  --color-sky-100: #18303F;
+  --color-sky-200: #224659;
+  --color-sky-700: #6EC6F7;
+  --color-sky-800: #9EDBFA;
+
+  /* slate */
+  --color-slate-50: #0F1826;
+  --color-slate-100: #16212F;
+  --color-slate-200: #1F2A39;
+  --color-slate-300: #2B3746;
+  --color-slate-400: #838FA3;
+  --color-slate-500: #95A1B4;
+  --color-slate-600: #AAB5C6;
+  --color-slate-700: #C4CDDA;
+  --color-slate-800: #DBE2EC;
+  --color-slate-900: #ECF1F8;
+
+  /* teal */
+  --color-teal-50: #123029;
+  --color-teal-100: #183F37;
+  --color-teal-200: #22594E;
+  --color-teal-700: #6EF7ED;
+  --color-teal-800: #9EFAF5;
+
+  /* violet */
+  --color-violet-50: #171230;
+  --color-violet-100: #1F183F;
+  --color-violet-200: #2B2259;
+  --color-violet-600: #9147F5;
+  --color-violet-700: #AE6EF7;
+  --color-violet-800: #C7A0F8;
+
+  /* yellow */
+  --color-yellow-50: #302D12;
+  --color-yellow-600: #F5BB47;
+  --color-yellow-900: #FAE0C7;
+
+  /* 涨/跌这两支手钉,不走上面的公式 —— 它们是全页语义最重的一对,
+     算出来的值会漂(emerald 到高亮度会偏薄荷,红橙两族在文字档几乎撞色)。 */
+  --color-emerald-600: #34D399;   /* 涨 · 正文 */
+  --color-emerald-700: #6EE7B7;   /* 涨 · 深绿底上的文字 */
+  --color-red-600: #FF6B6E;       /* 跌 */
+  --color-red-700: #FF9295;       /* 跌 · 深红底上的文字 */
 }

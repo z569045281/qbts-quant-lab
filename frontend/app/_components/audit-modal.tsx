@@ -67,9 +67,9 @@ export function AuditModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
          onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col"
+      <div className="bg-surface rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col"
            onClick={e => e.stopPropagation()}>
-        <div className="px-5 py-3.5 border-b border-[#EDEDF0] flex items-center">
+        <div className="px-5 py-3.5 border-b border-hairline flex items-center">
           <span className="text-sm font-semibold text-gray-800">👀 谁点了按钮</span>
           <span className="ml-2 text-[10px] text-gray-400">Lambda 记录 · 定时任务不计入</span>
           <button onClick={onClose}
@@ -91,7 +91,7 @@ export function AuditModal({ onClose }: { onClose: () => void }) {
 
           {visitors.size > 0 && (
             <div>
-              <div className="text-[10px] font-semibold text-[#525461] uppercase tracking-wider mb-1.5">
+              <div className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-1.5">
                 访客小结(按 IP+设备)
               </div>
               <div className="space-y-1">
@@ -107,7 +107,7 @@ export function AuditModal({ onClose }: { onClose: () => void }) {
 
           {(rows ?? []).length > 0 && (
             <div>
-              <div className="text-[10px] font-semibold text-[#525461] uppercase tracking-wider mb-1.5">
+              <div className="text-[10px] font-semibold text-ink-muted uppercase tracking-wider mb-1.5">
                 逐条记录(近 100 条 · 本地时间)
               </div>
               <div className="space-y-1.5">

@@ -30,7 +30,7 @@ function ConvictionMeter({ v }: { v: number }) {
     <div className="flex items-center gap-2">
       <div className="flex gap-0.5">
         {Array.from({ length: 10 }).map((_, i) => (
-          <span key={i} className={`h-3 w-1.5 rounded-sm ${i < v ? "bg-[#006FFF]" : "bg-gray-200"}`} />
+          <span key={i} className={`h-3 w-1.5 rounded-sm ${i < v ? "bg-brand" : "bg-gray-200"}`} />
         ))}
       </div>
       <span className="text-xs font-mono font-semibold text-gray-600">{v}/10</span>
@@ -58,9 +58,9 @@ function DecisionHero({ d }: { d: SpacexDecision }) {
             { k: "入场", v: usd(d.entry), c: "text-gray-900" },
             { k: "止损", v: usd(d.stop), c: "text-rose-600" },
             { k: "目标", v: usd(d.target), c: "text-emerald-600" },
-            { k: "盈亏比", v: d.rr ? `${d.rr}` : "—", c: "text-[#006FFF]" },
+            { k: "盈亏比", v: d.rr ? `${d.rr}` : "—", c: "text-brand" },
           ].map(x => (
-            <div key={x.k} className="bg-white/70 rounded-lg px-2.5 py-2">
+            <div key={x.k} className="bg-surface/70 rounded-lg px-2.5 py-2">
               <div className="text-[10px] text-gray-400">{x.k}</div>
               <div className={`font-mono font-bold text-sm ${x.c}`}>{x.v}</div>
             </div>
@@ -87,7 +87,7 @@ function DecisionHero({ d }: { d: SpacexDecision }) {
 
       {/* lockup note — 单独强调 */}
       {d.lockup_note && (
-        <div className="mt-3 rounded-lg bg-white/70 border border-amber-200 px-3 py-2">
+        <div className="mt-3 rounded-lg bg-surface/70 border border-amber-200 px-3 py-2">
           <div className="text-[11px] font-semibold text-amber-700">🔓 对 8/6 解禁的判断</div>
           <p className="text-[12px] text-gray-600 mt-0.5 leading-relaxed">{d.lockup_note}</p>
         </div>
@@ -155,7 +155,7 @@ export default function SpacexPage() {
     <main className="max-w-[900px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-4">
       <SelfCheckCard page="spacex" />
       {/* 标题 */}
-      <section className="rounded-2xl border border-[#EDEDF0] bg-gradient-to-br from-slate-900 to-slate-800 p-5 shadow-sm text-white">
+      <section className="rounded-2xl border border-hairline bg-gradient-to-br from-slate-900 to-slate-800 p-5 shadow-sm text-white">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-lg">🚀</span>
           <span className="text-base font-bold">SpaceX · SPCX</span>
@@ -175,7 +175,7 @@ export default function SpacexPage() {
           <div className="mt-3 flex items-center gap-2 flex-wrap">
             <button
               onClick={regenerate} disabled={running}
-              className="px-3.5 py-1.5 rounded-lg bg-[#006FFF] text-white text-xs font-semibold
+              className="px-3.5 py-1.5 rounded-lg bg-brand text-white text-xs font-semibold
                          disabled:opacity-50 hover:bg-[#0060DB] transition-colors inline-flex items-center gap-1.5">
               {running
                 ? <><span className="inline-block w-2 h-2 rounded-full bg-white/90 animate-pulse" /> 生成中…</>
@@ -187,11 +187,11 @@ export default function SpacexPage() {
       </section>
 
       {loading ? (
-        <div className="text-sm text-[#525461] flex items-center gap-2 px-1">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#006FFF] animate-pulse" /> 读取 SpaceX 决策…
+        <div className="text-sm text-ink-muted flex items-center gap-2 px-1">
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-brand animate-pulse" /> 读取 SpaceX 决策…
         </div>
       ) : !state ? (
-        <div className="rounded-2xl border border-[#EDEDF0] bg-white p-8 text-center">
+        <div className="rounded-2xl border border-hairline bg-surface p-8 text-center">
           <p className="text-sm text-gray-500">尚未生成 SpaceX 数据。</p>
           <p className="mt-1 text-[11px] text-gray-400 leading-relaxed">
             需要先在 Supabase 建 <code className="font-mono bg-gray-100 px-1 rounded">spacex_state</code> 表
@@ -205,7 +205,7 @@ export default function SpacexPage() {
           {state.decision ? (
             <DecisionHero d={state.decision} />
           ) : (
-            <section className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-center">
+            <section className="rounded-2xl border border-dashed border-gray-300 bg-surface p-6 text-center">
               <p className="text-sm text-gray-600 font-medium">DeepSeek 决策待生成</p>
               <p className="mt-1 text-[11px] text-gray-400 leading-relaxed">
                 数据已就绪,但决策为空 —— 云端尚未配 DeepSeek 密钥或本次调用失败。
@@ -236,7 +236,7 @@ export default function SpacexPage() {
           )}
 
           {/* 📒 战绩台账(2026-09-02 补:此前上线 50 天零记录,"战绩如何"根本答不出来)*/}
-          <section className="rounded-2xl border border-gray-300 bg-white p-4 shadow-sm">
+          <section className="rounded-2xl border border-gray-300 bg-surface p-4 shadow-sm">
             <div className="text-xs font-bold text-gray-800 mb-2">
               📒 战绩台账 · 每条决策记录 + 5 个交易日后打分
             </div>
@@ -323,7 +323,7 @@ export default function SpacexPage() {
                   const isEvent = state.options?.event_expiry?.expiry === x.expiry;
                   return (
                     <div key={i} className={`flex items-center gap-2 text-[12px] rounded-lg px-2.5 py-1.5 ${
-                      isEvent ? "bg-rose-100 border border-rose-200" : "bg-white/70"}`}>
+                      isEvent ? "bg-rose-100 border border-rose-200" : "bg-surface/70"}`}>
                       <span className="font-mono text-gray-500 w-24 shrink-0">{x.expiry}</span>
                       <span className="text-[10px] text-gray-400 w-14 shrink-0">还{x.dte ?? "?"}天</span>
                       <span className={`font-mono font-bold ${isEvent ? "text-rose-600" : "text-violet-700"}`}>
@@ -378,7 +378,7 @@ export default function SpacexPage() {
                   { k: "vs 20周期线", v: state.intraday.above_sma20 == null ? "—" : state.intraday.above_sma20 ? "上方" : "下方", sub: usd(state.intraday.sma20) },
                   { k: "vs 锚定VWAP", v: state.intraday.above_vwap == null ? "—" : state.intraday.above_vwap ? "上方" : "下方", sub: usd(state.intraday.vwap) },
                 ].map(x => (
-                  <div key={x.k} className="bg-white/70 rounded-lg px-2.5 py-2">
+                  <div key={x.k} className="bg-surface/70 rounded-lg px-2.5 py-2">
                     <div className="text-[10px] text-gray-400">{x.k}</div>
                     <div className="font-mono font-semibold text-gray-800 text-sm">{x.v}</div>
                     {x.sub && <div className="text-[9px] text-gray-400 font-mono">{x.sub}</div>}
@@ -416,7 +416,7 @@ export default function SpacexPage() {
 
           {/* 技术读数(日线,薄数据参考)*/}
           {dd && (
-            <section className="rounded-2xl border border-[#EDEDF0] bg-white p-4 shadow-sm">
+            <section className="rounded-2xl border border-hairline bg-surface p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-xs font-semibold text-gray-700">📊 日线技术读数(薄数据·仅参考)</span>
                 <span className="text-[10px] text-gray-400">{dd.n_bars} 根日线 · {dd.as_of}</span>
@@ -449,7 +449,7 @@ export default function SpacexPage() {
 
           {/* 新闻 */}
           {state.news?.length > 0 && (
-            <section className="rounded-2xl border border-[#EDEDF0] bg-white p-4 shadow-sm">
+            <section className="rounded-2xl border border-hairline bg-surface p-4 shadow-sm">
               <div className="text-xs font-semibold text-gray-700 mb-2">📰 近3日头条(喂给 DeepSeek 的原料)</div>
               <ul className="space-y-1.5">
                 {state.news.map((n, i) => (

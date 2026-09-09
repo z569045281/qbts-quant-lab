@@ -18,10 +18,10 @@ import { SelfCheckCard } from "../_components/self-check";
 const STANCE: Record<string, { border: string; bg: string; chip: string; bar: string }> = {
   "买入区":   { border: "border-emerald-300", bg: "bg-emerald-50/50", chip: "bg-emerald-100 text-emerald-700", bar: "bg-emerald-500" },
   "接近买点": { border: "border-amber-300",   bg: "bg-amber-50/40",   chip: "bg-amber-100 text-amber-700",   bar: "bg-amber-400" },
-  "观望":     { border: "border-[#E5E5EA]",   bg: "bg-white",         chip: "bg-gray-100 text-gray-500",     bar: "bg-gray-400" },
+  "观望":     { border: "border-hairline",   bg: "bg-surface",         chip: "bg-gray-100 text-gray-500",     bar: "bg-gray-400" },
   "偏空回避": { border: "border-red-200",     bg: "bg-red-50/40",     chip: "bg-red-100 text-red-700",       bar: "bg-red-400" },
 };
-const FALLBACK = { border: "border-[#E5E5EA]", bg: "bg-white", chip: "bg-gray-100 text-gray-500", bar: "bg-gray-300" };
+const FALLBACK = { border: "border-hairline", bg: "bg-surface", chip: "bg-gray-100 text-gray-500", bar: "bg-gray-300" };
 
 const TREND_CN: Record<string, string> = { bullish: "结构看多", bearish: "结构看空", neutral: "结构中性" };
 const REGIME_CN: Record<string, string> = { expansion: "波动扩张", contraction: "波动收缩", normal: "波动正常" };
@@ -39,7 +39,7 @@ function ScanCard({ r, editable, onRemove }: {
 
   if (r.error) {
     return (
-      <div className="relative rounded-2xl border border-[#E5E5EA] bg-white p-4 flex items-center gap-3">
+      <div className="relative rounded-2xl border border-hairline bg-surface p-4 flex items-center gap-3">
         <span className="text-lg">⚠️</span>
         <span className="font-bold text-gray-800">{r.ticker}</span>
         <span className="text-xs text-gray-400">{r.theme} · 数据拉取失败</span>
@@ -58,7 +58,7 @@ function ScanCard({ r, editable, onRemove }: {
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-medium">{r.theme}</span>
         <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${s.chip}`}>{r.stance}</span>
         <span className="ml-auto text-sm font-mono text-gray-900">${r.price?.toFixed(2)}</span>
-        <span className={`text-sm font-semibold ${up ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+        <span className={`text-sm font-semibold ${up ? "text-emerald-600" : "text-down"}`}>
           {up ? "▲" : "▼"} {pct(Math.abs(r.today_change ?? 0))}
         </span>
       </div>
@@ -182,7 +182,7 @@ function pctSigned(n: number): string {
 
 function PaperPanel({ p }: { p: PaperSim }) {
   const t = p.totals;
-  const tone = (n: number) => (n > 0 ? "text-emerald-600" : n < 0 ? "text-[#F03A3E]" : "text-gray-500");
+  const tone = (n: number) => (n > 0 ? "text-emerald-600" : n < 0 ? "text-down" : "text-gray-500");
   // 账本按机制代际分开看:v1 = 07-13 六连修之前的旧机制(已定性为学费,折叠归档),
   // v2 = 现行机制。头部四格只算 v2 —— 别让旧账污染对现行机制的判断。原始数据不删,8/15 审判按代际分开。
   const closedV2 = p.closed.filter(c => c.epoch === "v2");
@@ -191,7 +191,7 @@ function PaperPanel({ p }: { p: PaperSim }) {
   const realizedV1 = closedV1.reduce((s, c) => s + c.pnl, 0);
   const winV2 = closedV2.filter(c => c.pnl > 0).length;
   return (
-    <section className="rounded-2xl border border-[#E6E6EA] bg-white p-4 shadow-sm">
+    <section className="rounded-2xl border border-hairline bg-surface p-4 shadow-sm">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-sm">📊</span>
         <span className="text-xs font-semibold text-gray-800">模拟战绩 · 每个买入信号投 ${p.trade_usd.toFixed(0)}</span>
@@ -201,19 +201,19 @@ function PaperPanel({ p }: { p: PaperSim }) {
 
       {/* 总览(只算现行机制 v2;旧机制 v1 的学费在下方折叠归档) */}
       <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-        <div className="bg-[#FAFAFC] rounded-xl px-2 py-2">
+        <div className="bg-sunken rounded-xl px-2 py-2">
           <div className="text-[10px] text-gray-400">v2 总盈亏</div>
           <div className={`text-lg font-bold font-mono ${tone(realizedV2 + t.unrealized)}`}>{money(realizedV2 + t.unrealized)}</div>
         </div>
-        <div className="bg-[#FAFAFC] rounded-xl px-2 py-2">
+        <div className="bg-sunken rounded-xl px-2 py-2">
           <div className="text-[10px] text-gray-400">v2 已平仓(落袋)</div>
           <div className={`text-sm font-semibold font-mono ${tone(realizedV2)}`}>{money(realizedV2)}</div>
         </div>
-        <div className="bg-[#FAFAFC] rounded-xl px-2 py-2">
+        <div className="bg-sunken rounded-xl px-2 py-2">
           <div className="text-[10px] text-gray-400">持仓浮动</div>
           <div className={`text-sm font-semibold font-mono ${tone(t.unrealized)}`}>{money(t.unrealized)}</div>
         </div>
-        <div className="bg-[#FAFAFC] rounded-xl px-2 py-2">
+        <div className="bg-sunken rounded-xl px-2 py-2">
           <div className="text-[10px] text-gray-400">v2 平仓胜率</div>
           <div className="text-sm font-semibold font-mono text-gray-700">
             {closedV2.length > 0 ? `${((winV2 / closedV2.length) * 100).toFixed(0)}% (${winV2}/${closedV2.length})` : "—"}
@@ -262,7 +262,7 @@ function PaperPanel({ p }: { p: PaperSim }) {
           <div className="text-[11px] text-gray-500 mb-1">已平仓 · 现行机制 v2({closedV2.length} 笔)</div>
           <div className="space-y-1">
             {closedV2.map((c, i) => (
-              <div key={`${c.ticker}-${c.exit_date}-${i}`} className="flex items-center gap-2 text-[12px] bg-[#FAFAFC] rounded-lg px-2.5 py-1.5">
+              <div key={`${c.ticker}-${c.exit_date}-${i}`} className="flex items-center gap-2 text-[12px] bg-sunken rounded-lg px-2.5 py-1.5">
                 <span className="font-bold text-gray-800 w-12">{c.ticker}</span>
                 <span className="text-gray-400 text-[11px]">{c.entry_date.slice(5)}→{c.exit_date.slice(5)} · {c.days}天</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{c.reason}</span>
@@ -282,7 +282,7 @@ function PaperPanel({ p }: { p: PaperSim }) {
           </summary>
           <div className="space-y-1 mt-1 opacity-70">
             {closedV1.map((c, i) => (
-              <div key={`${c.ticker}-${c.exit_date}-${i}`} className="flex items-center gap-2 text-[12px] bg-[#FAFAFC] rounded-lg px-2.5 py-1.5">
+              <div key={`${c.ticker}-${c.exit_date}-${i}`} className="flex items-center gap-2 text-[12px] bg-sunken rounded-lg px-2.5 py-1.5">
                 <span className="font-bold text-gray-800 w-12">{c.ticker}</span>
                 <span className="text-gray-400 text-[11px]">{c.entry_date.slice(5)}→{c.exit_date.slice(5)} · {c.days}天</span>
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">{c.reason}</span>
@@ -350,7 +350,7 @@ export default function WatchScanPage() {
     <main className="max-w-[1100px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-4">
       <SelfCheckCard page="watch" />
       {/* 标题 */}
-      <section className="bg-white rounded-2xl border border-[#EDEDF0] p-5 shadow-sm">
+      <section className="bg-surface rounded-2xl border border-hairline p-5 shadow-sm">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-base">🔭</span>
           <span className="text-sm font-semibold text-gray-800">自选扫描 · 分散高波动篮子</span>
@@ -364,19 +364,19 @@ export default function WatchScanPage() {
           )}
           {genAt && <span className="ml-auto text-[10px] text-gray-400 font-mono">扫描于 {genAt}</span>}
         </div>
-        <p className="mt-2 text-xs text-[#525461] leading-relaxed">
+        <p className="mt-2 text-xs text-ink-muted leading-relaxed">
           不同驱动的高波动板块,每天扫一遍——按"最接近买点"排序,给立场、大白话触发条件、关键价位,
           并记录自己的历史命中率(5 个交易日后评判)。<span className="text-gray-400">纯机械信号。</span>
         </p>
         <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
           {[["🟢", "买入区"], ["🟡", "接近买点"], ["⚪", "观望"], ["🔴", "偏空回避"]].map(([e, l]) => (
-            <span key={l} className="px-1.5 py-0.5 rounded bg-[#F6F6F8] text-gray-500">{e} {l}</span>
+            <span key={l} className="px-1.5 py-0.5 rounded bg-sunken text-gray-500">{e} {l}</span>
           ))}
         </div>
 
         {/* 管理自选 */}
         {WATCH_EDITABLE && (
-          <div className="mt-3 pt-3 border-t border-[#F0F0F2] flex items-center gap-2 flex-wrap">
+          <div className="mt-3 pt-3 border-t border-hairline flex items-center gap-2 flex-wrap">
             <span className="text-[11px] text-gray-500">管理自选:</span>
             <input
               value={input}
@@ -384,10 +384,10 @@ export default function WatchScanPage() {
               onKeyDown={e => { if (e.key === "Enter") handleAdd(); }}
               placeholder="股票代码 如 NVDA"
               disabled={!!busy}
-              className="px-2.5 py-1 text-xs font-mono border border-[#D9D9DE] rounded-md w-36 focus:outline-none focus:border-[#006FFF] disabled:bg-gray-50"
+              className="px-2.5 py-1 text-xs font-mono border border-hairline rounded-md w-36 focus:outline-none focus:border-brand disabled:bg-gray-50"
             />
             <button onClick={handleAdd} disabled={!!busy || !input.trim()}
-              className="px-3 py-1 text-xs font-medium bg-[#006FFF] text-white rounded-md hover:bg-blue-600 disabled:opacity-40">
+              className="px-3 py-1 text-xs font-medium bg-brand text-white rounded-md hover:bg-blue-600 disabled:opacity-40">
               添加
             </button>
             {busy && (
@@ -438,7 +438,7 @@ export default function WatchScanPage() {
             <span>⛔</span>
             <span className="font-semibold text-red-700">今日避雷</span>
             {scan.avoid.tickers.map(t => (
-              <span key={t} className="px-2 py-0.5 rounded-full bg-white border border-red-200 text-red-600 font-mono text-[12px] font-semibold">{t}</span>
+              <span key={t} className="px-2 py-0.5 rounded-full bg-surface border border-red-200 text-red-600 font-mono text-[12px] font-semibold">{t}</span>
             ))}
           </div>
           <p className="mt-1 text-[12px] leading-relaxed text-red-700/80">{scan.avoid.note}</p>
@@ -447,7 +447,7 @@ export default function WatchScanPage() {
 
       {/* 🧭 板块轮动地图(与复盘页同源,随每日发布刷新)*/}
       {rot && (
-        <section className="bg-white rounded-2xl border border-[#EDEDF0] p-5 shadow-sm">
+        <section className="bg-surface rounded-2xl border border-hairline p-5 shadow-sm">
           <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
             <h2 className="text-sm font-semibold text-gray-800">🧭 板块轮动地图 · 钱正在往哪儿去</h2>
             <span className="text-[10px] text-gray-400 font-mono">vs {rot.benchmark} · 截至 {rot.as_of}</span>
@@ -485,11 +485,11 @@ export default function WatchScanPage() {
 
       {/* 状态 / 卡片 */}
       {loading ? (
-        <div className="text-sm text-[#525461] flex items-center gap-2 px-1">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#006FFF] animate-pulse" /> 读取扫描结果…
+        <div className="text-sm text-ink-muted flex items-center gap-2 px-1">
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-brand animate-pulse" /> 读取扫描结果…
         </div>
       ) : !scan || scan.results.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-[#EDEDF0] p-8 text-center text-sm text-gray-400">
+        <div className="bg-surface rounded-2xl border border-hairline p-8 text-center text-sm text-gray-400">
           尚未生成扫描 — 运行一次 <code className="font-mono bg-gray-100 px-1 rounded">publish.py</code>(或等每日自动任务)后这里就会有数据。
         </div>
       ) : (

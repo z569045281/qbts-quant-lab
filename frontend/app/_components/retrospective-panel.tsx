@@ -74,13 +74,13 @@ export function RetrospectivePanel() {
   };
 
   return (
-    <div className="mt-4 border-t border-[#F0F0F2] pt-3">
+    <div className="mt-4 border-t border-hairline pt-3">
       <button
         onClick={onClick}
         disabled={locked}
         className={`w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border transition ${
           locked
-            ? "border-[#EDEDF0] bg-[#F6F6F8] text-gray-400 cursor-not-allowed"
+            ? "border-hairline bg-sunken text-gray-400 cursor-not-allowed"
             : "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
         }`}
       >
@@ -96,7 +96,7 @@ export function RetrospectivePanel() {
       )}
 
       {open && !locked && (
-        <div className="mt-2 rounded-lg bg-[#FAFAFB] border border-[#EDEDF0] px-3.5 py-3">
+        <div className="mt-2 rounded-lg bg-sunken border border-hairline px-3.5 py-3">
           {loading ? (
             <div className="text-xs text-gray-400 py-4 text-center">读取中…</div>
           ) : retro ? (

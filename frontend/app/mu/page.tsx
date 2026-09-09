@@ -33,7 +33,7 @@ export default function MuPage() {
     <main className="max-w-3xl mx-auto px-4 sm:px-6 py-4 space-y-4">
       <header className="space-y-1">
         <h1 className="text-lg font-bold text-gray-900">🔬 第二考场</h1>
-        <p className="text-[12px] text-[#525461] leading-relaxed">
+        <p className="text-[12px] text-ink-muted leading-relaxed">
           第二只票的<b>涨/跌表态</b>测量轨。存在的理由:QBTS 那边每个交易日只攒 1 个样本,
           9 月初才够第一次真判决 —— 而<b>一个考场的结论永远可能是运气</b>。
           加一只与 QBTS 低相关的票,样本速度翻倍,而且变成两场独立考试:
@@ -46,11 +46,11 @@ export default function MuPage() {
       </header>
 
       {loading ? (
-        <div className="text-sm text-[#525461] flex items-center gap-2 px-1">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#006FFF] animate-pulse" /> 读取台账…
+        <div className="text-sm text-ink-muted flex items-center gap-2 px-1">
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-brand animate-pulse" /> 读取台账…
         </div>
       ) : tickers.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-[#EDEDF0] p-8 text-center space-y-2">
+        <div className="bg-surface rounded-2xl border border-hairline p-8 text-center space-y-2">
           <p className="text-sm text-gray-500">测量轨还没有数据。</p>
           <p className="text-[12px] text-gray-400 leading-relaxed">
             需要先在 Supabase 跑一次{" "}

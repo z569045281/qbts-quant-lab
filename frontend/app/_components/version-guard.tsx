@@ -36,7 +36,7 @@ export function VersionGuard() {
     <button
       onClick={() => location.reload()}
       className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-full
-                 bg-[#006FFF] text-white text-sm font-semibold shadow-lg shadow-blue-500/30
+                 bg-brand text-white text-sm font-semibold shadow-lg shadow-blue-500/30
                  hover:bg-[#0060DB] transition-colors flex items-center gap-2 animate-pulse"
     >
       🔄 有新版本 · 点击刷新

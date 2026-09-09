@@ -74,7 +74,7 @@ export function DcaCalculator({
   }
 
   return (
-    <section className="bg-white rounded-2xl border border-[#EDEDF0] p-5 shadow-sm space-y-4">
+    <section className="bg-surface rounded-2xl border border-hairline p-5 shadow-sm space-y-4">
       <div className="flex items-center gap-2">
         <span className="text-base">💰</span>
         <span className="text-sm font-semibold text-gray-800">定投计算器 · 复利希望机</span>
@@ -90,12 +90,12 @@ export function DcaCalculator({
             value={amount} onChange={e => setAmount(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") addOne(); }}
             className="w-36 px-3 py-2 rounded-lg border border-gray-300 font-mono text-sm
-                       focus:outline-none focus:ring-2 focus:ring-[#006FFF]/40"
+                       focus:outline-none focus:ring-2 focus:ring-brand/40"
           />
         </label>
         <button
           onClick={addOne} disabled={amt <= 0}
-          className="px-4 py-2 rounded-lg bg-[#006FFF] text-white text-sm font-semibold
+          className="px-4 py-2 rounded-lg bg-brand text-white text-sm font-semibold
                      disabled:opacity-40 hover:bg-[#0060DB] transition-colors"
         >
           记一笔 ✓
@@ -108,12 +108,12 @@ export function DcaCalculator({
           <div className="text-[11px] text-gray-500 mb-1.5">这笔 {usd(amt)} 按建议权重应该这样买:</div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {split.map(s => (
-              <div key={s.t} className="bg-white rounded-lg px-2.5 py-2 border border-black/5">
+              <div key={s.t} className="bg-surface rounded-lg px-2.5 py-2 border border-black/5">
                 <div className="flex items-center gap-1">
                   <span className="text-sm font-bold text-gray-900">{s.t}</span>
                   <span className="text-[10px] text-gray-400">{s.w}%</span>
                 </div>
-                <div className="font-mono font-semibold text-[#006FFF] text-sm">{usd(s.money)}</div>
+                <div className="font-mono font-semibold text-brand text-sm">{usd(s.money)}</div>
                 {s.shares != null && (
                   <div className="text-[10px] text-gray-400 font-mono">≈{s.shares.toFixed(2)} 股 @${s.price!.toFixed(0)}</div>
                 )}
@@ -136,7 +136,7 @@ export function DcaCalculator({
               type="number" inputMode="decimal" value={rate}
               onChange={e => setRate(e.target.value)}
               className="w-14 px-2 py-1 rounded border border-gray-300 font-mono text-sm text-center
-                         focus:outline-none focus:ring-2 focus:ring-[#006FFF]/40"
+                         focus:outline-none focus:ring-2 focus:ring-brand/40"
             />
             %
           </label>
@@ -147,7 +147,7 @@ export function DcaCalculator({
             {horizons.map(y => {
               const v = fv(y);
               return (
-                <div key={y} className="bg-white/80 rounded-lg px-2 py-2.5 text-center">
+                <div key={y} className="bg-surface/80 rounded-lg px-2 py-2.5 text-center">
                   <div className="text-[11px] text-gray-500">{y} 年后</div>
                   <div className="text-base font-bold text-emerald-600 font-mono leading-tight">{usd(v)}</div>
                   <div className="text-[10px] text-gray-400 font-mono">×{(v / totalInvested).toFixed(1)}</div>

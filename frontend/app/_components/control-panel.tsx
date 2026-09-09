@@ -29,7 +29,7 @@ export function ControlPanel({ onPublished, compact = false }:
 }
 
 /** 紧凑模式共用的按钮外观 */
-const COMPACT_BTN = "px-2.5 py-1 text-[12px] font-medium rounded-lg bg-[#006FFF] text-white "
+const COMPACT_BTN = "px-2.5 py-1 text-[12px] font-medium rounded-lg bg-brand text-white "
   + "hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1.5";
 
 /* ── CLOUD: button → Lambda Function URL; quotes are auto ─────────────────── */
@@ -71,7 +71,7 @@ function CloudPanel({ onPublished, compact }: { onPublished: () => void; compact
             : <>🧠 出今天的决策</>}
         </button>
         {result && (
-          <span className={`text-[11px] ${result.ok ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+          <span className={`text-[11px] ${result.ok ? "text-emerald-600" : "text-down"}`}>
             {result.ok ? `✓ ${result.msg}` : `✗ ${result.msg}`}
           </span>
         )}
@@ -84,7 +84,7 @@ function CloudPanel({ onPublished, compact }: { onPublished: () => void; compact
       <button
         onClick={run}
         disabled={busy}
-        className="px-3.5 py-2 text-sm font-medium rounded-lg bg-[#006FFF] text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        className="px-3.5 py-2 text-sm font-medium rounded-lg bg-brand text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
       >
         {busy
           ? <><span className="inline-block w-2.5 h-2.5 rounded-full bg-white animate-pulse" />出决策中…（约 1–2 分钟）</>
@@ -97,7 +97,7 @@ function CloudPanel({ onPublished, compact }: { onPublished: () => void; compact
       </span>
 
       {result && (
-        <span className={`text-xs ${result.ok ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+        <span className={`text-xs ${result.ok ? "text-emerald-600" : "text-down"}`}>
           {result.ok ? `✓ ${result.msg}` : `✗ ${result.msg}`}
         </span>
       )}
@@ -205,7 +205,7 @@ function LocalPanel({ onPublished, compact }: { onPublished: () => void; compact
             : <>🧠 出今天的决策</>}
         </button>
         {!pub.running && pub.ok !== null && (
-          <span className={`text-[11px] ${pub.ok ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+          <span className={`text-[11px] ${pub.ok ? "text-emerald-600" : "text-down"}`}>
             {pub.ok ? "✓ 已更新" : "✗ 失败(日志在「系统」标签)"}
           </span>
         )}
@@ -218,7 +218,7 @@ function LocalPanel({ onPublished, compact }: { onPublished: () => void; compact
       <button
         onClick={runPublish}
         disabled={pub.running || busy === "publish"}
-        className="px-3.5 py-2 text-sm font-medium rounded-lg bg-[#006FFF] text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        className="px-3.5 py-2 text-sm font-medium rounded-lg bg-brand text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
       >
         {pub.running
           ? <><span className="inline-block w-2.5 h-2.5 rounded-full bg-white animate-pulse" />出决策中…</>
@@ -231,7 +231,7 @@ function LocalPanel({ onPublished, compact }: { onPublished: () => void; compact
         className={`px-3.5 py-2 text-sm font-medium rounded-lg border flex items-center gap-2 disabled:opacity-50 ${
           pusherOn
             ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-            : "border-[#EDEDF0] bg-white text-[#525461] hover:bg-gray-50"
+            : "border-hairline bg-surface text-ink-muted hover:bg-gray-50"
         }`}
       >
         <span className={`inline-block w-2 h-2 rounded-full ${pusherOn ? "bg-emerald-500 animate-pulse" : "bg-gray-300"}`} />
@@ -249,19 +249,19 @@ function LocalPanel({ onPublished, compact }: { onPublished: () => void; compact
       </button>
 
       {!pub.running && pub.ok !== null && (
-        <span className={`text-xs ${pub.ok ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+        <span className={`text-xs ${pub.ok ? "text-emerald-600" : "text-down"}`}>
           {pub.ok ? `✓ 决策已更新 ${pub.finished_at ?? ""}` : "✗ 出决策失败（见下方日志）"}
         </span>
       )}
 
       {retroMsg && (
-        <span className={`text-xs ${retroMsg.startsWith("✓") ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+        <span className={`text-xs ${retroMsg.startsWith("✓") ? "text-emerald-600" : "text-down"}`}>
           {retroMsg}
         </span>
       )}
 
       {!pub.running && pub.ok === false && pub.log && (
-        <pre className="basis-full mt-3 text-[11px] font-mono text-[#525461] bg-red-50 border border-red-100 rounded-md px-3 py-2 max-h-40 overflow-auto whitespace-pre-wrap">{pub.log}</pre>
+        <pre className="basis-full mt-3 text-[11px] font-mono text-ink-muted bg-red-50 border border-red-100 rounded-md px-3 py-2 max-h-40 overflow-auto whitespace-pre-wrap">{pub.log}</pre>
       )}
 
       <p className="basis-full mt-2 text-[11px] text-[#9A9CA5]">
@@ -274,9 +274,9 @@ function LocalPanel({ onPublished, compact }: { onPublished: () => void; compact
 /* Shared chrome so both modes look identical. */
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <section className="bg-white rounded-2xl border border-[#EDEDF0] shadow-sm px-5 py-4">
+    <section className="bg-surface rounded-2xl border border-hairline shadow-sm px-5 py-4">
       <div className="flex items-center gap-3 flex-wrap">
-        <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider mr-1">控制台</span>
+        <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider mr-1">控制台</span>
         {children}
       </div>
     </section>

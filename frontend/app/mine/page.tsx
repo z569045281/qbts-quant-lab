@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { IChartApi, ISeriesApi, CandlestickData, SeriesMarker, Time } from "lightweight-charts";
 import { API } from "../_lib/api";
 import { READONLY } from "../_lib/supabase";
+import { useDarkMode, chartTheme } from "../_lib/theme";
 
 interface FactorEntry {
   id: string;
@@ -205,6 +206,7 @@ function FactorChart({ factorId, factorName, onClose }: {
   const chartRef     = useRef<IChartApi | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
+  const dark = useDarkMode();
 
   useEffect(() => {
     let cancelled = false;
@@ -226,14 +228,15 @@ function FactorChart({ factorId, factorName, onClose }: {
         const data: ChartData = await res.json();
         if (cancelled || !containerRef.current) return;
 
+        const th = chartTheme();
         chart = createChart(containerRef.current, {
           width:  containerRef.current.clientWidth,
           height: 420,
-          layout: { background: { color: "#ffffff" }, textColor: "#525461" },
-          grid:   { vertLines: { color: "#EDEDF0" }, horzLines: { color: "#EDEDF0" } },
+          layout: { background: { color: th.bg }, textColor: th.text },
+          grid:   { vertLines: { color: th.grid }, horzLines: { color: th.grid } },
           crosshair: { mode: 1 },
-          rightPriceScale: { borderColor: "#EDEDF0" },
-          timeScale: { borderColor: "#EDEDF0", timeVisible: true, secondsVisible: false },
+          rightPriceScale: { borderColor: th.border },
+          timeScale: { borderColor: th.border, timeVisible: true, secondsVisible: false },
         });
         chartRef.current = chart;
 
@@ -300,24 +303,24 @@ function FactorChart({ factorId, factorName, onClose }: {
       chartRef.current = null;
       chart?.remove();
     };
-  }, [factorId]);
+  }, [factorId, dark]);
 
   return (
-    <div className="border-t-2 border-[#006FFF] bg-white">
+    <div className="border-t-2 border-brand bg-surface">
       {/* Chart header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#EDEDF0]">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-hairline">
         <div>
           <span className="font-semibold text-gray-900 text-sm">{factorName}</span>
-          <span className="ml-3 text-xs text-[#525461]">
+          <span className="ml-3 text-xs text-ink-muted">
             黄色虚线 = IS/OOS 分割点 &nbsp;·&nbsp;
-            <span className="text-[#006FFF] font-medium">▲ 蓝色 = 买入</span>
+            <span className="text-brand font-medium">▲ 蓝色 = 买入</span>
             &nbsp;·&nbsp;
-            <span className="text-[#F03A3E] font-medium">▼ 红色 = 卖出</span>
+            <span className="text-down font-medium">▼ 红色 = 卖出</span>
           </span>
         </div>
         <button
           onClick={onClose}
-          className="text-[#525461] hover:text-gray-900 text-lg leading-none px-2 transition-colors"
+          className="text-ink-muted hover:text-gray-900 text-lg leading-none px-2 transition-colors"
         >
           ✕
         </button>
@@ -326,12 +329,12 @@ function FactorChart({ factorId, factorName, onClose }: {
       {/* Chart area */}
       <div className="relative">
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10">
-            <span className="text-sm text-[#525461]">加载图表数据...</span>
+          <div className="absolute inset-0 flex items-center justify-center bg-surface/80 z-10">
+            <span className="text-sm text-ink-muted">加载图表数据...</span>
           </div>
         )}
         {error && (
-          <div className="py-16 text-center text-[#F03A3E] text-sm">{error}</div>
+          <div className="py-16 text-center text-down text-sm">{error}</div>
         )}
         <div ref={containerRef} className="w-full" />
       </div>
@@ -342,7 +345,7 @@ function FactorChart({ factorId, factorName, onClose }: {
 /* Reusable card shell */
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-white rounded-xl border border-[#EDEDF0] shadow-sm ${className}`}>
+    <div className={`bg-surface rounded-xl border border-hairline shadow-sm ${className}`}>
       {children}
     </div>
   );
@@ -351,8 +354,8 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
 /* Card section header */
 function CardHeader({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <div className="px-5 py-3.5 border-b border-[#EDEDF0] flex items-center justify-between">
-      <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">{children}</span>
+    <div className="px-5 py-3.5 border-b border-hairline flex items-center justify-between">
+      <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">{children}</span>
       {right && <div className="flex items-center gap-2">{right}</div>}
     </div>
   );
@@ -381,7 +384,7 @@ function TodaySignalsPanel() {
   if (!data) {
     return (
       <Card className="px-5 py-5">
-        <div className="text-sm text-[#525461]">
+        <div className="text-sm text-ink-muted">
           {loading ? "正在拉取今日信号..." : "无数据 — 先在下方挖矿生成因子"}
         </div>
       </Card>
@@ -390,8 +393,8 @@ function TodaySignalsPanel() {
 
   const ens = data.ensemble;
   const ensColor = ens?.signal === 1   ? "text-emerald-600 bg-emerald-50 border-emerald-200"
-                 : ens?.signal === -1  ? "text-[#F03A3E]  bg-red-50      border-red-200"
-                 :                       "text-[#525461]  bg-[#F6F6F8]   border-[#EDEDF0]";
+                 : ens?.signal === -1  ? "text-down  bg-red-50      border-red-200"
+                 :                       "text-ink-muted  bg-sunken   border-hairline";
 
   return (
     <Card>
@@ -404,7 +407,7 @@ function TodaySignalsPanel() {
             <button
               onClick={refresh}
               disabled={loading}
-              className="px-2.5 py-1 text-xs text-[#006FFF] hover:bg-blue-50 rounded transition-colors disabled:opacity-50"
+              className="px-2.5 py-1 text-xs text-brand hover:bg-blue-50 rounded transition-colors disabled:opacity-50"
             >
               {loading ? "刷新中…" : "刷新"}
             </button>
@@ -431,7 +434,7 @@ function TodaySignalsPanel() {
               <div className="mt-3 flex gap-3 text-xs">
                 <span className="text-emerald-700">▲{ens.n_buy}</span>
                 <span className="text-gray-500">●{ens.n_hold}</span>
-                <span className="text-[#F03A3E]">▼{ens.n_sell}</span>
+                <span className="text-down">▼{ens.n_sell}</span>
               </div>
             </>
           )}
@@ -440,12 +443,12 @@ function TodaySignalsPanel() {
         {/* Per-factor cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
           {data.factors.length === 0 ? (
-            <div className="col-span-full text-sm text-[#525461]">无可用因子</div>
+            <div className="col-span-full text-sm text-ink-muted">无可用因子</div>
           ) : data.factors.map(f => {
             const sigColor = f.signal === 1   ? "text-emerald-600 border-emerald-200 bg-emerald-50"
-                           : f.signal === -1  ? "text-[#F03A3E]   border-red-200      bg-red-50"
-                           : f.label === "ERROR" ? "text-[#F03A3E] border-red-200    bg-red-50"
-                           :                     "text-[#525461]   border-[#EDEDF0]   bg-[#F6F6F8]";
+                           : f.signal === -1  ? "text-down   border-red-200      bg-red-50"
+                           : f.label === "ERROR" ? "text-down border-red-200    bg-red-50"
+                           :                     "text-ink-muted   border-hairline   bg-sunken";
             return (
               <div key={f.id} className={`rounded-lg border ${sigColor} px-3 py-2.5`}>
                 <div className="flex items-start justify-between mb-1.5">
@@ -484,7 +487,7 @@ export default function MinePage() {
   useEffect(() => { if (READONLY) router.replace("/"); }, [router]);
   if (READONLY) {
     return (
-      <main className="max-w-[1600px] mx-auto px-6 py-16 text-center text-sm text-[#525461]">
+      <main className="max-w-[1600px] mx-auto px-6 py-16 text-center text-sm text-ink-muted">
         因子挖矿控制台仅在本地可用，正在跳转到决策仪表盘…
       </main>
     );
@@ -613,8 +616,8 @@ function MineConsole() {
         onClick={() => toggleSort(k)}
         className={`px-3 py-3 text-right text-xs font-medium cursor-pointer select-none transition-colors
           ${active
-            ? accent ? "text-[#006FFF]" : "text-gray-900"
-            : "text-[#525461] hover:text-gray-700"}`}
+            ? accent ? "text-brand" : "text-gray-900"
+            : "text-ink-muted hover:text-gray-700"}`}
       >
         {label} {active ? (sortDir === -1 ? "↓" : "↑") : ""}
       </th>
@@ -719,10 +722,10 @@ function MineConsole() {
      RENDER
   ──────────────────────────────────────────────────────────────── */
   return (
-    <div className="min-h-screen bg-[#F6F6F8] font-sans">
+    <div className="min-h-screen bg-sunken font-sans">
 
       {/* ── Top nav ── */}
-      <header className="bg-[#006FFF] text-white px-6 py-0 flex items-center h-14 shadow-md">
+      <header className="bg-brand text-white px-6 py-0 flex items-center h-14 shadow-md">
         <div className="max-w-6xl w-full mx-auto flex items-center gap-4">
           <span className="font-bold text-base tracking-tight">QBTS Factor Miner</span>
           <span className="h-4 w-px bg-white/20" />
@@ -750,8 +753,8 @@ function MineConsole() {
               { label: "运行时长",      val: fmtElapsed(elapsed), unit: "", blue: false, pulse: mining },
             ].map(({ label, val, unit, blue, pulse }) => (
               <Card key={label} className="px-5 py-4 text-center">
-                <p className="text-xs text-[#525461] mb-1">{label}</p>
-                <p className={`font-bold text-xl ${blue ? "text-[#006FFF]" : pulse ? "text-amber-500" : "text-gray-900"} ${pulse ? "animate-pulse" : ""}`}>
+                <p className="text-xs text-ink-muted mb-1">{label}</p>
+                <p className={`font-bold text-xl ${blue ? "text-brand" : pulse ? "text-amber-500" : "text-gray-900"} ${pulse ? "animate-pulse" : ""}`}>
                   {val}{unit}
                 </p>
               </Card>
@@ -764,14 +767,14 @@ function MineConsole() {
           <div className="flex items-center gap-4 flex-wrap">
             {/* Rounds input */}
             <div className="flex items-center gap-2">
-              <label className="text-sm text-[#525461]">挖矿轮数</label>
+              <label className="text-sm text-ink-muted">挖矿轮数</label>
               <input
                 type="number" min={1} max={50} value={rounds}
                 onChange={e => setRounds(Math.max(1, Math.min(50, +e.target.value)))}
                 disabled={mining}
-                className="w-16 border border-[#EDEDF0] rounded-lg px-2.5 py-1.5 text-sm text-center
-                           text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-[#006FFF]/30
-                           focus:border-[#006FFF] disabled:opacity-40 disabled:bg-gray-50 transition"
+                className="w-16 border border-hairline rounded-lg px-2.5 py-1.5 text-sm text-center
+                           text-gray-900 bg-surface focus:outline-none focus:ring-2 focus:ring-brand/30
+                           focus:border-brand disabled:opacity-40 disabled:bg-gray-50 transition"
               />
               <span className="text-xs text-gray-400">/ 50</span>
             </div>
@@ -782,7 +785,7 @@ function MineConsole() {
               className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all
                 ${autoLoop
                   ? "border-amber-300 bg-amber-50 text-amber-700"
-                  : "border-[#EDEDF0] bg-white text-[#525461] hover:border-gray-300 hover:text-gray-700"}`}
+                  : "border-hairline bg-surface text-ink-muted hover:border-gray-300 hover:text-gray-700"}`}
             >
               <span className={`w-2 h-2 rounded-full ${autoLoop ? "bg-amber-500 animate-pulse" : "bg-gray-300"}`} />
               自动循环 {autoLoop ? "ON" : "OFF"}
@@ -796,7 +799,7 @@ function MineConsole() {
                 disabled={mining}
                 title="清空排行榜，重置所有状态"
                 className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg font-medium text-sm
-                  border border-[#EDEDF0] bg-white text-[#525461] hover:text-[#F03A3E]
+                  border border-hairline bg-surface text-ink-muted hover:text-down
                   hover:border-red-200 hover:bg-red-50 transition-all disabled:opacity-40
                   disabled:cursor-not-allowed"
               >
@@ -809,10 +812,10 @@ function MineConsole() {
                 className={`flex items-center gap-2.5 px-8 py-2.5 rounded-lg font-semibold text-sm
                   text-white transition-all duration-200 shadow-sm
                   ${mining
-                    ? "bg-[#F03A3E] hover:bg-red-500"
+                    ? "bg-down hover:bg-red-500"
                     : done
                     ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-[#006FFF] hover:bg-[#338CFF]"}`}
+                    : "bg-brand hover:bg-[#338CFF]"}`}
               >
                 {mining && <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
                 {mining ? "停止挖矿" : done ? "再次挖矿" : "启动全自动 AI 挖矿"}
@@ -829,7 +832,7 @@ function MineConsole() {
             <div className={`flex items-center gap-4 px-5 py-3 rounded-xl border text-sm
               ${bull ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                 : bear ? "border-red-200 bg-red-50 text-red-800"
-                : "border-[#EDEDF0] bg-white text-[#525461]"}`}>
+                : "border-hairline bg-surface text-ink-muted"}`}>
               <span className="text-base">{bull ? "📈" : bear ? "📉" : "➡️"}</span>
               <span className="font-semibold">{sentiment.sentiment_label}</span>
               <span className="opacity-30">|</span>
@@ -847,7 +850,7 @@ function MineConsole() {
         {(logs.length > 0 || mining) && (
           <Card className="overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1e] border-b border-white/5">
-              <span className="w-3 h-3 rounded-full bg-[#F03A3E]" />
+              <span className="w-3 h-3 rounded-full bg-down" />
               <span className="w-3 h-3 rounded-full bg-amber-400" />
               <span className="w-3 h-3 rounded-full bg-emerald-500" />
               <span className="ml-2 text-xs text-gray-500 font-mono">qbts-miner — activity log</span>
@@ -869,7 +872,7 @@ function MineConsole() {
               {mining && (
                 <div className="flex gap-3 leading-5">
                   <span className="w-16" />
-                  <span className="text-[#006FFF] animate-pulse">▌</span>
+                  <span className="text-brand animate-pulse">▌</span>
                 </div>
               )}
               <div ref={logEndRef} />
@@ -889,8 +892,8 @@ function MineConsole() {
                 {factors.length > 0 && (
                   <button
                     onClick={() => exportCSV(factors)}
-                    className="text-xs text-[#525461] hover:text-gray-900 border border-[#EDEDF0]
-                               hover:border-gray-300 rounded-lg px-3 py-1.5 transition-colors bg-white"
+                    className="text-xs text-ink-muted hover:text-gray-900 border border-hairline
+                               hover:border-gray-300 rounded-lg px-3 py-1.5 transition-colors bg-surface"
                   >
                     导出 CSV
                   </button>
@@ -912,8 +915,8 @@ function MineConsole() {
                     ${filter === key
                       ? key === "starred"
                         ? "bg-amber-400 text-white"
-                        : "bg-[#006FFF] text-white"
-                      : "text-[#525461] hover:text-gray-900 hover:bg-[#F6F6F8]"}`}
+                        : "bg-brand text-white"
+                      : "text-ink-muted hover:text-gray-900 hover:bg-sunken"}`}
                 >
                   {label}
                 </button>
@@ -922,27 +925,27 @@ function MineConsole() {
           </CardHeader>
 
           {visible.length === 0 ? (
-            <div className="py-16 text-center text-[#525461] text-sm">
+            <div className="py-16 text-center text-ink-muted text-sm">
               {factors.length === 0 ? "暂无因子 — 点击「启动全自动 AI 挖矿」开始" : "当前筛选无结果"}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-[#EDEDF0] bg-[#F6F6F8]">
-                    <th className="px-3 py-3 text-center text-xs font-medium text-[#525461]">★</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[#525461]">#</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-[#525461]">因子名称</th>
-                    <th className="px-3 py-3 text-center text-xs font-medium text-[#525461]">周期</th>
+                  <tr className="border-b border-hairline bg-sunken">
+                    <th className="px-3 py-3 text-center text-xs font-medium text-ink-muted">★</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-ink-muted">#</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-ink-muted">因子名称</th>
+                    <th className="px-3 py-3 text-center text-xs font-medium text-ink-muted">周期</th>
                     <th className="px-3 py-3 text-right text-xs font-medium text-gray-400">IS Sharpe</th>
-                    <th className="px-3 py-3 text-right text-xs font-medium text-[#525461]">止损/单日最大亏</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-ink-muted">止损/单日最大亏</th>
                     <th className="px-1 py-3 text-center text-gray-300">→</th>
                     <SortTh k="oos_sharpe_ratio" label="OOS Sharpe" accent />
                     <SortTh k="oos_win_rate"      label="OOS 胜率/次数"   accent />
                     <SortTh k="oos_total_return"  label="OOS 盈利 ($1w)"  accent />
                     <SortTh k="oos_max_drawdown"  label="OOS 回撤"        accent />
                     <SortTh k="q_hit_rate"       label="命中率/信号" accent />
-                    <th className="px-3 py-3 text-right text-xs font-medium text-[#525461]">IC 衰减</th>
+                    <th className="px-3 py-3 text-right text-xs font-medium text-ink-muted">IC 衰减</th>
                     <SortTh k="score" label="评分" accent />
                   </tr>
                 </thead>
@@ -956,7 +959,7 @@ function MineConsole() {
                           ? "bg-blue-50 border-blue-100"
                           : f.overfit
                           ? "border-red-100 bg-red-50/50 hover:bg-red-50"
-                          : "border-[#EDEDF0] hover:bg-[#F6F6F8]"}`}
+                          : "border-hairline hover:bg-sunken"}`}
                     >
                       <td className="px-3 py-3 text-center">
                         <button
@@ -971,7 +974,7 @@ function MineConsole() {
                       <td className="px-4 py-3 text-gray-400 font-medium">{idx + 1}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
-                          <span className={`shrink-0 w-2 h-2 rounded-full ${f.overfit ? "bg-[#F03A3E]" : "bg-emerald-500"}`} />
+                          <span className={`shrink-0 w-2 h-2 rounded-full ${f.overfit ? "bg-down" : "bg-emerald-500"}`} />
                           <div>
                             <div className="flex items-center gap-1.5">
                               <p className="text-gray-900 font-medium truncate max-w-[180px]">{f.name}</p>
@@ -990,12 +993,12 @@ function MineConsole() {
                                 </span>
                               )}
                             </div>
-                            <p className="text-[#525461] truncate max-w-[180px] mt-0.5 text-xs">{f.description}</p>
+                            <p className="text-ink-muted truncate max-w-[180px] mt-0.5 text-xs">{f.description}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-3 py-3 text-center">
-                        <span className="text-[#525461] bg-[#F6F6F8] border border-[#EDEDF0] px-2 py-0.5 rounded-md text-xs font-mono">
+                        <span className="text-ink-muted bg-sunken border border-hairline px-2 py-0.5 rounded-md text-xs font-mono">
                           {f.freq}
                         </span>
                       </td>
@@ -1009,9 +1012,9 @@ function MineConsole() {
                           }
                           const ratio  = (f.oos_n_trades ?? 0) > 0 ? nStops / (f.oos_n_trades ?? 1) : 0;
                           const stopColor = ratio <= 0.15 ? "text-emerald-600"
-                                          : ratio <= 0.30 ? "text-amber-500" : "text-[#F03A3E]";
+                                          : ratio <= 0.30 ? "text-amber-500" : "text-down";
                           const lossColor = worst >= -0.04 ? "text-emerald-600"
-                                          : worst >= -0.07 ? "text-amber-500" : "text-[#F03A3E]";
+                                          : worst >= -0.07 ? "text-amber-500" : "text-down";
                           return (
                             <div className="flex flex-col items-end gap-0.5">
                               <span className={`font-mono ${stopColor}`}>{nStops}次</span>
@@ -1024,7 +1027,7 @@ function MineConsole() {
                       <td className="px-3 py-3 text-right">
                         <span className={`font-mono font-semibold
                           ${f.oos_sharpe_ratio > 0.5 ? "text-emerald-600"
-                            : f.oos_sharpe_ratio > 0 ? "text-amber-500" : "text-[#F03A3E]"}`}>
+                            : f.oos_sharpe_ratio > 0 ? "text-amber-500" : "text-down"}`}>
                           {fmt(f.oos_sharpe_ratio)}
                         </span>
                       </td>
@@ -1032,8 +1035,8 @@ function MineConsole() {
                         <div className="flex flex-col items-end gap-0.5">
                           <WinBadge v={f.oos_win_rate} />
                           <span className={`font-mono text-xs ${
-                            (f.oos_n_trades ?? 0) >= 10 ? "text-[#525461]"
-                            : "text-[#F03A3E]"
+                            (f.oos_n_trades ?? 0) >= 10 ? "text-ink-muted"
+                            : "text-down"
                           }`}>{f.oos_n_trades ?? 0}笔</span>
                         </div>
                       </td>
@@ -1042,7 +1045,7 @@ function MineConsole() {
                           const pnl = Math.round(f.oos_total_return * 10000);
                           const pct = (f.oos_total_return * 100).toFixed(1);
                           const pos = pnl >= 0;
-                          const color = pos ? "text-emerald-600" : "text-[#F03A3E]";
+                          const color = pos ? "text-emerald-600" : "text-down";
                           return (
                             <div className="flex flex-col items-end gap-0.5">
                               <span className={`font-mono font-semibold ${color}`}>
@@ -1064,15 +1067,15 @@ function MineConsole() {
                             // Backwards-compat: show old ICIR for pre-Phase-2 entries
                             return (
                               <span className={`font-mono font-semibold
-                                ${(f.q_icir ?? 0) > 0.5 ? "text-[#006FFF]"
-                                  : (f.q_icir ?? 0) > 0 ? "text-[#525461]" : "text-[#F03A3E]"}`}>
+                                ${(f.q_icir ?? 0) > 0.5 ? "text-brand"
+                                  : (f.q_icir ?? 0) > 0 ? "text-ink-muted" : "text-down"}`}>
                                 {fmt(f.q_icir ?? 0)}
                               </span>
                             );
                           }
                           const hrColor = hr >= 0.55 ? "text-emerald-600"
-                                        : hr >= 0.52 ? "text-amber-500" : "text-[#F03A3E]";
-                          const nsColor = (ns ?? 0) >= 30 ? "text-[#525461]" : "text-[#F03A3E]";
+                                        : hr >= 0.52 ? "text-amber-500" : "text-down";
+                          const nsColor = (ns ?? 0) >= 30 ? "text-ink-muted" : "text-down";
                           return (
                             <div className="flex flex-col items-end gap-0.5">
                               <span className={`font-mono font-semibold ${hrColor}`}>
@@ -1087,7 +1090,7 @@ function MineConsole() {
                         {f.ic_decay ? <IcSparkline decay={f.ic_decay} /> : <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-3 py-3 text-right">
-                        <span className="text-[#006FFF] font-semibold font-mono">{fmt(f.score)}</span>
+                        <span className="text-brand font-semibold font-mono">{fmt(f.score)}</span>
                       </td>
                     </tr>
                   ))}
@@ -1111,7 +1114,7 @@ function MineConsole() {
           <Card className="overflow-hidden">
             <CardHeader
               right={
-                <span className="text-xs text-[#525461]">
+                <span className="text-xs text-ink-muted">
                   {ensemble.kept_count} 正交因子合并 · {ensemble.dropped_count} 相关因子已过滤
                 </span>
               }
@@ -1125,9 +1128,9 @@ function MineConsole() {
                 { label: "OOS 最大回撤", v: fmt(ensemble.ens_max_drawdown, true),  good: ensemble.ens_max_drawdown > -0.3 },
                 { label: "OOS 总收益",   v: fmt(ensemble.ens_total_return, true),  good: ensemble.ens_total_return > 0 },
               ].map(({ label, v, good }) => (
-                <div key={label} className="bg-[#F6F6F8] rounded-lg px-4 py-4 text-center border border-[#EDEDF0]">
-                  <p className="text-xs text-[#525461] mb-1.5">{label}</p>
-                  <p className={`font-mono font-bold text-xl ${good ? "text-[#006FFF]" : "text-[#F03A3E]"}`}>{v}</p>
+                <div key={label} className="bg-sunken rounded-lg px-4 py-4 text-center border border-hairline">
+                  <p className="text-xs text-ink-muted mb-1.5">{label}</p>
+                  <p className={`font-mono font-bold text-xl ${good ? "text-brand" : "text-down"}`}>{v}</p>
                 </div>
               ))}
             </div>
@@ -1143,8 +1146,8 @@ function MineConsole() {
                   {trading.configured && (
                     <button
                       onClick={fetchTradingStatus}
-                      className="text-xs text-[#525461] hover:text-gray-900 border border-[#EDEDF0]
-                                 hover:border-gray-300 rounded-lg px-3 py-1.5 transition-colors bg-white"
+                      className="text-xs text-ink-muted hover:text-gray-900 border border-hairline
+                                 hover:border-gray-300 rounded-lg px-3 py-1.5 transition-colors bg-surface"
                     >
                       刷新
                     </button>
@@ -1152,7 +1155,7 @@ function MineConsole() {
                   <span className={`text-xs px-2.5 py-1 rounded-full font-medium border
                     ${trading.configured
                       ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      : "bg-red-50 text-[#F03A3E] border-red-200"}`}>
+                      : "bg-red-50 text-down border-red-200"}`}>
                     {trading.configured ? "已连接 Alpaca" : "未配置"}
                   </span>
                 </div>
@@ -1165,14 +1168,14 @@ function MineConsole() {
             {!trading.configured && (
               <div className="p-6 space-y-4">
                 <p className="text-sm text-gray-700">
-                  Alpaca Paper Trading 未配置。在项目根目录 <code className="bg-[#F6F6F8] border border-[#EDEDF0] px-1.5 py-0.5 rounded text-xs font-mono">.env</code> 中添加：
+                  Alpaca Paper Trading 未配置。在项目根目录 <code className="bg-sunken border border-hairline px-1.5 py-0.5 rounded text-xs font-mono">.env</code> 中添加：
                 </p>
                 <pre className="bg-[#0f0f12] text-emerald-400 rounded-xl p-4 text-xs font-mono leading-6 overflow-x-auto">
 {`ALPACA_API_KEY=your_paper_api_key
 ALPACA_SECRET_KEY=your_paper_secret_key`}
                 </pre>
-                <p className="text-xs text-[#525461]">
-                  前往 <span className="text-[#006FFF] font-medium">alpaca.markets</span> 注册免费账户，切换到 Paper Trading 后生成 API Key。
+                <p className="text-xs text-ink-muted">
+                  前往 <span className="text-brand font-medium">alpaca.markets</span> 注册免费账户，切换到 Paper Trading 后生成 API Key。
                 </p>
               </div>
             )}
@@ -1197,14 +1200,14 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
                       },
                       { label: "购买力", val: `$${trading.account.buying_power.toLocaleString("en-US", { minimumFractionDigits: 2 })}`, highlight: false },
                     ].map(({ label, val, sub, good, pnl }) => (
-                      <div key={label} className="bg-[#F6F6F8] border border-[#EDEDF0] rounded-xl px-4 py-4 text-center">
-                        <p className="text-xs text-[#525461] mb-1">{label}</p>
+                      <div key={label} className="bg-sunken border border-hairline rounded-xl px-4 py-4 text-center">
+                        <p className="text-xs text-ink-muted mb-1">{label}</p>
                         <p className={`font-semibold text-base font-mono
-                          ${pnl ? (good ? "text-emerald-600" : "text-[#F03A3E]") : "text-gray-900"}`}>
+                          ${pnl ? (good ? "text-emerald-600" : "text-down") : "text-gray-900"}`}>
                           {val}
                         </p>
                         {sub && (
-                          <p className={`text-xs font-mono mt-0.5 ${good ? "text-emerald-500" : "text-[#F03A3E]"}`}>{sub}</p>
+                          <p className={`text-xs font-mono mt-0.5 ${good ? "text-emerald-500" : "text-down"}`}>{sub}</p>
                         )}
                       </div>
                     ))}
@@ -1214,49 +1217,49 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
                 {/* position + signal */}
                 <div className="grid grid-cols-2 gap-4">
                   {/* position */}
-                  <div className="border border-[#EDEDF0] rounded-xl p-4 bg-white space-y-2.5">
-                    <p className="text-xs font-semibold text-[#525461] uppercase tracking-wider">当前持仓 · QBTS</p>
+                  <div className="border border-hairline rounded-xl p-4 bg-surface space-y-2.5">
+                    <p className="text-xs font-semibold text-ink-muted uppercase tracking-wider">当前持仓 · QBTS</p>
                     {trading.position ? (
                       <div className="space-y-2">
                         {[
                           { k: "数量",     v: `${trading.position.qty.toFixed(0)} 股` },
                           { k: "持仓方向", v: trading.position.side.toUpperCase(),
-                            color: trading.position.side === "long" ? "text-emerald-600" : "text-[#525461]" },
+                            color: trading.position.side === "long" ? "text-emerald-600" : "text-ink-muted" },
                           { k: "均价",     v: `$${trading.position.avg_entry_price}` },
                           { k: "现价",     v: `$${trading.position.current_price}` },
                         ].map(({ k, v, color }) => (
                           <div key={k} className="flex justify-between items-center text-sm">
-                            <span className="text-[#525461]">{k}</span>
+                            <span className="text-ink-muted">{k}</span>
                             <span className={`font-mono font-medium ${color ?? "text-gray-900"}`}>{v}</span>
                           </div>
                         ))}
-                        <div className="flex justify-between items-center text-sm pt-2 border-t border-[#EDEDF0]">
-                          <span className="text-[#525461]">浮动盈亏</span>
+                        <div className="flex justify-between items-center text-sm pt-2 border-t border-hairline">
+                          <span className="text-ink-muted">浮动盈亏</span>
                           <div className="text-right">
-                            <p className={`font-mono font-semibold ${trading.position.unrealized_pl >= 0 ? "text-emerald-600" : "text-[#F03A3E]"}`}>
+                            <p className={`font-mono font-semibold ${trading.position.unrealized_pl >= 0 ? "text-emerald-600" : "text-down"}`}>
                               {trading.position.unrealized_pl >= 0 ? "+" : ""}${trading.position.unrealized_pl.toFixed(2)}
                             </p>
-                            <p className={`text-xs font-mono ${trading.position.unrealized_plpc >= 0 ? "text-emerald-500" : "text-[#F03A3E]"}`}>
+                            <p className={`text-xs font-mono ${trading.position.unrealized_plpc >= 0 ? "text-emerald-500" : "text-down"}`}>
                               {trading.position.unrealized_plpc >= 0 ? "+" : ""}{trading.position.unrealized_plpc.toFixed(2)}%
                             </p>
                           </div>
                         </div>
                       </div>
                     ) : (
-                      <div className="py-6 text-center text-[#525461] text-sm">空仓</div>
+                      <div className="py-6 text-center text-ink-muted text-sm">空仓</div>
                     )}
                   </div>
 
                   {/* signal + execute */}
-                  <div className="border border-[#EDEDF0] rounded-xl p-4 bg-white space-y-3">
-                    <p className="text-xs font-semibold text-[#525461] uppercase tracking-wider">最佳因子信号</p>
+                  <div className="border border-hairline rounded-xl p-4 bg-surface space-y-3">
+                    <p className="text-xs font-semibold text-ink-muted uppercase tracking-wider">最佳因子信号</p>
                     {trading.signal ? (
                       <>
                         <div className="flex justify-center py-3">
                           <span className={`text-2xl font-black px-8 py-3 rounded-xl
                             ${trading.signal.label === "BUY"  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : trading.signal.label === "SELL" ? "bg-red-50 text-[#F03A3E] border border-red-200"
-                              : "bg-[#F6F6F8] text-[#525461] border border-[#EDEDF0]"}`}>
+                              : trading.signal.label === "SELL" ? "bg-red-50 text-down border border-red-200"
+                              : "bg-sunken text-ink-muted border border-hairline"}`}>
                             {trading.signal.label === "BUY" ? "▲" : trading.signal.label === "SELL" ? "▼" : "—"} {trading.signal.label}
                           </span>
                         </div>
@@ -1266,13 +1269,13 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
                           { k: "周期",    v: trading.signal.freq, mono: true },
                         ].map(({ k, v, mono, blue }) => (
                           <div key={k} className="flex justify-between items-center text-sm">
-                            <span className="text-[#525461]">{k}</span>
-                            <span className={`${mono ? "font-mono" : ""} ${blue ? "text-[#006FFF] font-semibold" : "text-gray-900"} truncate max-w-[180px] text-right`}>{v}</span>
+                            <span className="text-ink-muted">{k}</span>
+                            <span className={`${mono ? "font-mono" : ""} ${blue ? "text-brand font-semibold" : "text-gray-900"} truncate max-w-[180px] text-right`}>{v}</span>
                           </div>
                         ))}
                       </>
                     ) : (
-                      <div className="py-6 text-center text-[#525461] text-sm">先挖矿生成因子</div>
+                      <div className="py-6 text-center text-ink-muted text-sm">先挖矿生成因子</div>
                     )}
 
                     <button
@@ -1282,8 +1285,8 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
                         ${tradeExecuting
                           ? "bg-amber-50 text-amber-700 border border-amber-200 cursor-wait"
                           : !trading.signal
-                          ? "bg-[#F6F6F8] text-gray-400 border border-[#EDEDF0] cursor-not-allowed"
-                          : "bg-[#006FFF] hover:bg-[#338CFF] text-white shadow-sm"}`}
+                          ? "bg-sunken text-gray-400 border border-hairline cursor-not-allowed"
+                          : "bg-brand hover:bg-[#338CFF] text-white shadow-sm"}`}
                     >
                       {tradeExecuting
                         ? <span className="flex items-center justify-center gap-2">
@@ -1297,9 +1300,9 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
 
                 {/* execution log */}
                 {tradeLogs.length > 0 && (
-                  <div className="rounded-xl overflow-hidden border border-[#EDEDF0]">
+                  <div className="rounded-xl overflow-hidden border border-hairline">
                     <div className="px-4 py-2.5 bg-[#1a1a1e] border-b border-white/5 text-xs text-gray-500 font-mono flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#006FFF]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand" />
                       执行日志
                       {tradeExecuting && <span className="ml-auto text-amber-400 animate-pulse">● LIVE</span>}
                     </div>
@@ -1314,7 +1317,7 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
                       {tradeExecuting && (
                         <div className="flex gap-3 leading-5">
                           <span className="w-16" />
-                          <span className="text-[#006FFF] animate-pulse">▌</span>
+                          <span className="text-brand animate-pulse">▌</span>
                         </div>
                       )}
                       <div ref={tradeLogEnd} />
@@ -1324,16 +1327,16 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
 
                 {/* recent orders */}
                 {trading.orders && trading.orders.length > 0 && (
-                  <div className="rounded-xl overflow-hidden border border-[#EDEDF0]">
-                    <div className="px-5 py-3 bg-[#F6F6F8] border-b border-[#EDEDF0] text-xs font-semibold text-[#525461] uppercase tracking-wider">
+                  <div className="rounded-xl overflow-hidden border border-hairline">
+                    <div className="px-5 py-3 bg-sunken border-b border-hairline text-xs font-semibold text-ink-muted uppercase tracking-wider">
                       最近委托
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-[#EDEDF0]">
+                          <tr className="border-b border-hairline">
                             {["时间", "方向", "数量", "成交量", "成交价", "状态"].map((h, i) => (
-                              <th key={h} className={`px-4 py-2.5 text-xs font-medium text-[#525461]
+                              <th key={h} className={`px-4 py-2.5 text-xs font-medium text-ink-muted
                                 ${i === 0 ? "text-left" : i === 1 ? "text-center" : "text-right"}`}>
                                 {h}
                               </th>
@@ -1342,25 +1345,25 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
                         </thead>
                         <tbody>
                           {trading.orders.map(o => (
-                            <tr key={o.id} className="border-t border-[#EDEDF0] hover:bg-[#F6F6F8] transition-colors">
-                              <td className="px-4 py-3 text-[#525461] text-xs">{o.created_at}</td>
+                            <tr key={o.id} className="border-t border-hairline hover:bg-sunken transition-colors">
+                              <td className="px-4 py-3 text-ink-muted text-xs">{o.created_at}</td>
                               <td className="px-4 py-3 text-center">
                                 <span className={`font-semibold text-xs px-2 py-0.5 rounded-md
                                   ${o.side === "BUY"
                                     ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                    : "bg-red-50 text-[#F03A3E] border border-red-200"}`}>
+                                    : "bg-red-50 text-down border border-red-200"}`}>
                                   {o.side}
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-right font-mono text-gray-900">{o.qty.toFixed(0)}</td>
-                              <td className="px-4 py-3 text-right font-mono text-[#525461]">{o.filled_qty.toFixed(0)}</td>
+                              <td className="px-4 py-3 text-right font-mono text-ink-muted">{o.filled_qty.toFixed(0)}</td>
                               <td className="px-4 py-3 text-right font-mono text-gray-900">
                                 {o.filled_avg_price > 0 ? `$${o.filled_avg_price}` : "—"}
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <span className={`text-xs px-2 py-0.5 rounded-md font-medium
                                   ${o.status === "filled"   ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                    : o.status === "canceled" ? "bg-[#F6F6F8] text-[#525461] border border-[#EDEDF0]"
+                                    : o.status === "canceled" ? "bg-sunken text-ink-muted border border-hairline"
                                     : "bg-amber-50 text-amber-700 border border-amber-200"}`}>
                                   {o.status}
                                 </span>

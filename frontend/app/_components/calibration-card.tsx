@@ -18,14 +18,14 @@ export function CalibrationCard() {
 
   const hitColor = (r: number) => r >= 0.55 ? "text-emerald-600"
                                  : r >= 0.45 ? "text-amber-500"
-                                              : "text-[#F03A3E]";
+                                              : "text-down";
 
   return (
-    <section className="bg-white rounded-xl border border-[#EDEDF0] overflow-hidden">
-      <div className="px-5 py-3 border-b border-[#EDEDF0] flex items-center justify-between">
+    <section className="bg-surface rounded-xl border border-hairline overflow-hidden">
+      <div className="px-5 py-3 border-b border-hairline flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-base">📊</span>
-          <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+          <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
             模型校准 · 每个信号源的实战命中率
           </span>
         </div>
@@ -48,7 +48,7 @@ export function CalibrationCard() {
             </div>
           </div>
           {cal.n_total < 5 && (
-            <div className="text-[10px] text-gray-400 italic leading-snug pt-2 border-t border-[#EDEDF0]">
+            <div className="text-[10px] text-gray-400 italic leading-snug pt-2 border-t border-hairline">
               每次仪表盘加载会自动记录一条预测。5 天后系统会用真实 5 日收益评判，
               然后给每个信号源调整权重。N 越大越准。
             </div>
@@ -77,7 +77,7 @@ export function CalibrationCard() {
                   </span>
                   <span className={`font-mono text-[10px] text-right ${
                     info.weight_mult > 1.1 ? "text-emerald-600"
-                    : info.weight_mult < 0.9 ? "text-[#F03A3E]"
+                    : info.weight_mult < 0.9 ? "text-down"
                     : "text-gray-500"
                   }`}>
                     ×{info.weight_mult.toFixed(2)}

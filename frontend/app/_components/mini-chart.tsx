@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useDarkMode, chartTheme } from "../_lib/theme";
 import type {
   IChartApi,
   CandlestickData,
@@ -41,6 +42,7 @@ export function MiniChart({
 }: MiniChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef     = useRef<IChartApi | null>(null);
+  const dark         = useDarkMode();
 
   useEffect(() => {
     let chart: IChartApi | null = null;
@@ -51,21 +53,22 @@ export function MiniChart({
       const { createChart } = await import("lightweight-charts");
       if (cancelled || !containerRef.current) return;
 
+      const th = chartTheme();
       chart = createChart(containerRef.current, {
         width:  containerRef.current.clientWidth,
         height: CHART_HEIGHT,
-        layout: { background: { color: "#ffffff" }, textColor: "#525461", fontSize: 13 },
-        grid:   { vertLines: { color: "#F0F0F2" }, horzLines: { color: "#F0F0F2" } },
-        rightPriceScale: { borderColor: "#EDEDF0" },
-        timeScale: { borderColor: "#EDEDF0", timeVisible: false, secondsVisible: false },
+        layout: { background: { color: th.bg }, textColor: th.text, fontSize: 13 },
+        grid:   { vertLines: { color: th.grid }, horzLines: { color: th.grid } },
+        rightPriceScale: { borderColor: th.border },
+        timeScale: { borderColor: th.border, timeVisible: false, secondsVisible: false },
         crosshair: { mode: 1 },
       });
       chartRef.current = chart;
 
       const candleSeries = chart.addCandlestickSeries({
-        upColor: "#22c55e", downColor: "#F03A3E",
-        borderUpColor: "#22c55e", borderDownColor: "#F03A3E",
-        wickUpColor: "#22c55e", wickDownColor: "#F03A3E",
+        upColor: th.up, downColor: th.down,
+        borderUpColor: th.up, borderDownColor: th.down,
+        wickUpColor: th.up, wickDownColor: th.down,
       });
       candleSeries.setData(candles.map(c => ({ ...c, time: c.time as Time })) as CandlestickData[]);
 
@@ -160,15 +163,15 @@ export function MiniChart({
       chartRef.current = null;
       chart?.remove();
     };
-  }, [candles, sma20, sma200, high_52w, low_52w, plan, supply, demand, poc, markers, nwBands]);
+  }, [candles, sma20, sma200, high_52w, low_52w, plan, supply, demand, poc, markers, nwBands, dark]);
 
   const hasPlan = !!(plan && (plan.action === "LONG_QBTX" || plan.action === "SHORT_QBTZ"));
   const hasNw   = !!(nwBands && nwBands.length > 1);
 
   return (
-    <section className="bg-white rounded-xl border border-[#EDEDF0] overflow-hidden">
-      <div className="px-5 py-4 border-b border-[#EDEDF0] flex items-center justify-between flex-wrap gap-2">
-        <span className="text-sm font-semibold text-[#525461] uppercase tracking-wider">
+    <section className="bg-surface rounded-xl border border-hairline overflow-hidden">
+      <div className="px-5 py-4 border-b border-hairline flex items-center justify-between flex-wrap gap-2">
+        <span className="text-sm font-semibold text-ink-muted uppercase tracking-wider">
           📈 60 日价格走势{hasPlan ? " · 计划 / 区位 / 战绩" : ""}
         </span>
         <div className="flex items-center gap-3 text-[11px] font-mono flex-wrap">
@@ -178,7 +181,7 @@ export function MiniChart({
           {hasNw && <span className="flex items-center gap-1"><span className="w-3.5 h-0.5 bg-[#EA580C]" />NW卖出线</span>}
           {hasNw && <span className="flex items-center gap-1"><span className="w-3.5 h-px border-t border-[rgba(240,58,62,0.6)]" />/<span className="w-3.5 h-px border-t border-[rgba(20,184,166,0.7)]" />上/下轨</span>}
           {hasPlan && <span className="flex items-center gap-1"><span className="w-3.5 h-0.5 bg-[#2563EB]" />入场</span>}
-          {hasPlan && <span className="flex items-center gap-1"><span className="w-3.5 h-0.5 bg-[#F03A3E]" />止损</span>}
+          {hasPlan && <span className="flex items-center gap-1"><span className="w-3.5 h-0.5 bg-down" />止损</span>}
           {hasPlan && <span className="flex items-center gap-1"><span className="w-3.5 h-0.5 bg-[#16A34A]" />目标</span>}
           <span className="flex items-center gap-1"><span className="w-3.5 h-px border-t border-dotted border-gray-400" />供给/需求·POC</span>
           <span className="flex items-center gap-1">↑✓/↓✗ 历史决策</span>

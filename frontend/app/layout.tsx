@@ -37,7 +37,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-[#F2F2F7]">
+      <body className="min-h-full flex flex-col bg-sunken">
         {/* 在 body 渲染前同步设定夜间模式,避免切换时闪烁。默认跟随系统偏好,
             用户手动选过则用 localStorage 记忆。 */}
         <script

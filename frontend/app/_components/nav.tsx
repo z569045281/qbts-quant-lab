@@ -120,7 +120,7 @@ export function NavBar() {
                 <Link key={t.href} href={t.href}
                       className={`whitespace-nowrap px-3.5 py-1.5 rounded-md text-sm font-medium transition-all
                         ${active
-                          ? "bg-[#006FFF] text-white shadow-md shadow-blue-500/30"
+                          ? "bg-brand text-white shadow-md shadow-blue-500/30"
                           : "text-blue-100 hover:bg-white/10"}`}>
                   {t.label}
                 </Link>
@@ -139,7 +139,7 @@ export function NavBar() {
             and home-indicator safe-area padding. ── */}
       <nav
         className="md:hidden fixed bottom-0 inset-x-0 z-40 border-t border-black/[0.07]
-                   bg-white/75 backdrop-blur-xl backdrop-saturate-150"
+                   bg-surface/75 backdrop-blur-xl backdrop-saturate-150"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
         <div className="flex h-[50px]">
@@ -149,7 +149,7 @@ export function NavBar() {
               <Link key={t.href} href={t.href}
                     aria-current={active ? "page" : undefined}
                     className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors active:opacity-50
-                      ${active ? "text-[#006FFF]" : "text-[#8A8A8E]"}`}>
+                      ${active ? "text-brand" : "text-[#8A8A8E]"}`}>
                 <t.Icon />
                 <span className="text-[10px] font-medium leading-none tracking-wide">{t.short}</span>
               </Link>

@@ -23,9 +23,9 @@ export function SelfCheckCard({ page, check: preloaded }:
   if (issues.length === 0) return null;
 
   return (
-    <section className="bg-white rounded-xl border border-amber-200/70 p-4">
+    <section className="bg-surface rounded-xl border border-amber-200/70 p-4">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+        <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
           🔬 AI 系统自检 · 本页发现
         </span>
         {check?.generated_at && (
@@ -59,9 +59,9 @@ export function SiteCheckOverview({ check }: { check?: SiteCheck | null }) {
   if (entries.length === 0) return null;
 
   return (
-    <section className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+    <section className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+        <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
           🔬 全站系统体检 · {check.n_issues} 项发现
         </span>
         <span className="text-[10px] text-gray-400 font-mono">

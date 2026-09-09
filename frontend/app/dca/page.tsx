@@ -17,7 +17,7 @@ const VAL: Record<string, { border: string; bg: string; chip: string }> = {
   "中性": { border: "border-amber-200",   bg: "bg-amber-50/30",   chip: "bg-amber-100 text-amber-700" },
   "偏贵": { border: "border-red-200",      bg: "bg-red-50/30",     chip: "bg-red-100 text-red-600" },
 };
-const FALLBACK = { border: "border-[#E5E5EA]", bg: "bg-white", chip: "bg-gray-100 text-gray-500" };
+const FALLBACK = { border: "border-hairline", bg: "bg-surface", chip: "bg-gray-100 text-gray-500" };
 
 const signed = (n: number | null | undefined, d = 1) =>
   typeof n === "number" && isFinite(n) ? `${n >= 0 ? "+" : ""}${(n * 100).toFixed(d)}%` : "—";
@@ -27,7 +27,7 @@ function DcaCard({ r }: { r: DcaResult }) {
   const v = VAL[r.valuation] ?? FALLBACK;
   if (r.error) {
     return (
-      <div className="rounded-2xl border border-[#E5E5EA] bg-white p-4 flex items-center gap-3">
+      <div className="rounded-2xl border border-hairline bg-surface p-4 flex items-center gap-3">
         <span className="text-lg">⚠️</span>
         <span className="font-bold text-gray-800">{r.ticker}</span>
         <span className="text-xs text-gray-400">{r.name} · 数据拉取失败</span>
@@ -44,7 +44,7 @@ function DcaCard({ r }: { r: DcaResult }) {
         {r.role && <span className="text-[10px] text-gray-400">{r.role}</span>}
         <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${v.chip}`}>{r.valuation_emoji} {r.valuation}</span>
         <span className="ml-auto text-sm font-mono text-gray-900">${r.price?.toFixed(2)}</span>
-        <span className={`text-sm font-semibold ${up ? "text-emerald-600" : "text-[#F03A3E]"}`}>{signed(r.today_change)}</span>
+        <span className={`text-sm font-semibold ${up ? "text-emerald-600" : "text-down"}`}>{signed(r.today_change)}</span>
       </div>
 
       {/* 历史平均年回报(复合年化 CAGR,含分红)——用户最关心的数字,做醒目条 */}
@@ -58,23 +58,23 @@ function DcaCard({ r }: { r: DcaResult }) {
 
       {/* 估值 + 目标权重 */}
       <div className="mt-2.5 grid grid-cols-3 gap-2 text-xs">
-        <div className="bg-white/70 rounded-lg px-2.5 py-1.5">
+        <div className="bg-surface/70 rounded-lg px-2.5 py-1.5">
           <div className="text-[10px] text-gray-400">P/E</div>
           <div className="font-mono font-semibold text-gray-700">{r.pe ?? "—"}</div>
         </div>
-        <div className="bg-white/70 rounded-lg px-2.5 py-1.5" title="盈利收益率 1/PE ≈ 粗略的长期预期年化(实际)">
+        <div className="bg-surface/70 rounded-lg px-2.5 py-1.5" title="盈利收益率 1/PE ≈ 粗略的长期预期年化(实际)">
           <div className="text-[10px] text-gray-400">粗估长期年化</div>
           <div className="font-mono font-semibold text-gray-700">{r.earnings_yield != null ? `~${(r.earnings_yield * 100).toFixed(1)}%` : "—"}</div>
         </div>
-        <div className="bg-white/70 rounded-lg px-2.5 py-1.5">
+        <div className="bg-surface/70 rounded-lg px-2.5 py-1.5">
           <div className="text-[10px] text-gray-400">建议权重</div>
-          <div className="font-mono font-semibold text-[#006FFF]">{r.target_weight != null ? `${r.target_weight}%` : "—"}</div>
+          <div className="font-mono font-semibold text-brand">{r.target_weight != null ? `${r.target_weight}%` : "—"}</div>
         </div>
       </div>
 
       {/* 证据版「何时多投」 */}
       {r.deploy && (
-        <div className="mt-2.5 rounded-lg px-2.5 py-2 bg-white/70 border border-black/5">
+        <div className="mt-2.5 rounded-lg px-2.5 py-2 bg-surface/70 border border-black/5">
           <div className="text-[12px] font-semibold text-gray-800">{r.deploy.emoji} {r.deploy.tag}</div>
           <p className="mt-0.5 text-[12px] leading-relaxed text-gray-600">{r.deploy.text}</p>
           <div className="mt-1 text-[10px] text-gray-400 font-mono">
@@ -109,7 +109,7 @@ export default function DcaPage() {
     <main className="max-w-[1100px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-4">
       <SelfCheckCard page="dca" />
       {/* 标题 + 大盘估值背景 */}
-      <section className="bg-white rounded-2xl border border-[#EDEDF0] p-5 shadow-sm">
+      <section className="bg-surface rounded-2xl border border-hairline p-5 shadow-sm">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-base">📥</span>
           <span className="text-sm font-semibold text-gray-800">定投专区 · 全球估值菜单</span>
@@ -127,12 +127,12 @@ export default function DcaPage() {
 
       {/* 建议配置 */}
       {state?.allocation && Object.keys(weights).length > 0 && (
-        <section className="bg-white rounded-2xl border border-[#EDEDF0] p-4 shadow-sm">
+        <section className="bg-surface rounded-2xl border border-hairline p-4 shadow-sm">
           <div className="text-xs font-semibold text-gray-700 mb-2">🎯 建议配置(温和的估值倾斜,每年再平衡)</div>
           <div className="flex h-6 rounded-lg overflow-hidden text-[10px] font-semibold text-white">
             {Object.entries(weights).map(([t, w], i) => (
               <div key={t}
-                className={["bg-[#006FFF]", "bg-emerald-500", "bg-amber-500", "bg-purple-500",
+                className={["bg-brand", "bg-emerald-500", "bg-amber-500", "bg-purple-500",
                             "bg-cyan-600", "bg-slate-500", "bg-yellow-600"][i % 7]}
                 style={{ width: `${w}%` }} title={`${t} ${w}%`}>
                 <span className="px-1.5 leading-6">{t} {w}%</span>
@@ -151,11 +151,11 @@ export default function DcaPage() {
 
       {/* 卡片 */}
       {loading ? (
-        <div className="text-sm text-[#525461] flex items-center gap-2 px-1">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#006FFF] animate-pulse" /> 读取定投建议…
+        <div className="text-sm text-ink-muted flex items-center gap-2 px-1">
+          <span className="inline-block w-2.5 h-2.5 rounded-full bg-brand animate-pulse" /> 读取定投建议…
         </div>
       ) : !state || state.results.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-[#EDEDF0] p-8 text-center text-sm text-gray-400">
+        <div className="bg-surface rounded-2xl border border-hairline p-8 text-center text-sm text-gray-400">
           尚未生成 — 运行一次 <code className="font-mono bg-gray-100 px-1 rounded">publish.py</code>(或等每日自动任务)后这里就会有数据。
         </div>
       ) : (

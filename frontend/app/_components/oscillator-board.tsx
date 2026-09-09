@@ -25,7 +25,7 @@ const BAND: Record<OscBand, { dot: string; chip: string; label: string }> = {
   cool: { dot: "bg-emerald-400", chip: "bg-emerald-50 text-emerald-700",  label: "偏冷" },
   mid:  { dot: "bg-gray-400",    chip: "bg-gray-100 text-gray-600",       label: "中性" },
   warm: { dot: "bg-red-300",     chip: "bg-red-50 text-red-700",          label: "偏热" },
-  ob:   { dot: "bg-[#F03A3E]",   chip: "bg-red-100 text-red-800",         label: "超买" },
+  ob:   { dot: "bg-down",   chip: "bg-red-100 text-red-800",         label: "超买" },
 };
 
 const STATE_CHIP: Record<Oscillators["state"], string> = {
@@ -41,9 +41,9 @@ export function OscillatorStrip({ osc, onOpen }: { osc: Oscillators; onOpen: () 
   const ext = osc.rows.reduce((a, r) =>
     Math.min(r.pos, 1 - r.pos) < Math.min(a.pos, 1 - a.pos) ? r : a, osc.rows[0]);
   return (
-    <div className="bg-white rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 py-2
+    <div className="bg-surface rounded-2xl shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 py-2
                     flex items-center gap-x-3 gap-y-1 flex-wrap text-[12px]">
-      <span className="text-[11px] font-semibold text-[#525461] uppercase tracking-wider shrink-0">
+      <span className="text-[11px] font-semibold text-ink-muted uppercase tracking-wider shrink-0">
         🌡️ 超买/超卖
       </span>
       <span className={`px-2 py-0.5 rounded-full font-bold ${STATE_CHIP[osc.state]}`}>
@@ -61,7 +61,7 @@ export function OscillatorStrip({ osc, onOpen }: { osc: Oscillators; onOpen: () 
                 style={{ left: `${r.pos * 100}%` }} />
         ))}
       </span>
-      <span className="text-[#525461] tabular-nums">
+      <span className="text-ink-muted tabular-nums">
         {osc.n_os} 超卖 · {osc.n_cool} 偏冷 · {osc.n_warm} 偏热 · {osc.n_ob} 超买
       </span>
       {ext && (
@@ -73,8 +73,8 @@ export function OscillatorStrip({ osc, onOpen }: { osc: Oscillators; onOpen: () 
         {osc.fired.length ? `扳机已触发:${osc.fired.join("、")}` : "无在册扳机触发"}
       </span>
       <button onClick={onOpen}
-              className="ml-auto shrink-0 text-[11px] text-[#006FFF] hover:underline
-                         focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#006FFF]">
+              className="ml-auto shrink-0 text-[11px] text-brand hover:underline
+                         focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand">
         逐项看 ›
       </button>
     </div>
@@ -84,7 +84,7 @@ export function OscillatorStrip({ osc, onOpen }: { osc: Oscillators; onOpen: () 
 function Row({ r }: { r: OscRow }) {
   const b = BAND[r.band];
   return (
-    <div className="py-2 border-b border-[#F0F0F2] last:border-0">
+    <div className="py-2 border-b border-hairline last:border-0">
       <div className="flex items-baseline gap-2 flex-wrap mb-1.5">
         <span className="text-[12px] font-medium text-gray-800">{r.name}</span>
         <span className="font-mono text-[13px] font-semibold text-gray-900 tabular-nums">{r.value_cn}</span>
@@ -126,9 +126,9 @@ function Row({ r }: { r: OscRow }) {
 /** 「结构」标签里的完整卡 */
 export function OscillatorBoard({ osc }: { osc: Oscillators }) {
   return (
-    <div className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+    <div className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
       <div className="flex items-baseline justify-between gap-2 mb-1 flex-wrap">
-        <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+        <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
           🌡️ 超买 / 超卖逐项
         </span>
         <span className="flex items-center gap-2">
@@ -140,7 +140,7 @@ export function OscillatorBoard({ osc }: { osc: Oscillators }) {
           </span>
         </span>
       </div>
-      <p className="text-[12px] text-[#525461] leading-relaxed">{osc.summary_cn}</p>
+      <p className="text-[12px] text-ink-muted leading-relaxed">{osc.summary_cn}</p>
       <p className={`text-[12px] leading-relaxed mb-2 font-medium ${
         osc.fired.length ? "text-emerald-700" : "text-[#B45309]"}`}>
         {osc.caveat_cn}
@@ -149,13 +149,13 @@ export function OscillatorBoard({ osc }: { osc: Oscillators }) {
         <span>← 便宜(超卖)</span><span>贵(超买) →</span>
       </div>
       {osc.rows.map(r => <Row key={r.key} r={r} />)}
-      <div className="mt-3 text-[10px] text-gray-400 bg-[#F6F6F8] rounded-lg px-2.5 py-2 leading-relaxed">
+      <div className="mt-3 text-[10px] text-gray-400 bg-sunken rounded-lg px-2.5 py-2 leading-relaxed">
         ⓘ {osc.discipline_cn}
       </div>
       {/* 色觉/打印/强制配色下颜色可能失效 —— 表格视图保证信息不丢 */}
       <details className="group mt-2">
         <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden
-                            text-[11px] text-[#006FFF] hover:underline">
+                            text-[11px] text-brand hover:underline">
           <span className="group-open:hidden">看表格版(不依赖颜色) ›</span>
           <span className="hidden group-open:inline">收起表格</span>
         </summary>
@@ -171,7 +171,7 @@ export function OscillatorBoard({ osc }: { osc: Oscillators }) {
             </thead>
             <tbody>
               {osc.rows.map(r => (
-                <tr key={r.key} className="border-t border-[#F0F0F2]">
+                <tr key={r.key} className="border-t border-hairline">
                   <td className="py-1 pr-3 text-gray-700">{r.name}</td>
                   <td className="py-1 pr-3 font-mono text-gray-900 tabular-nums">{r.value_cn}</td>
                   <td className="py-1 pr-3 text-gray-700">{r.band_cn}</td>

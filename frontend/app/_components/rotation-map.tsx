@@ -150,12 +150,12 @@ export function RotationMap({ data }: { data: SectorRotation }) {
                   <circle cx={head[0]} cy={head[1]} r="13" fill="none" stroke={q.color}
                           strokeWidth="1.3" strokeDasharray="4 4" className="rot-spin" opacity="0.8" />
                 )}
-                <circle cx={head[0]} cy={head[1]} r="4.5" fill={q.color} stroke="#fff" strokeWidth="2" />
+                <circle cx={head[0]} cy={head[1]} r="4.5" fill={q.color} stroke="var(--color-surface)" strokeWidth="2" />
                 <path d="M 5 0 L -3.5 4.5 L -1.5 0 L -3.5 -4.5 Z" fill={q.color}
                       transform={`translate(${(head[0] + 12 * Math.cos(ang * Math.PI / 180)).toFixed(1)},${(head[1] + 12 * Math.sin(ang * Math.PI / 180)).toFixed(1)}) rotate(${ang.toFixed(1)})`} />
                 {/* 直接标注(墨字 + 白描边;量子加粗) */}
                 <text x={lp.x + 10} y={lp.y} fontSize="11.5" fontWeight={isQ ? 800 : 600}
-                      fill="#111318" stroke="#ffffff" strokeWidth="3" paintOrder="stroke">
+                      fill="var(--foreground)" stroke="var(--color-surface)" strokeWidth="3" paintOrder="stroke">
                   {s.emoji} {s.label}
                 </text>
                 {/* 放大的命中区 */}
@@ -171,7 +171,7 @@ export function RotationMap({ data }: { data: SectorRotation }) {
         const q = QUAD[(hovered.quadrant as QuadKey) ?? "lagging"] ?? QUAD.lagging;
         const left = (sx(hovered.x) / W) * 100, top = (sy(hovered.y) / H) * 100;
         return (
-          <div className="absolute z-10 pointer-events-none rounded-lg border border-[#EDEDF0] bg-white shadow-lg px-3 py-2 text-[12px] leading-relaxed"
+          <div className="absolute z-10 pointer-events-none rounded-lg border border-hairline bg-surface shadow-lg px-3 py-2 text-[12px] leading-relaxed"
                style={{ left: `${left}%`, top: `${top}%`,
                         transform: `translate(${left > 72 ? "-105%" : "8px"}, ${top > 75 ? "-115%" : "-40%"})` }}>
             <div className="font-semibold text-gray-900">{hovered.emoji} {hovered.label} <span className="font-mono text-gray-500">{hovered.ticker}</span></div>
@@ -217,18 +217,18 @@ export function RotationMap({ data }: { data: SectorRotation }) {
         <summary className="text-[11px] text-gray-400 cursor-pointer hover:text-gray-600">数据表</summary>
         <div className="overflow-x-auto mt-1">
           <table className="text-[12px] w-full">
-            <thead><tr className="text-left text-[10px] uppercase tracking-wider text-gray-500 border-b border-[#EDEDF0]">
+            <thead><tr className="text-left text-[10px] uppercase tracking-wider text-gray-500 border-b border-hairline">
               <th className="py-1 pr-3">板块</th><th className="py-1 pr-3">象限</th>
               <th className="py-1 pr-3">相对强度</th><th className="py-1 pr-3">相对动量</th><th className="py-1">20日</th>
             </tr></thead>
             <tbody>
               {[...data.sectors].sort((a, b) => b.x + b.y - a.x - a.y).map(s => (
-                <tr key={s.ticker} className="border-b border-[#F4F4F6] last:border-0">
+                <tr key={s.ticker} className="border-b border-hairline last:border-0">
                   <td className="py-1 pr-3 text-gray-900">{s.emoji} {s.label} <span className="font-mono text-gray-400">{s.ticker}</span></td>
                   <td className="py-1 pr-3 text-gray-700">{QUAD[(s.quadrant as QuadKey) ?? "lagging"]?.label}{QUAD[(s.quadrant as QuadKey) ?? "lagging"]?.glyph}</td>
                   <td className="py-1 pr-3 font-mono text-gray-700">{s.x.toFixed(2)}</td>
                   <td className="py-1 pr-3 font-mono text-gray-700">{s.y.toFixed(2)}</td>
-                  <td className={`py-1 font-mono ${s.ret20 >= 0 ? "text-emerald-600" : "text-[#F03A3E]"}`}>{s.ret20 >= 0 ? "+" : ""}{(s.ret20 * 100).toFixed(1)}%</td>
+                  <td className={`py-1 font-mono ${s.ret20 >= 0 ? "text-emerald-600" : "text-down"}`}>{s.ret20 >= 0 ? "+" : ""}{(s.ret20 * 100).toFixed(1)}%</td>
                 </tr>
               ))}
             </tbody>

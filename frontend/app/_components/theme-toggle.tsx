@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-/** 夜间模式开关:切 <html class="dark"> 并存 localStorage。实际变暗由
- *  globals.css 的整页 invert 滤镜完成(零改色类)。 */
+/** 夜间模式开关:切 <html class="dark"> 并存 localStorage。变暗由 globals.css
+ *  重定义整套 Tailwind 调色板变量完成 —— 2026-09-09 换掉了原来的整页 invert
+ *  滤镜,那个会把 K 线图和涨跌色一起反相。canvas 图表另走 _lib/theme.ts。 */
 export function ThemeToggle() {
   const [dark, setDark] = useState(false);
 

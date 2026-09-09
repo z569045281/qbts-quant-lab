@@ -14,7 +14,7 @@ import {
 const TICKERS = ["QBTS", "QBTX", "QBTZ"] as const;
 
 const ADVICE_STYLE: Record<string, string> = {
-  持有: "bg-[#F6F6F8] text-[#525461]",
+  持有: "bg-sunken text-ink-muted",
   加仓: "bg-emerald-100 text-emerald-700",
   减仓: "bg-amber-100 text-amber-800",
   清仓: "bg-red-100 text-red-700",
@@ -53,9 +53,9 @@ export default function PositionsCard({ initial, prices, advice, adviceAsOf }: {
   }
 
   return (
-    <section className="bg-white rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
+    <section className="bg-surface rounded-3xl shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold text-[#525461] uppercase tracking-wider">
+        <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">
           💼 当前持仓(真金)· AI 每日给操作建议
         </span>
         {WATCH_EDITABLE && (
@@ -69,7 +69,7 @@ export default function PositionsCard({ initial, prices, advice, adviceAsOf }: {
 
       {/* 持仓行 */}
       {list.length === 0 ? (
-        <div className="text-[13px] text-gray-400 bg-[#F6F6F8] rounded-xl px-4 py-3">
+        <div className="text-[13px] text-gray-400 bg-sunken rounded-xl px-4 py-3">
           还没有记录持仓。买入后点「＋ 记一笔」——之后每天生成决策时,AI 会对每笔持仓给出
           持有 / 加仓 / 减仓 / 清仓的建议(并核对执行军规,比如 QBTZ 不许过周末)。
         </div>
@@ -80,7 +80,7 @@ export default function PositionsCard({ initial, prices, advice, adviceAsOf }: {
             const pnl = px && p.cost ? px / p.cost - 1 : null;
             const a = advice?.find(x => x.ticker === p.ticker);
             return (
-              <div key={p.ticker} className="bg-[#F6F6F8] rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed">
+              <div key={p.ticker} className="bg-sunken rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <span>
                     <b>{p.ticker}</b>
@@ -123,23 +123,23 @@ export default function PositionsCard({ initial, prices, advice, adviceAsOf }: {
 
       {/* 记一笔表单 */}
       {open && WATCH_EDITABLE && (
-        <div className="mt-3 bg-[#F6F6F8] rounded-xl px-3.5 py-3 flex items-end gap-2 flex-wrap text-[13px]">
+        <div className="mt-3 bg-sunken rounded-xl px-3.5 py-3 flex items-end gap-2 flex-wrap text-[13px]">
           <label className="flex flex-col gap-1">
             <span className="text-[11px] text-gray-400">代码</span>
             <select value={form.ticker} onChange={e => setForm({ ...form, ticker: e.target.value })}
-              className="rounded-lg border border-gray-200 bg-white px-2 py-1.5">
+              className="rounded-lg border border-gray-200 bg-surface px-2 py-1.5">
               {TICKERS.map(t => <option key={t}>{t}</option>)}
             </select>
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-[11px] text-gray-400">数量(股)</span>
             <input inputMode="decimal" value={form.qty} onChange={e => setForm({ ...form, qty: e.target.value })}
-              placeholder="如 42" className="w-24 rounded-lg border border-gray-200 bg-white px-2 py-1.5" />
+              placeholder="如 42" className="w-24 rounded-lg border border-gray-200 bg-surface px-2 py-1.5" />
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-[11px] text-gray-400">成本价($)</span>
             <input inputMode="decimal" value={form.cost} onChange={e => setForm({ ...form, cost: e.target.value })}
-              placeholder="如 4.74" className="w-24 rounded-lg border border-gray-200 bg-white px-2 py-1.5" />
+              placeholder="如 4.74" className="w-24 rounded-lg border border-gray-200 bg-surface px-2 py-1.5" />
           </label>
           <button onClick={save} disabled={busy}
             className="rounded-full bg-[#007AFF] text-white font-semibold px-4 py-1.5 disabled:opacity-50 active:opacity-70">

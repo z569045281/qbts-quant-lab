@@ -35,7 +35,7 @@ export function TabBar({
 }) {
   return (
     <div className="sticky top-0 z-30 -mx-4 sm:-mx-6 px-4 sm:px-6 py-2
-                    bg-[#F5F5F7]/90 backdrop-blur-xl border-b border-black/[0.06]">
+                    bg-sunken/90 backdrop-blur-xl border-b border-black/[0.06]">
       <div className="max-w-[1200px] mx-auto flex items-center gap-3 flex-wrap">
         <div className="min-w-0 shrink-0">{rail}</div>
         <nav className="flex items-center gap-0.5 ml-auto overflow-x-auto" aria-label="仪表盘分区">
@@ -49,13 +49,13 @@ export function TabBar({
                 aria-current={on ? "page" : undefined}
                 className={`relative shrink-0 px-3 py-1.5 rounded-lg text-[13px] font-medium
                             transition-colors focus-visible:outline-2 focus-visible:outline-offset-2
-                            focus-visible:outline-[#006FFF] ${
+                            focus-visible:outline-brand ${
                   on ? "bg-gray-900 text-white shadow-sm"
-                     : "text-[#525461] hover:bg-black/[0.05]"}`}
+                     : "text-ink-muted hover:bg-black/[0.05]"}`}
               >
                 {t.label}
                 {dots?.[t.key] && !on && (
-                  <span className="absolute top-1 right-1.5 w-1.5 h-1.5 rounded-full bg-[#F03A3E]" />
+                  <span className="absolute top-1 right-1.5 w-1.5 h-1.5 rounded-full bg-down" />
                 )}
               </button>
             );
