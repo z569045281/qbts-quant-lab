@@ -112,6 +112,28 @@ def _log(title: str, body: str, tags: str, priority: str, sent: bool) -> None:
         print(f"! ntfy_log skipped: {type(e).__name__}: {e}")
 
 
+def pushed_since(title: str, since_iso: str) -> bool:
+    """台账里 `since_iso` 之后有没有**成功**推过这个 title —— 去重的第二道保险。
+
+    为什么需要它:各模块的「今天推过了」标记都住在 `live_quote.data` 这一个整块
+    覆写的 blob 里,那一次读或写失败,标记就凭空消失(2026-09-14:周末BTC 推了
+    18 条)。`ntfy_log` 是独立的一张表,两处同时抖的概率低得多。
+
+    ⚠️ 查不到、查失败、没配库 —— 一律返回 False。台账只能拦重复,**绝不许**反过来
+    把一条真信号挡掉。"""
+    try:
+        from dashboard.db import supabase
+        sb = supabase()
+        if sb is None:
+            return False
+        r = (sb.table(_LOG_TABLE).select("ts").eq("title", title).eq("sent", True)
+             .gte("ts", since_iso).limit(1).execute())
+        return bool(r.data)
+    except Exception as e:
+        print(f"! ntfy_log dedup check skipped: {type(e).__name__}: {e}")
+        return False
+
+
 def push(title: str, body: str, tags: str = "rotating_light",
          priority: str = "high", stamp: bool = True) -> bool:
     """POST to ntfy.sh (no auth needed). 中文/emoji 标题会自动按 RFC 2047 编码

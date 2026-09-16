@@ -11,7 +11,12 @@ QBTS 有强分辨力:开→收 +2.57%/−2.97%(t=3.57;近1年 +2.90/−1.45);收
 运行:QuoteFunction 里调 maybe_btc_weekend —— 周日 ≥20:00 ET 起算并立即推
 ntfy(周日调度 cron(1/10 20-23 ? * SUN),分钟错开 %5 避免顺带触发 SMC 重算);
 周一全天 carry(错过周日则周一首个运行分钟补算补推);其余日子 None → 前端
-横幅自动消失。去重键 = 该周末的周五日期(friday),经 live_quote 读回。
+横幅自动消失。
+
+去重两道:①该周末的周五日期(friday)+ `pushed` 标记,经 live_quote 读回;
+②`ntfy_log` 台账里这个窗口已有成功记录就不再推(2026-09-16 加)。第二道是必需的 ——
+live_quote.data 是整块覆写的 blob,Supabase 读或写失败一次标记就蒸发,09-14 那天
+(连续 502/504)因此把同一条信号推了 18 遍。
 """
 
 from __future__ import annotations
@@ -23,6 +28,17 @@ logger = logging.getLogger(__name__)
 
 _NIGHT_OPEN_HOUR_ET = 20   # 周日 20:00 ET = 美股夜盘开门 = BTC 周日 UTC 线定案
 _CLOSE_HOUR_ET = 16        # 周一 16:00 ET 收盘 = 日内单窗口关闭 = 信号过期
+_TITLE = "QBTS weekend BTC signal"   # 台账去重要按标题查,所以只能有这一个出处
+
+
+def _since_iso(friday) -> str:
+    """这个周末的推送窗口起点(周六 00:00 ET → UTC ISO),给 ntfy_log 查重当下界。
+    窗口实际是周日 20:00 ET–周一 16:00 ET;放宽到周六只是留余量,上一个周末的那条
+    早在 7 天前,不可能被圈进来。"""
+    from zoneinfo import ZoneInfo
+    sat = datetime.combine(friday + timedelta(days=1), datetime.min.time(),
+                           tzinfo=ZoneInfo("America/New_York"))
+    return sat.astimezone(ZoneInfo("UTC")).isoformat()
 
 
 def _compute(now_et: datetime, friday, live_fallback: bool = False) -> dict | None:
@@ -107,11 +123,17 @@ def maybe_btc_weekend(prev: dict | None, now_et: datetime) -> dict | None:
             return None
 
     if not bw.get("pushed"):
-        from dashboard.notify import push as _ntfy
+        from dashboard.notify import push as _ntfy, pushed_since
+        # 第二道保险(2026-09-16):`pushed` 标记住在 live_quote 那个整块覆写的 blob 里,
+        # Supabase 读/写抖一下就没了 —— 09-14 因此推了 18 条。台账是另一张表,查到这个
+        # 周末已经推过就直接补上标记。查不到/查失败照旧推(宁可重一条,不可哑火)。
+        if pushed_since(_TITLE, _since_iso(friday)):
+            bw["pushed"] = True
+            return bw
         pct = bw["weekend_ret"] * 100
         if bw["green"]:
             ok = _ntfy(
-                "QBTS weekend BTC signal",
+                _TITLE,
                 f"周末 BTC {pct:+.1f}% 🟢\n"
                 f"→ 夜盘/盘前可先建仓(QBTS 现货、限价单,点差大勿追),或开盘买 QBTX\n"
                 f"→ 无论哪种:周一收盘前全部卖出,不过夜\n"
@@ -119,7 +141,7 @@ def maybe_btc_weekend(prev: dict | None, now_et: datetime) -> dict | None:
                 tags="chart_with_upwards_trend", priority="high")
         else:
             ok = _ntfy(
-                "QBTS weekend BTC signal",
+                _TITLE,
                 f"周末 BTC {pct:+.1f}% 🔴\n"
                 f"→ 周一不做多,夜盘也不(历史此情形周一日内均值 −3.0%)",
                 tags="no_entry", priority="default")

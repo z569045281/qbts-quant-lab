@@ -47,21 +47,39 @@ def quote_handler(event, context):
     fires an ntfy push when the state rises into TRIGGER — so the fleeting 15m
     trigger can actually be caught, not just at the 09:00 daily publish.
     """
+    import time
     from datetime import datetime
     from zoneinfo import ZoneInfo
     import quote_pusher
 
     sb = quote_pusher.get_supabase()
-    payload = quote_pusher.build_payload()
 
     # Previous live data (SMC rising-edge dedup + btc_weekend push dedup + carry-forward).
-    prev_data = {}
-    try:
-        r = sb.table("live_quote").select("data").eq("id", 1).single().execute()
-        prev_data = ((r.data or {}).get("data") or {})
-    except Exception:
-        prev_data = {}
+    #
+    # ⚠️ 2026-09-14 事故:Supabase 抖了一整天(502/504/401/500),这一行读失败时旧代码
+    # 静默地把 prev_data 当成 `{}` —— 于是**所有**住在这个 blob 里的去重键(smc / geo /
+    # catalyst / event_day / earnings_alert / dec_trigger / btc_weekend / tiaojiu)一起
+    # 蒸发,各模块当成"第一次"重推一遍,然后把没有这些键的 payload 整块写回去,把状态
+    # 彻底焊死成丢失。周末BTC 信号那天因此推了 18 条(该推 1 条)。
+    # 治法:读不到就**整跳放弃**,一个字都不写。少更新一分钟报价 ≪ 冲掉全仓去重状态。
+    # (`.limit(1)` 而不是 `.single()`:表里真没有行时 `.single()` 也抛,会让首次运行
+    #  永远建不出这一行 —— 必须把"没有数据"和"读不到"分开。)
+    prev_data = None
+    for attempt in range(3):
+        try:
+            r = sb.table("live_quote").select("data").eq("id", 1).limit(1).execute()
+            rows = r.data or []
+            prev_data = (rows[0].get("data") or {}) if rows else {}
+            break
+        except Exception as e:
+            print(f"! live_quote read failed ({attempt + 1}/3): {type(e).__name__}: {e}")
+            time.sleep(1 + attempt)
+    if prev_data is None:
+        print("! live_quote unreadable → 整跳跳过(不写、不推),下一分钟再来")
+        return {"ok": False, "skipped": "live_quote read failed"}
     prev_smc = prev_data.get("smc")
+
+    payload = quote_pusher.build_payload()   # 读得到状态才值得去拉行情
 
     now_et = datetime.now(ZoneInfo("America/New_York"))
 

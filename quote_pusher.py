@@ -286,11 +286,25 @@ def get_supabase():
     return create_client(url, key)
 
 
-def push_payload(sb, payload: dict) -> dict:
-    """Upsert a pre-built payload into the live_quote row (id=1)."""
-    sb.table("live_quote").upsert(
-        {"id": 1, "updated_at": datetime.utcnow().isoformat() + "Z", "data": payload}
-    ).execute()
+def push_payload(sb, payload: dict, tries: int = 3) -> dict:
+    """Upsert a pre-built payload into the live_quote row (id=1).
+
+    ⚠️ 这一次写失败 = 各模块「今天已经推过了」的标记全部丢失(它们都住在这一行的
+    blob 里,而 ntfy 已经在写库之前发出去了)→ 下一跳当成第一次,重推一遍。
+    2026-09-14 Supabase 连续 502/504 那天,周末BTC 就是这么推了 18 条。
+    所以这里必须重试,别让一次网关抖动变成一条重复推送。"""
+    for attempt in range(tries):
+        try:
+            sb.table("live_quote").upsert(
+                {"id": 1, "updated_at": datetime.utcnow().isoformat() + "Z", "data": payload}
+            ).execute()
+            return payload
+        except Exception as e:
+            if attempt == tries - 1:
+                raise
+            print(f"! live_quote write failed ({attempt + 1}/{tries}): "
+                  f"{type(e).__name__}: {str(e)[:140]}", flush=True)
+            time.sleep(1 + attempt)
     return payload
 
 
