@@ -65,11 +65,11 @@ export function OscillatorStrip({ osc, onOpen }: { osc: Oscillators; onOpen: () 
         {osc.n_os} 超卖 · {osc.n_cool} 偏冷 · {osc.n_warm} 偏热 · {osc.n_ob} 超买
       </span>
       {ext && (
-        <span className="text-gray-400">
+        <span className="text-ink-faint">
           最极端 <b className="text-gray-600">{ext.name} {ext.value_cn}</b>
         </span>
       )}
-      <span className={`shrink-0 ${osc.fired.length ? "text-emerald-700 font-semibold" : "text-gray-400"}`}>
+      <span className={`shrink-0 ${osc.fired.length ? "text-emerald-700 font-semibold" : "text-ink-faint"}`}>
         {osc.fired.length ? `扳机已触发:${osc.fired.join("、")}` : "无在册扳机触发"}
       </span>
       <button onClick={onOpen}
@@ -94,7 +94,7 @@ function Row({ r }: { r: OscRow }) {
             扳机已触发
           </span>
         )}
-        <span className="ml-auto text-meta text-gray-400">{r.source}</span>
+        <span className="ml-auto text-meta text-ink-faint">{r.source}</span>
       </div>
       {/* 轨道:左便宜右贵。刻度线是该指标**自己的**阈值,不是统一分档 */}
       <div className="relative h-4">
@@ -104,7 +104,7 @@ function Row({ r }: { r: OscRow }) {
           <div key={m.label} className="absolute top-0 h-4 flex flex-col items-center"
                style={{ left: `${m.at * 100}%` }}>
             <div className="w-px h-2.5 bg-gray-400/70" />
-            <span className="text-meta text-gray-400 leading-none whitespace-nowrap
+            <span className="text-meta text-ink-faint leading-none whitespace-nowrap
                              absolute top-2.5 -translate-x-1/2 left-0">{m.label}</span>
           </div>
         ))}
@@ -113,7 +113,7 @@ function Row({ r }: { r: OscRow }) {
                          ring-2 ring-white shadow-sm ${b.dot}`}
              style={{ left: `${r.pos * 100}%` }} />
       </div>
-      <div className="mt-2.5 text-meta text-gray-400 leading-snug">{r.threshold_cn}</div>
+      <div className="mt-2.5 text-meta text-ink-faint leading-snug">{r.threshold_cn}</div>
       {r.hint_cn && (
         <div className="mt-1 text-meta text-emerald-700 bg-emerald-50 rounded-inner px-2 py-1 leading-snug">
           → {r.hint_cn}
@@ -135,7 +135,7 @@ export function OscillatorBoard({ osc }: { osc: Oscillators }) {
           <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${STATE_CHIP[osc.state]}`}>
             {osc.state_cn}
           </span>
-          <span className="text-meta px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
+          <span className="text-meta px-2 py-0.5 rounded-full bg-gray-100 text-ink-faint font-medium">
             零决策权
           </span>
         </span>
@@ -145,11 +145,11 @@ export function OscillatorBoard({ osc }: { osc: Oscillators }) {
         osc.fired.length ? "text-emerald-700" : "text-[#B45309]"}`}>
         {osc.caveat_cn}
       </p>
-      <div className="flex justify-between text-meta text-gray-400 mb-1">
+      <div className="flex justify-between text-meta text-ink-faint mb-1">
         <span>← 便宜(超卖)</span><span>贵(超买) →</span>
       </div>
       {osc.rows.map(r => <Row key={r.key} r={r} />)}
-      <div className="mt-3 text-meta text-gray-400 bg-sunken rounded-inner px-2.5 py-2 leading-relaxed">
+      <div className="mt-3 text-meta text-ink-faint bg-sunken rounded-inner px-2.5 py-2 leading-relaxed">
         ⓘ {osc.discipline_cn}
       </div>
       {/* 色觉/打印/强制配色下颜色可能失效 —— 表格视图保证信息不丢 */}
@@ -162,7 +162,7 @@ export function OscillatorBoard({ osc }: { osc: Oscillators }) {
         <div className="mt-2 overflow-x-auto">
           <table className="w-full text-meta">
             <thead>
-              <tr className="text-gray-400 text-left">
+              <tr className="text-ink-faint text-left">
                 <th className="py-1 pr-3 font-medium">读数</th>
                 <th className="py-1 pr-3 font-medium">当前值</th>
                 <th className="py-1 pr-3 font-medium">档位</th>
@@ -175,7 +175,7 @@ export function OscillatorBoard({ osc }: { osc: Oscillators }) {
                   <td className="py-1 pr-3 text-gray-700">{r.name}</td>
                   <td className="py-1 pr-3 font-mono text-gray-900 tabular-nums">{r.value_cn}</td>
                   <td className="py-1 pr-3 text-gray-700">{r.band_cn}</td>
-                  <td className="py-1 text-gray-500">{r.threshold_cn}</td>
+                  <td className="py-1 text-ink-faint">{r.threshold_cn}</td>
                 </tr>
               ))}
             </tbody>

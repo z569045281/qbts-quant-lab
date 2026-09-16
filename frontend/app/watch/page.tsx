@@ -18,10 +18,10 @@ import { SelfCheckCard } from "../_components/self-check";
 const STANCE: Record<string, { border: string; bg: string; chip: string; bar: string }> = {
   "买入区":   { border: "border-emerald-300", bg: "bg-emerald-50/50", chip: "bg-emerald-100 text-emerald-700", bar: "bg-emerald-500" },
   "接近买点": { border: "border-amber-300",   bg: "bg-amber-50/40",   chip: "bg-amber-100 text-amber-700",   bar: "bg-amber-400" },
-  "观望":     { border: "border-hairline",   bg: "bg-surface",         chip: "bg-gray-100 text-gray-500",     bar: "bg-gray-400" },
+  "观望":     { border: "border-hairline",   bg: "bg-surface",         chip: "bg-gray-100 text-ink-faint",     bar: "bg-gray-400" },
   "偏空回避": { border: "border-red-200",     bg: "bg-red-50/40",     chip: "bg-red-100 text-red-700",       bar: "bg-red-400" },
 };
-const FALLBACK = { border: "border-hairline", bg: "bg-surface", chip: "bg-gray-100 text-gray-500", bar: "bg-gray-300" };
+const FALLBACK = { border: "border-hairline", bg: "bg-surface", chip: "bg-gray-100 text-ink-faint", bar: "bg-gray-300" };
 
 const TREND_CN: Record<string, string> = { bullish: "结构看多", bearish: "结构看空", neutral: "结构中性" };
 const REGIME_CN: Record<string, string> = { expansion: "波动扩张", contraction: "波动收缩", normal: "波动正常" };
@@ -42,7 +42,7 @@ function ScanCard({ r, editable, onRemove }: {
       <div className="relative rounded-card border border-hairline bg-surface p-4 flex items-center gap-3">
         <span className="text-section">⚠️</span>
         <span className="font-bold text-gray-800">{r.ticker}</span>
-        <span className="text-body text-gray-400">{r.theme} · 数据拉取失败</span>
+        <span className="text-body text-ink-faint">{r.theme} · 数据拉取失败</span>
         {editable && <RemoveBtn t={r.ticker} onRemove={onRemove} />}
       </div>
     );
@@ -55,7 +55,7 @@ function ScanCard({ r, editable, onRemove }: {
       <div className="flex items-center gap-2 flex-wrap pr-6">
         <span className="text-section leading-none">{r.stance_emoji}</span>
         <span className="text-section font-bold text-gray-900">{r.ticker}</span>
-        <span className="text-meta px-1.5 py-0.5 rounded-inner bg-gray-100 text-gray-500 font-medium">{r.theme}</span>
+        <span className="text-meta px-1.5 py-0.5 rounded-inner bg-gray-100 text-ink-faint font-medium">{r.theme}</span>
         <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${s.chip}`}>{r.stance}</span>
         <span className="ml-auto text-card font-mono text-gray-900">${r.price?.toFixed(2)}</span>
         <span className={`text-card font-semibold ${up ? "text-emerald-600" : "text-down"}`}>
@@ -72,7 +72,7 @@ function ScanCard({ r, editable, onRemove }: {
 
       {/* 评分条 + 历史命中 */}
       <div className="flex items-center gap-2 mt-2.5">
-        <span className="text-meta text-gray-400 w-12">买点分</span>
+        <span className="text-meta text-ink-faint w-12">买点分</span>
         <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
           <div className={`h-full ${s.bar}`} style={{ width: `${r.score}%` }} />
         </div>
@@ -129,7 +129,7 @@ function ScanCard({ r, editable, onRemove }: {
       {r.earnings && (
         <div className={`mt-2 text-meta leading-relaxed rounded-inner px-2.5 py-1.5 border ${
           r.earnings.soon ? "bg-purple-50 text-purple-700 border-purple-200"
-          : "bg-gray-50 text-gray-500 border-gray-100"}`}>
+          : "bg-gray-50 text-ink-faint border-gray-100"}`}>
           📅 财报 <b>{r.earnings.days} 天后</b>（{r.earnings.date}）{r.earnings.soon && " 🔴 临近,持仓注意跳空风险"}
         </div>
       )}
@@ -142,7 +142,7 @@ function ScanCard({ r, editable, onRemove }: {
           {r.dilution.level === "high" ? "🔴 增发风险" : "🟠 稀释隐患"}
           ：<b>{r.dilution.recent.map(h => h.form).join("、")}</b>
           （{r.dilution.recent[0]?.date}）
-          <span className="block opacity-80 mt-0.5">{r.dilution.note}</span>
+          <span className="block text-ink-faint mt-0.5">{r.dilution.note}</span>
         </div>
       )}
 
@@ -160,13 +160,13 @@ function ScanCard({ r, editable, onRemove }: {
         {r.trend && (
           <span className={`px-1.5 py-0.5 rounded-inner ${
             r.trend === "bullish" ? "bg-emerald-50 text-emerald-600"
-            : r.trend === "bearish" ? "bg-red-50 text-red-600" : "bg-gray-50 text-gray-500"}`}>
+            : r.trend === "bearish" ? "bg-red-50 text-red-600" : "bg-gray-50 text-ink-faint"}`}>
             {TREND_CN[r.trend]}
           </span>
         )}
-        {r.regime && <span className="px-1.5 py-0.5 rounded-inner bg-gray-50 text-gray-500">{REGIME_CN[r.regime] ?? r.regime}</span>}
-        {typeof r.vol_annual === "number" && <span className="px-1.5 py-0.5 rounded-inner bg-gray-50 text-gray-500">年化波动 {Math.round(r.vol_annual * 100)}%</span>}
-        {typeof r.rsi === "number" && <span className="px-1.5 py-0.5 rounded-inner bg-gray-50 text-gray-500">RSI {r.rsi.toFixed(0)}</span>}
+        {r.regime && <span className="px-1.5 py-0.5 rounded-inner bg-gray-50 text-ink-faint">{REGIME_CN[r.regime] ?? r.regime}</span>}
+        {typeof r.vol_annual === "number" && <span className="px-1.5 py-0.5 rounded-inner bg-gray-50 text-ink-faint">年化波动 {Math.round(r.vol_annual * 100)}%</span>}
+        {typeof r.rsi === "number" && <span className="px-1.5 py-0.5 rounded-inner bg-gray-50 text-ink-faint">RSI {r.rsi.toFixed(0)}</span>}
       </div>
     </div>
   );
@@ -182,7 +182,7 @@ function pctSigned(n: number): string {
 
 function PaperPanel({ p }: { p: PaperSim }) {
   const t = p.totals;
-  const tone = (n: number) => (n > 0 ? "text-emerald-600" : n < 0 ? "text-down" : "text-gray-500");
+  const tone = (n: number) => (n > 0 ? "text-emerald-600" : n < 0 ? "text-down" : "text-ink-faint");
   // 账本按机制代际分开看:v1 = 07-13 六连修之前的旧机制(已定性为学费,折叠归档),
   // v2 = 现行机制。头部四格只算 v2 —— 别让旧账污染对现行机制的判断。原始数据不删,8/15 审判按代际分开。
   const closedV2 = p.closed.filter(c => c.epoch === "v2");
@@ -195,26 +195,26 @@ function PaperPanel({ p }: { p: PaperSim }) {
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-card">📊</span>
         <span className="text-body font-semibold text-gray-800">模拟战绩 · 每个买入信号投 ${p.trade_usd.toFixed(0)}</span>
-        <span className="text-meta px-1.5 py-0.5 rounded-inner bg-gray-100 text-gray-400">模拟 · 非真实交易</span>
+        <span className="text-meta px-1.5 py-0.5 rounded-inner bg-gray-100 text-ink-faint">模拟 · 非真实交易</span>
         <span className="text-meta px-1.5 py-0.5 rounded-inner bg-sky-100 text-sky-700">现行机制 v2 · 07-14 起</span>
       </div>
 
       {/* 总览(只算现行机制 v2;旧机制 v1 的学费在下方折叠归档) */}
       <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
         <div className="bg-sunken rounded-inner px-2 py-2">
-          <div className="text-meta text-gray-400">v2 总盈亏</div>
+          <div className="text-meta text-ink-faint">v2 总盈亏</div>
           <div className={`text-section font-bold font-mono ${tone(realizedV2 + t.unrealized)}`}>{money(realizedV2 + t.unrealized)}</div>
         </div>
         <div className="bg-sunken rounded-inner px-2 py-2">
-          <div className="text-meta text-gray-400">v2 已平仓(落袋)</div>
+          <div className="text-meta text-ink-faint">v2 已平仓(落袋)</div>
           <div className={`text-card font-semibold font-mono ${tone(realizedV2)}`}>{money(realizedV2)}</div>
         </div>
         <div className="bg-sunken rounded-inner px-2 py-2">
-          <div className="text-meta text-gray-400">持仓浮动</div>
+          <div className="text-meta text-ink-faint">持仓浮动</div>
           <div className={`text-card font-semibold font-mono ${tone(t.unrealized)}`}>{money(t.unrealized)}</div>
         </div>
         <div className="bg-sunken rounded-inner px-2 py-2">
-          <div className="text-meta text-gray-400">v2 平仓胜率</div>
+          <div className="text-meta text-ink-faint">v2 平仓胜率</div>
           <div className="text-card font-semibold font-mono text-gray-700">
             {closedV2.length > 0 ? `${((winV2 / closedV2.length) * 100).toFixed(0)}% (${winV2}/${closedV2.length})` : "—"}
           </div>
@@ -224,14 +224,14 @@ function PaperPanel({ p }: { p: PaperSim }) {
       {/* 回踩限价挂单(v2:照卡片打法等回调,触价才成交) */}
       {(p.pending?.length ?? 0) > 0 && (
         <div className="mt-3">
-          <div className="text-meta text-gray-500 mb-1">⏳ 等回踩的限价挂单 {p.pending!.length} 笔(5 个交易日内触价成交,否则撤单)</div>
+          <div className="text-meta text-ink-faint mb-1">⏳ 等回踩的限价挂单 {p.pending!.length} 笔(5 个交易日内触价成交,否则撤单)</div>
           <div className="space-y-1">
             {p.pending!.map(o => (
               <div key={o.ticker} className="flex items-center gap-2 text-body bg-amber-50/50 rounded-inner px-2.5 py-1.5">
                 <span className="font-bold text-gray-800 w-12">{o.ticker}</span>
-                <span className="text-gray-400 text-meta">{o.placed_date.slice(5)} 挂 ${o.limit.toFixed(2)}</span>
+                <span className="text-ink-faint text-meta">{o.placed_date.slice(5)} 挂 ${o.limit.toFixed(2)}</span>
                 {o.signal_price != null && <span className="text-gray-300 text-meta">信号价 ${o.signal_price.toFixed(2)}</span>}
-                {o.target != null && <span className="ml-auto text-meta text-gray-400">目标 ${o.target.toFixed(2)}</span>}
+                {o.target != null && <span className="ml-auto text-meta text-ink-faint">目标 ${o.target.toFixed(2)}</span>}
               </div>
             ))}
           </div>
@@ -241,13 +241,13 @@ function PaperPanel({ p }: { p: PaperSim }) {
       {/* 当前持仓 */}
       {p.open.length > 0 && (
         <div className="mt-3">
-          <div className="text-meta text-gray-500 mb-1">当前持仓 {p.open.length} 笔</div>
+          <div className="text-meta text-ink-faint mb-1">当前持仓 {p.open.length} 笔</div>
           <div className="space-y-1">
             {p.open.map(o => (
               <div key={o.ticker} className="flex items-center gap-2 text-body bg-emerald-50/40 rounded-inner px-2.5 py-1.5">
                 <span className="font-bold text-gray-800 w-12">{o.ticker}</span>
-                <span className="text-gray-400 text-meta">{o.entry_date.slice(5)} 买 ${o.entry_price.toFixed(2)}</span>
-                <span className="text-gray-400 text-meta">→ ${o.current_price.toFixed(2)}</span>
+                <span className="text-ink-faint text-meta">{o.entry_date.slice(5)} 买 ${o.entry_price.toFixed(2)}</span>
+                <span className="text-ink-faint text-meta">→ ${o.current_price.toFixed(2)}</span>
                 <span className="text-gray-300 text-meta">{o.days}天</span>
                 <span className={`ml-auto font-mono font-semibold ${tone(o.pnl)}`}>{money(o.pnl)} ({pctSigned(o.pnl_pct)})</span>
               </div>
@@ -259,13 +259,13 @@ function PaperPanel({ p }: { p: PaperSim }) {
       {/* 已平仓 — 现行机制 v2 */}
       {closedV2.length > 0 && (
         <div className="mt-3">
-          <div className="text-meta text-gray-500 mb-1">已平仓 · 现行机制 v2({closedV2.length} 笔)</div>
+          <div className="text-meta text-ink-faint mb-1">已平仓 · 现行机制 v2({closedV2.length} 笔)</div>
           <div className="space-y-1">
             {closedV2.map((c, i) => (
               <div key={`${c.ticker}-${c.exit_date}-${i}`} className="flex items-center gap-2 text-body bg-sunken rounded-inner px-2.5 py-1.5">
                 <span className="font-bold text-gray-800 w-12">{c.ticker}</span>
-                <span className="text-gray-400 text-meta">{c.entry_date.slice(5)}→{c.exit_date.slice(5)} · {c.days}天</span>
-                <span className="text-meta px-1.5 py-0.5 rounded-inner bg-gray-100 text-gray-500">{c.reason}</span>
+                <span className="text-ink-faint text-meta">{c.entry_date.slice(5)}→{c.exit_date.slice(5)} · {c.days}天</span>
+                <span className="text-meta px-1.5 py-0.5 rounded-inner bg-gray-100 text-ink-faint">{c.reason}</span>
                 <span className={`ml-auto font-mono font-semibold ${tone(c.pnl)}`}>{money(c.pnl)} ({pctSigned(c.pnl_pct)})</span>
               </div>
             ))}
@@ -276,16 +276,16 @@ function PaperPanel({ p }: { p: PaperSim }) {
       {/* 旧机制 v1 — 折叠归档(07-13 六连修前的学费;审判需要,数据不删) */}
       {closedV1.length > 0 && (
         <details className="mt-3">
-          <summary className="text-meta text-gray-400 cursor-pointer select-none">
+          <summary className="text-meta text-ink-faint cursor-pointer select-none">
             📦 旧机制 v1 已归档({closedV1.length} 笔,合计 <span className={`font-mono ${tone(realizedV1)}`}>{money(realizedV1)}</span>)
             — 07-13 六连修前的学费,不代表现行机制;点开查看
           </summary>
-          <div className="space-y-1 mt-1 opacity-70">
+          <div className="space-y-1 mt-1 text-ink-faint">
             {closedV1.map((c, i) => (
               <div key={`${c.ticker}-${c.exit_date}-${i}`} className="flex items-center gap-2 text-body bg-sunken rounded-inner px-2.5 py-1.5">
                 <span className="font-bold text-gray-800 w-12">{c.ticker}</span>
-                <span className="text-gray-400 text-meta">{c.entry_date.slice(5)}→{c.exit_date.slice(5)} · {c.days}天</span>
-                <span className="text-meta px-1.5 py-0.5 rounded-inner bg-gray-100 text-gray-500">{c.reason}</span>
+                <span className="text-ink-faint text-meta">{c.entry_date.slice(5)}→{c.exit_date.slice(5)} · {c.days}天</span>
+                <span className="text-meta px-1.5 py-0.5 rounded-inner bg-gray-100 text-ink-faint">{c.reason}</span>
                 <span className={`ml-auto font-mono font-semibold ${tone(c.pnl)}`}>{money(c.pnl)} ({pctSigned(c.pnl_pct)})</span>
               </div>
             ))}
@@ -294,7 +294,7 @@ function PaperPanel({ p }: { p: PaperSim }) {
       )}
 
       {p.open.length === 0 && p.closed.length === 0 && (p.pending?.length ?? 0) === 0 && (
-        <p className="mt-3 text-meta text-gray-400">还没有触发任何买入信号 — 出现 🟢买入区 时会按"回踩限价"自动模拟挂单 ${p.trade_usd.toFixed(0)}。</p>
+        <p className="mt-3 text-meta text-ink-faint">还没有触发任何买入信号 — 出现 🟢买入区 时会按"回踩限价"自动模拟挂单 ${p.trade_usd.toFixed(0)}。</p>
       )}
     </section>
   );
@@ -362,22 +362,22 @@ export default function WatchScanPage() {
               扫描命中 {(ov.hit_rate * 100).toFixed(0)}% ({ov.correct}/{ov.n})
             </span>
           )}
-          {genAt && <span className="ml-auto text-meta text-gray-400 font-mono">扫描于 {genAt}</span>}
+          {genAt && <span className="ml-auto text-meta text-ink-faint font-mono">扫描于 {genAt}</span>}
         </div>
         <p className="mt-2 text-body text-ink-muted leading-relaxed">
           不同驱动的高波动板块,每天扫一遍——按"最接近买点"排序,给立场、大白话触发条件、关键价位,
-          并记录自己的历史命中率(5 个交易日后评判)。<span className="text-gray-400">纯机械信号。</span>
+          并记录自己的历史命中率(5 个交易日后评判)。<span className="text-ink-faint">纯机械信号。</span>
         </p>
         <div className="mt-2 flex flex-wrap gap-2 text-meta">
           {[["🟢", "买入区"], ["🟡", "接近买点"], ["⚪", "观望"], ["🔴", "偏空回避"]].map(([e, l]) => (
-            <span key={l} className="px-1.5 py-0.5 rounded-inner bg-sunken text-gray-500">{e} {l}</span>
+            <span key={l} className="px-1.5 py-0.5 rounded-inner bg-sunken text-ink-faint">{e} {l}</span>
           ))}
         </div>
 
         {/* 管理自选 */}
         {WATCH_EDITABLE && (
           <div className="mt-3 pt-3 border-t border-hairline flex items-center gap-2 flex-wrap">
-            <span className="text-meta text-gray-500">管理自选:</span>
+            <span className="text-meta text-ink-faint">管理自选:</span>
             <input
               value={input}
               onChange={e => setInput(e.target.value.toUpperCase())}
@@ -396,7 +396,7 @@ export default function WatchScanPage() {
                 {busy}…(重新扫描约 30 秒)
               </span>
             )}
-            {!busy && <span className="text-meta text-gray-400">点 ✕ 移除 · 改完会自动重新扫描</span>}
+            {!busy && <span className="text-meta text-ink-faint">点 ✕ 移除 · 改完会自动重新扫描</span>}
           </div>
         )}
       </section>
@@ -423,7 +423,7 @@ export default function WatchScanPage() {
             <span className="font-semibold text-gray-800">
               {scan.market.regime === "risk_on" ? "大盘顺风" : scan.market.regime === "risk_off" ? "大盘逆风" : "大盘中性"}
             </span>
-            <span className="text-meta font-mono text-gray-500">
+            <span className="text-meta font-mono text-ink-faint">
               VIX {scan.market.vix} · SPY {(scan.market.spy_vs_50dma * 100).toFixed(1)}% · QQQ {(scan.market.qqq_vs_50dma * 100).toFixed(1)}% vs 50日线
             </span>
           </div>
@@ -450,7 +450,7 @@ export default function WatchScanPage() {
         <section className="bg-surface rounded-card border border-hairline p-5 shadow-sm">
           <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
             <h2 className="text-card font-semibold text-gray-800">🧭 板块轮动地图 · 钱正在往哪儿去</h2>
-            <span className="text-meta text-gray-400 font-mono">vs {rot.benchmark} · 截至 {rot.as_of}</span>
+            <span className="text-meta text-ink-faint font-mono">vs {rot.benchmark} · 截至 {rot.as_of}</span>
           </div>
           <p className="text-meta text-[#8A8A8E] mb-2 leading-relaxed">
             自选篮子里的票大多挂在这些板块上——买点信号出现时,先看它的板块在不在右半边(顺风)。
@@ -489,7 +489,7 @@ export default function WatchScanPage() {
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-brand animate-pulse" /> 读取扫描结果…
         </div>
       ) : !scan || scan.results.length === 0 ? (
-        <div className="bg-surface rounded-card border border-hairline p-8 text-center text-card text-gray-400">
+        <div className="bg-surface rounded-card border border-hairline p-8 text-center text-card text-ink-faint">
           尚未生成扫描 — 运行一次 <code className="font-mono bg-gray-100 px-1 rounded-inner">publish.py</code>(或等每日自动任务)后这里就会有数据。
         </div>
       ) : (
@@ -500,7 +500,7 @@ export default function WatchScanPage() {
         </div>
       )}
 
-      <footer className="text-center text-meta text-gray-400 pb-4 leading-relaxed">
+      <footer className="text-center text-meta text-ink-faint pb-4 leading-relaxed">
         🔭 自选扫描 · 这些是高波动投机性标的的<b>扫描候选,非买入建议</b> · 系统只提示"哪只 / 什么价 / 什么时候"接近 setup,买卖与仓位由你决定 · 非投资建议
       </footer>
     </main>

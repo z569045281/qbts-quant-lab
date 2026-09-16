@@ -90,25 +90,25 @@ export default function ChallengePage() {
 
         <div className="mt-5 flex items-end gap-6 flex-wrap">
           <div>
-            <div className="text-meta text-gray-500">账本权益</div>
+            <div className="text-meta text-ink-faint">账本权益</div>
             <div className="text-display font-bold font-mono text-gray-900">{money(c.equity)}</div>
           </div>
           <div>
-            <div className="text-meta text-gray-500">盈亏</div>
+            <div className="text-meta text-ink-faint">盈亏</div>
             <div className={`text-display font-bold font-mono ${gainColor}`}>
               {c.pnl >= 0 ? "+" : ""}{money(c.pnl)}
             </div>
           </div>
           <div>
-            <div className="text-meta text-gray-500">收益率</div>
+            <div className="text-meta text-ink-faint">收益率</div>
             <div className={`text-price font-bold font-mono ${gainColor}`}>{c.pnl_pct >= 0 ? "+" : ""}{c.pnl_pct}%</div>
           </div>
           <div className="ml-auto text-right">
-            <div className="text-meta text-gray-500">剩余天数</div>
+            <div className="text-meta text-ink-faint">剩余天数</div>
             <div className="text-price font-bold font-mono text-gray-900">
               {win ? "—" : daysLeft(c.deadline)}
             </div>
-            <div className="text-meta text-gray-400">截止 {c.deadline}</div>
+            <div className="text-meta text-ink-faint">截止 {c.deadline}</div>
           </div>
         </div>
 
@@ -123,7 +123,7 @@ export default function ChallengePage() {
             <div className={`h-full rounded-full transition-all ${(win || (marathon && c.milestone_at)) ? "bg-emerald-500" : "bg-brand"}`}
                  style={{ width: `${Math.max(prog, 2)}%` }} />
           </div>
-          <div className="flex justify-between text-meta text-gray-400 mt-1 font-mono">
+          <div className="flex justify-between text-meta text-ink-faint mt-1 font-mono">
             <span>本金 {money(c.sleeve_start)}</span>
             <span>{c.floor_line != null ? `地板 ${money(c.floor_line)}` : "地板：无(跑到期)"}</span>
             <span>{marathon ? "里程碑" : "达标"} {money(c.win_line)}</span>
@@ -136,7 +136,7 @@ export default function ChallengePage() {
         <section className="bg-surface rounded-inner border border-hairline px-6 py-4">
           <div className="flex items-baseline justify-between mb-2">
             <h2 className="text-card font-semibold text-gray-900">📈 资金曲线</h2>
-            <span className="text-meta text-gray-400">每 15 分钟一点 · 峰值 {money(c.peak_equity)}</span>
+            <span className="text-meta text-ink-faint">每 15 分钟一点 · 峰值 {money(c.peak_equity)}</span>
           </div>
           <EquityChart curve={c.equity_curve!} start={c.sleeve_start}
                        winLine={c.win_line} floorLine={c.floor_line} />
@@ -179,7 +179,7 @@ export default function ChallengePage() {
               : "挑战已结束。"}
           </p>
         )}
-        <div className="mt-3 text-meta text-gray-400">
+        <div className="mt-3 text-meta text-ink-faint">
           篮子：{c.basket.join(" · ")}
         </div>
       </section>
@@ -211,7 +211,7 @@ export default function ChallengePage() {
         </section>
       )}
 
-      <div className="text-center text-meta text-gray-400">
+      <div className="text-center text-meta text-ink-faint">
         状态由{c.runner === "cloud" ? "云端挑战 bot（AWS Lambda）" : "本地挑战 bot "}每 15 分钟推送到 Supabase · 更新于 {c.updated_at} · 纸面模拟, 非投资建议
       </div>
     </main>
@@ -274,7 +274,7 @@ function EquityChart({ curve, start, winLine, floorLine }:
 function Stat({ label, value, mono, cls }: { label: string; value: string; mono?: boolean; cls?: string }) {
   return (
     <div>
-      <div className="text-meta text-gray-500">{label}</div>
+      <div className="text-meta text-ink-faint">{label}</div>
       <div className={`font-semibold text-gray-900 ${mono ? "font-mono" : ""} ${cls ?? ""}`}>{value}</div>
     </div>
   );

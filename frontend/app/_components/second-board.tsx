@@ -24,7 +24,7 @@ function HorizonTable({ b }: { b: SecondBoard }) {
   const keys = ["1d", "2d", "3d", "5d"].filter(k => b.by_horizon[k]);
   if (keys.length === 0) {
     return (
-      <p className="text-body text-gray-400 leading-relaxed">
+      <p className="text-body text-ink-faint leading-relaxed">
         还没有到期的视界 —— 最快 1 个交易日后这里出现第一行。
       </p>
     );
@@ -33,7 +33,7 @@ function HorizonTable({ b }: { b: SecondBoard }) {
     <div className="overflow-x-auto">
       <table className="w-full text-body">
         <thead>
-          <tr className="text-left text-gray-400 text-meta">
+          <tr className="text-left text-ink-faint text-meta">
             <th className="py-1.5 pr-3 font-medium">视界</th>
             <th className="py-1.5 pr-3 font-medium">样本</th>
             <th className="py-1.5 pr-3 font-medium">命中</th>
@@ -48,7 +48,7 @@ function HorizonTable({ b }: { b: SecondBoard }) {
             // 三态,不是两态:技巧恰好 0 = 与"无脑常喊一边"打平,既不是本事也不是
             // 反指 → 中性灰且不带 +/− 号(带号会读成"负的却标了个正")。
             const skillTone = h.skill_pp > 0 ? "text-emerald-700"
-                            : h.skill_pp < 0 ? "text-down" : "text-gray-500";
+                            : h.skill_pp < 0 ? "text-down" : "text-ink-faint";
             const skillTxt = h.skill_pp === 0 ? "0.0pp"
                            : `${h.skill_pp > 0 ? "+" : ""}${h.skill_pp.toFixed(1)}pp`;
             const mine = k === "2d" || k === "3d";
@@ -58,22 +58,22 @@ function HorizonTable({ b }: { b: SecondBoard }) {
                   {k}
                   {mine && <span className="ml-1 text-meta text-brand">你的持有期</span>}
                 </td>
-                <td className="py-1.5 pr-3 tabular-nums text-gray-500">{h.n}</td>
+                <td className="py-1.5 pr-3 tabular-nums text-ink-faint">{h.n}</td>
                 <td className="py-1.5 pr-3 tabular-nums text-gray-900 font-medium">
                   {(h.hit_rate * 100).toFixed(0)}%
-                  <span className="text-gray-400 font-normal"> [{(h.ci95[0] * 100).toFixed(0)},{(h.ci95[1] * 100).toFixed(0)}]</span>
+                  <span className="text-ink-faint font-normal"> [{(h.ci95[0] * 100).toFixed(0)},{(h.ci95[1] * 100).toFixed(0)}]</span>
                 </td>
-                <td className="py-1.5 pr-3 tabular-nums text-gray-500">{(h.baseline * 100).toFixed(0)}%</td>
+                <td className="py-1.5 pr-3 tabular-nums text-ink-faint">{(h.baseline * 100).toFixed(0)}%</td>
                 <td className={`py-1.5 pr-3 tabular-nums font-semibold ${skillTone}`}>
                   {skillTxt}
                 </td>
-                <td className="py-1.5 text-gray-500">{h.verdict}</td>
+                <td className="py-1.5 text-ink-faint">{h.verdict}</td>
               </tr>
             );
           })}
         </tbody>
       </table>
-      <p className="mt-2 text-meta text-gray-400 leading-relaxed">
+      <p className="mt-2 text-meta text-ink-faint leading-relaxed">
         <b className="text-gray-600">基线</b>=这段时间里无脑天天喊同一边能拿到的命中率;
         <b className="text-gray-600">技巧</b>=命中 − 基线。<b className="text-[#B45309]">跟基线比,不跟 50% 比</b> ——
         单边下跌里光喊「跌」就能拿 83%,那不是本事。
@@ -92,11 +92,11 @@ function RecordRow({ r }: { r: SecondRecord }) {
         {/* 显示 as_of(证据/价格属于哪根 bar,也是评分锚点),不是 date(哪天问的)。
             2026-09-02:后端锚点已改成 as_of,两者常差 1–3 天 —— 再按 date 标行,
             就会把日期摆在一串「从另一根 bar 起算」的收益旁边,正是后端刚修掉的错配。*/}
-        <span className="font-mono text-gray-500" title={`表态问于 ${r.date}`}>
+        <span className="font-mono text-ink-faint" title={`表态问于 ${r.date}`}>
           {(r.as_of ?? r.date).slice(5)}
         </span>
         <span className={`px-1.5 py-0.5 rounded-inner font-bold text-meta ${c.chip}`}>{c.cn}</span>
-        <span className="text-gray-400 tabular-nums">
+        <span className="text-ink-faint tabular-nums">
           p{r.p_up_5d.toFixed(2)} · 信心{r.conviction} · ${r.price}
         </span>
         {r.technical_muted && (
@@ -138,10 +138,10 @@ export function Board({ b }: { b: SecondBoard }) {
             🔬 {b.ticker} · 今日表态
           </span>
           <span className="flex items-center gap-2">
-            <span className="text-meta px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
+            <span className="text-meta px-2 py-0.5 rounded-full bg-gray-100 text-ink-faint font-medium">
               纯测量 · 无动作
             </span>
-            <span className="text-meta text-gray-400 font-mono"
+            <span className="text-meta text-ink-faint font-mono"
                   title={`表态问于 ${b.latest.date}`}>
               数据截至 {b.latest.as_of ?? b.latest.date}
             </span>
@@ -153,7 +153,7 @@ export function Board({ b }: { b: SecondBoard }) {
           <span className="text-card text-ink-muted tabular-nums">
             未来 5 日上涨概率 {(b.latest.p_up_5d * 100).toFixed(0)}% · 信心 {b.latest.conviction}/10
           </span>
-          <span className="ml-auto text-card text-gray-400 tabular-nums">${b.latest.price}</span>
+          <span className="ml-auto text-card text-ink-faint tabular-nums">${b.latest.price}</span>
         </div>
         {b.latest.technical_muted && (
           <p className="mt-2 text-body text-amber-800 bg-amber-50 rounded-inner px-2.5 py-1.5 leading-snug">
@@ -161,7 +161,7 @@ export function Board({ b }: { b: SecondBoard }) {
           </p>
         )}
         <p className="mt-2.5 text-body text-gray-700 leading-relaxed">{b.latest.why}</p>
-        <p className="mt-2 text-meta text-gray-400">
+        <p className="mt-2 text-meta text-ink-faint">
           {b.latest.model} · 与 QBTS 决策同一个模型、同一套表态语义(换标准就不算第二个考场)
         </p>
       </section>
@@ -174,7 +174,7 @@ export function Board({ b }: { b: SecondBoard }) {
           </span>
         </div>
         <HorizonTable b={b} />
-        <p className="mt-3 text-meta text-gray-400 bg-sunken rounded-inner px-2.5 py-2 leading-relaxed">
+        <p className="mt-3 text-meta text-ink-faint bg-sunken rounded-inner px-2.5 py-2 leading-relaxed">
           ⓘ 判活条件(在看到数据之前就写死了,审判日不许改):{b.rule}
         </p>
       </section>
@@ -203,7 +203,7 @@ export function Board({ b }: { b: SecondBoard }) {
           </span>
           <p className="mt-1 text-body text-[#78350F] leading-relaxed">{b.known_weakness}</p>
         </div>
-        <p className="text-meta text-gray-400 leading-relaxed">{b.discipline_cn}</p>
+        <p className="text-meta text-ink-faint leading-relaxed">{b.discipline_cn}</p>
       </section>
     </div>
   );

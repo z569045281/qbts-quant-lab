@@ -174,12 +174,12 @@ export function RotationMap({ data }: { data: SectorRotation }) {
           <div className="absolute z-10 pointer-events-none rounded-inner border border-hairline bg-surface shadow-lg px-3 py-2 text-body leading-relaxed"
                style={{ left: `${left}%`, top: `${top}%`,
                         transform: `translate(${left > 72 ? "-105%" : "8px"}, ${top > 75 ? "-115%" : "-40%"})` }}>
-            <div className="font-semibold text-gray-900">{hovered.emoji} {hovered.label} <span className="font-mono text-gray-500">{hovered.ticker}</span></div>
+            <div className="font-semibold text-gray-900">{hovered.emoji} {hovered.label} <span className="font-mono text-ink-faint">{hovered.ticker}</span></div>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: q.color }} />
               <span className="text-gray-700">{q.label}{q.glyph} · {q.hint}</span>
             </div>
-            <div className="font-mono text-gray-500">RS {hovered.x.toFixed(1)} · 动量 {hovered.y.toFixed(1)} · 20日 {hovered.ret20 >= 0 ? "+" : ""}{(hovered.ret20 * 100).toFixed(1)}%</div>
+            <div className="font-mono text-ink-faint">RS {hovered.x.toFixed(1)} · 动量 {hovered.y.toFixed(1)} · 20日 {hovered.ret20 >= 0 ? "+" : ""}{(hovered.ret20 * 100).toFixed(1)}%</div>
           </div>
         );
       })()}
@@ -189,7 +189,7 @@ export function RotationMap({ data }: { data: SectorRotation }) {
         {(Object.keys(QUAD) as QuadKey[]).map(q => (
           <span key={q} className="inline-flex items-center gap-1.5 text-body text-[#52514e]">
             <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: QUAD[q].color }} />
-            {QUAD[q].label}{QUAD[q].glyph}<span className="text-gray-400">{QUAD[q].hint}</span>
+            {QUAD[q].label}{QUAD[q].glyph}<span className="text-ink-faint">{QUAD[q].hint}</span>
           </span>
         ))}
       </div>
@@ -214,17 +214,17 @@ export function RotationMap({ data }: { data: SectorRotation }) {
 
       {/* 数据表(可及性兜底) */}
       <details className="mt-2">
-        <summary className="text-meta text-gray-400 cursor-pointer hover:text-gray-600">数据表</summary>
+        <summary className="text-meta text-ink-faint cursor-pointer hover:text-gray-600">数据表</summary>
         <div className="overflow-x-auto mt-1">
           <table className="text-body w-full">
-            <thead><tr className="text-left text-meta text-gray-500 border-b border-hairline">
+            <thead><tr className="text-left text-meta text-ink-faint border-b border-hairline">
               <th className="py-1 pr-3">板块</th><th className="py-1 pr-3">象限</th>
               <th className="py-1 pr-3">相对强度</th><th className="py-1 pr-3">相对动量</th><th className="py-1">20日</th>
             </tr></thead>
             <tbody>
               {[...data.sectors].sort((a, b) => b.x + b.y - a.x - a.y).map(s => (
                 <tr key={s.ticker} className="border-b border-hairline last:border-0">
-                  <td className="py-1 pr-3 text-gray-900">{s.emoji} {s.label} <span className="font-mono text-gray-400">{s.ticker}</span></td>
+                  <td className="py-1 pr-3 text-gray-900">{s.emoji} {s.label} <span className="font-mono text-ink-faint">{s.ticker}</span></td>
                   <td className="py-1 pr-3 text-gray-700">{QUAD[(s.quadrant as QuadKey) ?? "lagging"]?.label}{QUAD[(s.quadrant as QuadKey) ?? "lagging"]?.glyph}</td>
                   <td className="py-1 pr-3 font-mono text-gray-700">{s.x.toFixed(2)}</td>
                   <td className="py-1 pr-3 font-mono text-gray-700">{s.y.toFixed(2)}</td>

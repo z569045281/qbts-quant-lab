@@ -51,8 +51,8 @@ export default function MuPage() {
         </div>
       ) : tickers.length === 0 ? (
         <div className="bg-surface rounded-card border border-hairline p-8 text-center space-y-2">
-          <p className="text-card text-gray-500">测量轨还没有数据。</p>
-          <p className="text-body text-gray-400 leading-relaxed">
+          <p className="text-card text-ink-faint">测量轨还没有数据。</p>
+          <p className="text-body text-ink-faint leading-relaxed">
             需要先在 Supabase 跑一次{" "}
             <code className="font-mono bg-gray-100 px-1 rounded-inner">sql/second_journal_migration.sql</code>
             ,然后等下一次发布(或本地跑一次决策)写入第一条表态。
@@ -64,7 +64,7 @@ export default function MuPage() {
         </div>
       )}
 
-      <footer className="text-center text-meta text-gray-400 pb-4 leading-relaxed">
+      <footer className="text-center text-meta text-ink-faint pb-4 leading-relaxed">
         🔬 第二考场 · 纯测量轨,<b>零决策权</b> · 不进 QBTS 的决策提示词(两个考场互相看答案就不独立了)
         · 与 QBTS 台账分池存放、分池判决 · 非投资建议
       </footer>

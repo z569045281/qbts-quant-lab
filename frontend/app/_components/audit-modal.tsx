@@ -71,9 +71,9 @@ export function AuditModal({ onClose }: { onClose: () => void }) {
            onClick={e => e.stopPropagation()}>
         <div className="px-5 py-3.5 border-b border-hairline flex items-center">
           <span className="text-card font-semibold text-gray-800">👀 谁点了按钮</span>
-          <span className="ml-2 text-meta text-gray-400">Lambda 记录 · 定时任务不计入</span>
+          <span className="ml-2 text-meta text-ink-faint">Lambda 记录 · 定时任务不计入</span>
           <button onClick={onClose}
-                  className="ml-auto text-gray-400 hover:text-gray-600 text-section leading-none px-1">✕</button>
+                  className="ml-auto text-ink-faint hover:text-gray-600 text-section leading-none px-1">✕</button>
         </div>
 
         <div className="overflow-y-auto px-5 py-4 space-y-4 text-card">
@@ -84,9 +84,9 @@ export function AuditModal({ onClose }: { onClose: () => void }) {
                 " — 需先在 Supabase SQL Editor 跑 sql/publish_audit_migration.sql 建表"}
             </div>
           )}
-          {rows === null && !error && <div className="text-body text-gray-400 py-6">加载中…</div>}
+          {rows === null && !error && <div className="text-body text-ink-faint py-6">加载中…</div>}
           {rows !== null && rows.length === 0 && !error && (
-            <div className="text-body text-gray-400 py-6">还没有点击记录(部署后第一次真人点击才会出现)</div>
+            <div className="text-body text-ink-faint py-6">还没有点击记录(部署后第一次真人点击才会出现)</div>
           )}
 
           {visitors.size > 0 && (
@@ -98,7 +98,7 @@ export function AuditModal({ onClose }: { onClose: () => void }) {
                 {[...visitors.entries()].map(([k, v]) => (
                   <div key={k} className="flex items-baseline gap-2 text-body">
                     <span className="font-mono text-gray-800">{k}</span>
-                    <span className="text-gray-400">{v.tz ? `时区 ${v.tz} · ` : ""}共 {v.n} 次 · 最近 {fmtLocal(v.last)}</span>
+                    <span className="text-ink-faint">{v.tz ? `时区 ${v.tz} · ` : ""}共 {v.n} 次 · 最近 {fmtLocal(v.last)}</span>
                   </div>
                 ))}
               </div>
@@ -113,11 +113,11 @@ export function AuditModal({ onClose }: { onClose: () => void }) {
               <div className="space-y-1.5">
                 {(rows ?? []).map(r => (
                   <div key={r.id} className="flex items-baseline gap-2 text-body flex-wrap">
-                    <span className="font-mono text-gray-500 shrink-0">{fmtLocal(r.ts)}</span>
+                    <span className="font-mono text-ink-faint shrink-0">{fmtLocal(r.ts)}</span>
                     <span className="text-gray-800 shrink-0">{ACTION_CN[r.action] ?? r.action}</span>
                     <span className="font-mono text-gray-600">{r.ip}</span>
-                    <span className="text-gray-500">{device(r.ua, r.client)}</span>
-                    {r.client?.tz && <span className="text-gray-400">{r.client.tz}</span>}
+                    <span className="text-ink-faint">{device(r.ua, r.client)}</span>
+                    {r.client?.tz && <span className="text-ink-faint">{r.client.tz}</span>}
                     {r.client?.screen && <span className="text-gray-300">{r.client.screen}</span>}
                   </div>
                 ))}

@@ -45,7 +45,7 @@ function DecisionHero({ d }: { d: SpacexDecision }) {
       <div className="flex items-center gap-3 flex-wrap">
         <span className={`px-3 py-1 rounded-full text-white text-card font-bold ${a.chip}`}>{a.cn}</span>
         <ConvictionMeter v={d.conviction} />
-        <span className="ml-auto text-meta px-2 py-0.5 rounded-inner bg-black/5 text-gray-500 font-mono">
+        <span className="ml-auto text-meta px-2 py-0.5 rounded-inner bg-black/5 text-ink-faint font-mono">
           🧠 {d.model}
         </span>
       </div>
@@ -61,13 +61,13 @@ function DecisionHero({ d }: { d: SpacexDecision }) {
             { k: "盈亏比", v: d.rr ? `${d.rr}` : "—", c: "text-brand" },
           ].map(x => (
             <div key={x.k} className="bg-surface/70 rounded-inner px-2.5 py-2">
-              <div className="text-meta text-gray-400">{x.k}</div>
+              <div className="text-meta text-ink-faint">{x.k}</div>
               <div className={`font-mono font-bold text-card ${x.c}`}>{x.v}</div>
             </div>
           ))}
         </div>
       )}
-      {d.horizon && <div className="mt-2 text-meta text-gray-500">时间跨度:{d.horizon}</div>}
+      {d.horizon && <div className="mt-2 text-meta text-ink-faint">时间跨度:{d.horizon}</div>}
 
       {/* drivers */}
       {d.drivers?.length > 0 && (
@@ -78,7 +78,7 @@ function DecisionHero({ d }: { d: SpacexDecision }) {
               <div key={i} className="flex gap-2 text-body">
                 <span>{s}</span>
                 <span className="font-semibold text-gray-700 shrink-0">{dr.factor}</span>
-                <span className="text-gray-500">{dr.note}</span>
+                <span className="text-ink-faint">{dr.note}</span>
               </div>
             );
           })}
@@ -96,7 +96,7 @@ function DecisionHero({ d }: { d: SpacexDecision }) {
       {/* risks */}
       {d.risks?.length > 0 && (
         <div className="mt-3">
-          <div className="text-meta font-semibold text-gray-500 mb-1">⚠️ 风险</div>
+          <div className="text-meta font-semibold text-ink-faint mb-1">⚠️ 风险</div>
           <ul className="space-y-0.5">
             {d.risks.map((r, i) => (
               <li key={i} className="text-body text-gray-600 flex gap-1.5"><span className="text-rose-400">·</span>{r}</li>
@@ -107,9 +107,9 @@ function DecisionHero({ d }: { d: SpacexDecision }) {
 
       {d.system_notes && d.system_notes.length > 0 && (
         <details className="mt-3 text-meta">
-          <summary className="cursor-pointer text-gray-400 select-none">🔍 模型自检 ▾</summary>
+          <summary className="cursor-pointer text-ink-faint select-none">🔍 模型自检 ▾</summary>
           <ul className="mt-1 space-y-0.5">
-            {d.system_notes.map((n, i) => <li key={i} className="text-gray-500">· {n}</li>)}
+            {d.system_notes.map((n, i) => <li key={i} className="text-ink-faint">· {n}</li>)}
           </ul>
         </details>
       )}
@@ -192,8 +192,8 @@ export default function SpacexPage() {
         </div>
       ) : !state ? (
         <div className="rounded-card border border-hairline bg-surface p-8 text-center">
-          <p className="text-card text-gray-500">尚未生成 SpaceX 数据。</p>
-          <p className="mt-1 text-meta text-gray-400 leading-relaxed">
+          <p className="text-card text-ink-faint">尚未生成 SpaceX 数据。</p>
+          <p className="mt-1 text-meta text-ink-faint leading-relaxed">
             需要先在 Supabase 建 <code className="font-mono bg-gray-100 px-1 rounded-inner">spacex_state</code> 表
             (<code className="font-mono bg-gray-100 px-1 rounded-inner">sql/spacex_migration.sql</code>),
             再等云端每日 publish 用 DeepSeek 刷新一次。
@@ -207,7 +207,7 @@ export default function SpacexPage() {
           ) : (
             <section className="rounded-card border border-dashed border-gray-300 bg-surface p-6 text-center">
               <p className="text-card text-gray-600 font-medium">DeepSeek 决策待生成</p>
-              <p className="mt-1 text-meta text-gray-400 leading-relaxed">
+              <p className="mt-1 text-meta text-ink-faint leading-relaxed">
                 数据已就绪,但决策为空 —— 云端尚未配 DeepSeek 密钥或本次调用失败。
                 下次每日 publish 成功后这里会出现 DeepSeek 的判断。
               </p>
@@ -241,7 +241,7 @@ export default function SpacexPage() {
               📒 战绩台账 · 每条决策记录 + 5 个交易日后打分
             </div>
             {!sc || sc.n_total === 0 ? (
-              <p className="text-body text-gray-500 leading-relaxed">
+              <p className="text-body text-ink-faint leading-relaxed">
                 台账 2026-09-02 才建。<b>此前的决策没有任何记录</b>(每日只覆盖同一行快照),
                 历史无法回填 —— 从下一次云端刷新开始逐条累积。
               </p>
@@ -255,9 +255,9 @@ export default function SpacexPage() {
                     { k: "观望漏判率", v: sc.hold_miss_rate != null ? `${(sc.hold_miss_rate * 100).toFixed(0)}%` : "—", s: `HOLD ${sc.hold_n} 条 · |5日|≥3%` },
                   ].map((x) => (
                     <div key={x.k} className="rounded-inner bg-gray-50 px-2.5 py-1.5">
-                      <div className="text-meta text-gray-500">{x.k}</div>
+                      <div className="text-meta text-ink-faint">{x.k}</div>
                       <div className="font-mono font-bold text-card text-gray-800">{x.v}</div>
-                      <div className="text-meta text-gray-400">{x.s}</div>
+                      <div className="text-meta text-ink-faint">{x.s}</div>
                     </div>
                   ))}
                 </div>
@@ -266,7 +266,7 @@ export default function SpacexPage() {
                     : sc.verdict.startsWith("有 edge") ? "bg-emerald-50 text-emerald-700"
                     : "bg-rose-50 text-rose-700"}`}>
                   <b>预注册判决</b>:{sc.verdict}
-                  <span className="text-gray-400">
+                  <span className="text-ink-faint">
                     {" "}· 线是先写好的:方向性样本 &lt;20 一律 UNPROVEN,够了看 Wilson 95% 下界是否 &gt;50%。
                     HOLD 不进准确率(它没有方向)。
                   </span>
@@ -275,14 +275,14 @@ export default function SpacexPage() {
                   <div className="space-y-1">
                     {sc.recent.map((r) => (
                       <div key={r.date} className="flex items-center gap-2 text-body bg-gray-50 rounded-inner px-2.5 py-1">
-                        <span className="font-mono text-gray-500 w-20 shrink-0">{r.date}</span>
+                        <span className="font-mono text-ink-faint w-20 shrink-0">{r.date}</span>
                         <span className={`shrink-0 px-1.5 py-0.5 rounded-inner text-meta font-bold ${
                           ACT[r.action]?.chip ?? "bg-gray-400"} text-white`}>
                           {ACT[r.action]?.cn ?? r.action}
                         </span>
-                        <span className="font-mono text-gray-400 text-meta">{usd(r.price)}</span>
+                        <span className="font-mono text-ink-faint text-meta">{usd(r.price)}</span>
                         <span className="ml-auto font-mono text-meta text-gray-600">
-                          {r.status === "pending" ? <span className="text-gray-400">待满 5 天</span> : pct(r.ret5)}
+                          {r.status === "pending" ? <span className="text-ink-faint">待满 5 天</span> : pct(r.ret5)}
                         </span>
                         <span className="w-5 text-center shrink-0">
                           {r.correct === true ? "✅" : r.correct === false ? "❌" : r.status === "graded" ? "–" : ""}
@@ -297,7 +297,7 @@ export default function SpacexPage() {
 
           {/* 抢先量导语 */}
           {(state.options || state.intraday || state.peer_prior) && (
-            <div className="text-meta text-gray-500 leading-relaxed px-1">
+            <div className="text-meta text-ink-faint leading-relaxed px-1">
               🎯 <b>抢先量三条腿</b>:新 IPO 日线太短、指标失真,下面三块都<b>不吃日线历史长度</b> ——
               期权是市场对未来的前瞻预测、盘中 1h 已有足够数据、同业借长历史估波动。
             </div>
@@ -324,12 +324,12 @@ export default function SpacexPage() {
                   return (
                     <div key={i} className={`flex items-center gap-2 text-body rounded-inner px-2.5 py-1.5 ${
                       isEvent ? "bg-rose-100 border border-rose-200" : "bg-surface/70"}`}>
-                      <span className="font-mono text-gray-500 w-24 shrink-0">{x.expiry}</span>
-                      <span className="text-meta text-gray-400 w-14 shrink-0">还{x.dte ?? "?"}天</span>
+                      <span className="font-mono text-ink-faint w-24 shrink-0">{x.expiry}</span>
+                      <span className="text-meta text-ink-faint w-14 shrink-0">还{x.dte ?? "?"}天</span>
                       <span className={`font-mono font-bold ${isEvent ? "text-rose-600" : "text-violet-700"}`}>
                         ±{x.expected_move_pct != null ? (x.expected_move_pct * 100).toFixed(1) : "—"}%
                       </span>
-                      <span className="text-meta text-gray-400">
+                      <span className="text-meta text-ink-faint">
                         IV {x.atm_iv != null ? (x.atm_iv * 100).toFixed(0) : "—"}%
                         {x.iv_source === "straddle" && <span className="text-amber-600">(反解)</span>}
                       </span>
@@ -351,7 +351,7 @@ export default function SpacexPage() {
                     {" · "}{state.options.skew_put_minus_call > 0.01 ? "下行恐惧买盘更重" : state.options.skew_put_minus_call < -0.01 ? "偏追涨" : "基本对称"}
                   </div>
                 ) : (
-                  <div className="text-gray-400">IV 偏斜:<b>取不到</b> —— 不代表偏斜为零,别读成「下行担忧不重」。</div>
+                  <div className="text-ink-faint">IV 偏斜:<b>取不到</b> —— 不代表偏斜为零,别读成「下行担忧不重」。</div>
                 )}
               </div>
             </section>
@@ -379,9 +379,9 @@ export default function SpacexPage() {
                   { k: "vs 锚定VWAP", v: state.intraday.above_vwap == null ? "—" : state.intraday.above_vwap ? "上方" : "下方", sub: usd(state.intraday.vwap) },
                 ].map(x => (
                   <div key={x.k} className="bg-surface/70 rounded-inner px-2.5 py-2">
-                    <div className="text-meta text-gray-400">{x.k}</div>
+                    <div className="text-meta text-ink-faint">{x.k}</div>
                     <div className="font-mono font-semibold text-gray-800 text-card">{x.v}</div>
-                    {x.sub && <div className="text-meta text-gray-400 font-mono">{x.sub}</div>}
+                    {x.sub && <div className="text-meta text-ink-faint font-mono">{x.sub}</div>}
                   </div>
                 ))}
               </div>
@@ -393,22 +393,22 @@ export default function SpacexPage() {
             <section className="rounded-card border border-teal-200 bg-teal-50/50 p-4 shadow-sm">
               <div className="text-body font-bold text-teal-800 mb-1">🛰️ ③ 同业波动先验 · 收缩估计(设仓位/止损宽度用)</div>
               <div className="flex items-baseline gap-2 flex-wrap mb-2">
-                <span className="text-meta text-gray-500">自算 {pct(state.peer_prior.spcx_own_vol, 0)}(样本短)</span>
+                <span className="text-meta text-ink-faint">自算 {pct(state.peer_prior.spcx_own_vol, 0)}(样本短)</span>
                 <span className="text-gray-300">+</span>
-                <span className="text-meta text-gray-500">纯太空同业 {pct(state.peer_prior.peer_prior, 0)}</span>
+                <span className="text-meta text-ink-faint">纯太空同业 {pct(state.peer_prior.peer_prior, 0)}</span>
                 <span className="text-gray-300">→</span>
                 <span className="text-card font-bold font-mono text-teal-700">可用波动 {pct(state.peer_prior.blended_vol, 0)}</span>
-                <span className="text-meta text-gray-400">(收缩权重 {state.peer_prior.shrink_weight})</span>
+                <span className="text-meta text-ink-faint">(收缩权重 {state.peer_prior.shrink_weight})</span>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {state.peer_prior.peers.map(p => (
                   <span key={p.ticker} className={`text-meta px-2 py-0.5 rounded-full font-mono ${
-                    p.pure ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-gray-500"}`}>
+                    p.pure ? "bg-teal-100 text-teal-700" : "bg-gray-100 text-ink-faint"}`}>
                     {p.ticker} {(p.vol * 100).toFixed(0)}%
                   </span>
                 ))}
               </div>
-              <p className="mt-2 text-meta text-gray-400 leading-relaxed">
+              <p className="mt-2 text-meta text-ink-faint leading-relaxed">
                 自己只有 {state.peer_prior.n_bars} 根日线 → 主要借同业;bar 越多、权重越交还给自己(纯太空同业=实心)。
               </p>
             </section>
@@ -419,7 +419,7 @@ export default function SpacexPage() {
             <section className="rounded-card border border-hairline bg-surface p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-body font-semibold text-gray-700">📊 日线技术读数(薄数据·仅参考)</span>
-                <span className="text-meta text-gray-400">{dd.n_bars} 根日线 · {dd.as_of}</span>
+                <span className="text-meta text-ink-faint">{dd.n_bars} 根日线 · {dd.as_of}</span>
               </div>
               {dd.thin_data && (
                 <div className="mb-3 rounded-inner bg-orange-50 border border-orange-200 px-3 py-2 text-meta text-orange-700 leading-relaxed">
@@ -438,9 +438,9 @@ export default function SpacexPage() {
                   { k: "历史区间", v: `${usd(dd.atl)}`, sub: `高 ${usd(dd.ath)}` },
                 ].map(x => (
                   <div key={x.k} className="bg-gray-50/70 rounded-inner px-2.5 py-2">
-                    <div className="text-meta text-gray-400">{x.k}</div>
+                    <div className="text-meta text-ink-faint">{x.k}</div>
                     <div className="font-mono font-semibold text-gray-800 text-card">{x.v}</div>
-                    {x.sub && <div className="text-meta text-gray-400 font-mono">{x.sub}</div>}
+                    {x.sub && <div className="text-meta text-ink-faint font-mono">{x.sub}</div>}
                   </div>
                 ))}
               </div>
@@ -455,7 +455,7 @@ export default function SpacexPage() {
                 {state.news.map((n, i) => (
                   <li key={i} className="text-body text-gray-600 flex gap-1.5 leading-relaxed">
                     <span className="text-gray-300">·</span>
-                    <span>{n.title}{n.source && <span className="text-gray-400"> — {n.source}</span>}</span>
+                    <span>{n.title}{n.source && <span className="text-ink-faint"> — {n.source}</span>}</span>
                   </li>
                 ))}
               </ul>
@@ -464,7 +464,7 @@ export default function SpacexPage() {
         </>
       )}
 
-      <footer className="text-center text-meta text-gray-400 pb-4 leading-relaxed">
+      <footer className="text-center text-meta text-ink-faint pb-4 leading-relaxed">
         🚀 SpaceX 第二仪表盘 · 决策仅由 DeepSeek 生成、<b>非投资建议</b> ·
         SPCX 为新 IPO,历史极短、波动巨大,锁定期解禁是重大供给风险 · 点位为情景锚定,确切顶底不可知
       </footer>

@@ -43,6 +43,12 @@
   --color-brand: #006FFF;          /* 品牌蓝 · 选中态 · 链接 */
   --color-down: #F03A3E;           /* 跌 —— 与 emerald(涨)成对,别改成通用 red */
   --color-ink: #1A1A1E;            /* 最强文字(标题 · 关键数字) */
+  /* 三档文字灰阶的最后一档。原来这一层用 text-gray-400(#99A1AF) 和
+     text-gray-500(#6A7282) 混着写(220 + 103 处),浅色模式下分别是 **2.60:1**
+     和 4.48:1(on sunken)—— 前者远低于 4.5:1 的门槛,后者压线不过。
+     深色模式当初手调过所以没事(5.13:1),病只在浅色。
+     现在收成一档,浅色 #666B7A = 5.32:1(白) / 4.93:1(sunken)。 */
+  --color-ink-faint: #666B7A;      /* 三级文字:单位 · 时间戳 · 脚注 */
 
   /* ── 两支「叠在别的颜色上」的文字色,规则和上面相反 ────────────────────
      on-solid:压在实心填充上(bg-brand / bg-*-600 / bg-gray-900)。这些底色在
@@ -99,6 +105,7 @@ html.dark {
   --color-sunken: #0C1420;
   --color-hairline: #24334A;
   --color-ink-muted: #93A0B5;
+  --color-ink-faint: #838FA3;  /* 5.13:1 on surface · 5.65:1 on sunken */
   --color-brand: #4D9BFF;
   --color-down: #FF6B6E;
   --color-ink: #ECF1F8;

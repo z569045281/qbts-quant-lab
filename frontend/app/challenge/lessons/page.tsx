@@ -80,7 +80,7 @@ export default function ChallengeLessonsPage() {
           以及按同一套纪律,今天该做什么。
         </p>
         {chal && (
-          <p className="text-meta text-gray-400 mt-2 font-mono">
+          <p className="text-meta text-ink-faint mt-2 font-mono">
             live:状态 {chal.status} · 权益 {money(chal.equity)} · 更新于 {chal.updated_at}
           </p>
         )}
@@ -91,15 +91,15 @@ export default function ChallengeLessonsPage() {
         <h2 className="text-card font-semibold text-gray-900 mb-3">复盘 · 这 +10.7% 是怎么来的</h2>
         <ol className="space-y-2 text-card text-[#525461]">
           <li className="flex gap-2">
-            <span className="shrink-0 font-mono text-meta text-gray-400 pt-0.5">07-01</span>
+            <span className="shrink-0 font-mono text-meta text-ink-faint pt-0.5">07-01</span>
             <span>进场 <b>LABU</b>(3× 生科多头)3 股 @ $289.90,随单挂 bracket(TP $323.23 / STOP $255.11),然后<b>什么都不做</b>。</span>
           </li>
           <li className="flex gap-2">
-            <span className="shrink-0 font-mono text-meta text-gray-400 pt-0.5">07-07</span>
+            <span className="shrink-0 font-mono text-meta text-ink-faint pt-0.5">07-07</span>
             <span>持有 6 天后止盈单自己成交:<b className="text-emerald-600">+$86.97</b> —— 占全部利润的 <b>81%</b>。</span>
           </li>
           <li className="flex gap-2">
-            <span className="shrink-0 font-mono text-meta text-gray-400 pt-0.5">07-07</span>
+            <span className="shrink-0 font-mono text-meta text-ink-faint pt-0.5">07-07</span>
             <span>按规则立刻再进 LABU;30 分钟后权益摸到 +$100 赢线,<b className="text-emerald-600">+$20</b> 全清收手。🏆</span>
           </li>
         </ol>
@@ -132,7 +132,7 @@ export default function ChallengeLessonsPage() {
       <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4">
         <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
           <h2 className="text-card font-semibold text-gray-900">今日照做 · 同一套纪律现在怎么看</h2>
-          {basket?.as_of && <span className="text-meta text-gray-400 font-mono">数据截至 {basket.as_of} · 每日发布刷新</span>}
+          {basket?.as_of && <span className="text-meta text-ink-faint font-mono">数据截至 {basket.as_of} · 每日发布刷新</span>}
         </div>
 
         {!loaded ? (
@@ -154,7 +154,7 @@ export default function ChallengeLessonsPage() {
                 今天<b>没有合格标的</b> —— 按纪律应该空仓等待。不硬凑单,这也是这套打法的一部分。
               </div>
             )}
-            <p className="text-meta text-gray-400 mt-2">{basket.note}</p>
+            <p className="text-meta text-ink-faint mt-2">{basket.note}</p>
           </>
         )}
       </section>
@@ -164,7 +164,7 @@ export default function ChallengeLessonsPage() {
         <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4">
           <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
             <h2 className="text-card font-semibold text-gray-900">全场扫描 · 同一套门槛看整个杠杆 ETF 宇宙</h2>
-            <span className="text-meta text-gray-400 font-mono">
+            <span className="text-meta text-ink-faint font-mono">
               扫 {basket.market.n_scanned} 只 · 合格 {basket.market.n_qualified} 只
             </span>
           </div>
@@ -199,7 +199,7 @@ export default function ChallengeLessonsPage() {
         <section className="bg-white rounded-xl border border-[#EDEDF0] px-6 py-4">
           <div className="flex items-baseline justify-between flex-wrap gap-2 mb-1">
             <h2 className="text-card font-semibold text-gray-900">🧭 板块轮动地图 · 钱正在往哪儿去</h2>
-            <span className="text-meta text-gray-400 font-mono">vs {rot.benchmark} · 截至 {rot.as_of}</span>
+            <span className="text-meta text-ink-faint font-mono">vs {rot.benchmark} · 截至 {rot.as_of}</span>
           </div>
           <p className="text-body text-[#8A8A8E] mb-2 leading-relaxed">
             每条尾巴是一个板块最近 8 周的轨迹,箭头指向最新;顺时针轮回:
@@ -207,7 +207,7 @@ export default function ChallengeLessonsPage() {
             <b className="text-gray-700">只碰右上,盯着左上找下一个</b>。⚛️ 量子板块带虚线光环。
           </p>
           <RotationMap data={rot} />
-          <p className="text-meta text-gray-400 mt-2">{rot.note} · 每日发布刷新 · 非投资建议</p>
+          <p className="text-meta text-ink-faint mt-2">{rot.note} · 每日发布刷新 · 非投资建议</p>
         </section>
       )}
 
@@ -250,7 +250,7 @@ export default function ChallengeLessonsPage() {
         </ol>
       </section>
 
-      <div className="text-center text-meta text-gray-400">
+      <div className="text-center text-meta text-ink-faint">
         纸面模拟复盘 · 今日面板为机械读数,不构成投资建议
       </div>
     </main>
@@ -266,7 +266,7 @@ function EtfTable({ rows, pick, showLabel }: {
     <div className="overflow-x-auto">
       <table className="w-full text-body">
         <thead>
-          <tr className="text-left text-meta uppercase tracking-wider text-gray-500 border-b border-[#EDEDF0]">
+          <tr className="text-left text-meta uppercase tracking-wider text-ink-faint border-b border-[#EDEDF0]">
             <th className="py-1.5 pr-3">标的</th>
             {showLabel && <th className="py-1.5 pr-3">板块</th>}
             <th className="py-1.5 pr-3">收盘</th>
@@ -285,9 +285,9 @@ function EtfTable({ rows, pick, showLabel }: {
                 <td className="py-2 pr-3 font-mono font-semibold text-gray-900">
                   {e.ticker}{isPick && <span className="ml-1.5 text-meta text-emerald-600 font-sans font-medium">之选</span>}
                 </td>
-                {showLabel && <td className="py-2 pr-3 text-gray-500 text-body whitespace-nowrap">{e.label || "—"}</td>}
+                {showLabel && <td className="py-2 pr-3 text-ink-faint text-body whitespace-nowrap">{e.label || "—"}</td>}
                 {e.error ? (
-                  <td colSpan={5} className="py-2 text-gray-400">{e.error}</td>
+                  <td colSpan={5} className="py-2 text-ink-faint">{e.error}</td>
                 ) : (
                   <>
                     <td className="py-2 pr-3 font-mono text-gray-700">{money(e.close)}</td>

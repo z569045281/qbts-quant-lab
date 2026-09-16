@@ -29,7 +29,7 @@ export function SelfCheckCard({ page, check: preloaded }:
           🔬 AI 系统自检 · 本页发现
         </span>
         {check?.generated_at && (
-          <span className="text-meta text-gray-400 font-mono">
+          <span className="text-meta text-ink-faint font-mono">
             {check.generated_at.slice(5, 16).replace("T", " ")} UTC
           </span>
         )}
@@ -64,14 +64,14 @@ export function SiteCheckOverview({ check }: { check?: SiteCheck | null }) {
         <span className="text-section font-semibold text-gray-900">
           🔬 全站系统体检 · {check.n_issues} 项发现
         </span>
-        <span className="text-meta text-gray-400 font-mono">
+        <span className="text-meta text-ink-faint font-mono">
           {check.generated_at.slice(5, 16).replace("T", " ")} UTC
         </span>
       </div>
       <div className="space-y-3">
         {entries.map(([p, issues]) => (
           <div key={p}>
-            <div className="text-meta font-semibold text-gray-500 mb-1">{PAGE_LABEL[p]}</div>
+            <div className="text-meta font-semibold text-ink-faint mb-1">{PAGE_LABEL[p]}</div>
             <div className="space-y-1.5">
               {issues.map((n, i) => (
                 <div key={i} className="flex items-start gap-2 text-card leading-relaxed">
@@ -87,7 +87,7 @@ export function SiteCheckOverview({ check }: { check?: SiteCheck | null }) {
           </div>
         ))}
       </div>
-      <div className="mt-2.5 text-meta text-gray-400">
+      <div className="mt-2.5 text-meta text-ink-faint">
         每日 publish 后规则层+Haiku 对六个页面的数据体检 · 与决策模型的当日自检互补 · 修不修由你定
       </div>
     </section>

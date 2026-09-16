@@ -401,7 +401,7 @@ function TodaySignalsPanel() {
       <CardHeader
         right={
           <>
-            <span className="text-body text-gray-400">
+            <span className="text-body text-ink-faint">
               基准价 ${data.close?.toFixed(2) ?? "—"} · 截至 {data.as_of?.slice(0, 10) ?? "—"}
             </span>
             <button
@@ -420,7 +420,7 @@ function TodaySignalsPanel() {
       <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-5 p-5">
         {/* Big ensemble verdict */}
         <div className={`rounded-inner border-2 ${ensColor} p-5 flex flex-col items-center justify-center text-center`}>
-          <div className="text-meta opacity-75 mb-2">综合判定</div>
+          <div className="text-meta font-medium mb-2">综合判定</div>
           <div className="text-5xl font-bold mb-2">
             {ens?.label === "BUY"  ? "↗ 多" :
              ens?.label === "SELL" ? "↘ 空" :
@@ -433,7 +433,7 @@ function TodaySignalsPanel() {
               </div>
               <div className="mt-3 flex gap-3 text-body">
                 <span className="text-emerald-700">▲{ens.n_buy}</span>
-                <span className="text-gray-500">●{ens.n_hold}</span>
+                <span className="text-ink-faint">●{ens.n_hold}</span>
                 <span className="text-down">▼{ens.n_sell}</span>
               </div>
             </>
@@ -463,7 +463,7 @@ function TodaySignalsPanel() {
                   <span className="text-section font-bold">
                     {f.signal === 1 ? "↗ 多" : f.signal === -1 ? "↘ 空" : f.label === "ERROR" ? "⚠" : "—"}
                   </span>
-                  <div className="text-right text-meta font-mono text-gray-500">
+                  <div className="text-right text-meta font-mono text-ink-faint">
                     <div>S {f.oos_sharpe.toFixed(1)}</div>
                     <div>权重 {((f.weight ?? 0) * 100).toFixed(0)}%</div>
                   </div>
@@ -776,7 +776,7 @@ function MineConsole() {
                            text-gray-900 bg-surface focus:outline-none focus:ring-2 focus:ring-brand/30
                            focus:border-brand disabled:opacity-40 disabled:bg-gray-50 transition"
               />
-              <span className="text-body text-gray-400">/ 50</span>
+              <span className="text-body text-ink-faint">/ 50</span>
             </div>
 
             {/* Auto-loop toggle */}
@@ -853,7 +853,7 @@ function MineConsole() {
               <span className="w-3 h-3 rounded-full bg-down" />
               <span className="w-3 h-3 rounded-full bg-amber-400" />
               <span className="w-3 h-3 rounded-full bg-emerald-500" />
-              <span className="ml-2 text-body text-gray-500 font-mono">qbts-miner — activity log</span>
+              <span className="ml-2 text-body text-ink-faint font-mono">qbts-miner — activity log</span>
               {mining && (
                 <span className="ml-auto flex items-center gap-1.5 text-body text-amber-400 font-mono">
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
@@ -888,7 +888,7 @@ function MineConsole() {
           <CardHeader
             right={
               <>
-                <span className="text-body text-gray-400">点列头排序</span>
+                <span className="text-body text-ink-faint">点列头排序</span>
                 {factors.length > 0 && (
                   <button
                     onClick={() => exportCSV(factors)}
@@ -937,7 +937,7 @@ function MineConsole() {
                     <th className="px-4 py-3 text-left text-body font-medium text-ink-muted">#</th>
                     <th className="px-4 py-3 text-left text-body font-medium text-ink-muted">因子名称</th>
                     <th className="px-3 py-3 text-center text-body font-medium text-ink-muted">周期</th>
-                    <th className="px-3 py-3 text-right text-body font-medium text-gray-400">IS Sharpe</th>
+                    <th className="px-3 py-3 text-right text-body font-medium text-ink-faint">IS Sharpe</th>
                     <th className="px-3 py-3 text-right text-body font-medium text-ink-muted">止损/单日最大亏</th>
                     <th className="px-1 py-3 text-center text-gray-300">→</th>
                     <SortTh k="oos_sharpe_ratio" label="OOS Sharpe" accent />
@@ -971,7 +971,7 @@ function MineConsole() {
                           {f.favorited ? "★" : "☆"}
                         </button>
                       </td>
-                      <td className="px-4 py-3 text-gray-400 font-medium">{idx + 1}</td>
+                      <td className="px-4 py-3 text-ink-faint font-medium">{idx + 1}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2.5">
                           <span className={`shrink-0 w-2 h-2 rounded-full ${f.overfit ? "bg-down" : "bg-emerald-500"}`} />
@@ -1002,7 +1002,7 @@ function MineConsole() {
                           {f.freq}
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-right font-mono text-gray-400">{fmt(f.is_sharpe)}</td>
+                      <td className="px-3 py-3 text-right font-mono text-ink-faint">{fmt(f.is_sharpe)}</td>
                       <td className="px-3 py-3 text-right">
                         {(() => {
                           const nStops = f.oos_n_stops;
@@ -1285,7 +1285,7 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
                         ${tradeExecuting
                           ? "bg-amber-50 text-amber-700 border border-amber-200 cursor-wait"
                           : !trading.signal
-                          ? "bg-sunken text-gray-400 border border-hairline cursor-not-allowed"
+                          ? "bg-sunken text-ink-faint border border-hairline cursor-not-allowed"
                           : "bg-brand hover:bg-[#338CFF] text-on-solid shadow-sm"}`}
                     >
                       {tradeExecuting
@@ -1301,7 +1301,7 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
                 {/* execution log */}
                 {tradeLogs.length > 0 && (
                   <div className="rounded-inner overflow-hidden border border-hairline">
-                    <div className="px-4 py-2.5 bg-[#1a1a1e] border-b border-white/5 text-body text-gray-500 font-mono flex items-center gap-2">
+                    <div className="px-4 py-2.5 bg-[#1a1a1e] border-b border-white/5 text-body text-ink-faint font-mono flex items-center gap-2">
                       <span className="w-1.5 h-1.5 rounded-full bg-brand" />
                       执行日志
                       {tradeExecuting && <span className="ml-auto text-amber-400 animate-pulse">● LIVE</span>}
@@ -1382,7 +1382,7 @@ ALPACA_SECRET_KEY=your_paper_secret_key`}
         )}
 
         {/* footer */}
-        <div className="text-center text-body text-gray-400 pb-4">
+        <div className="text-center text-body text-ink-faint pb-4">
           QBTS Factor Miner · Walk-Forward OOS Validation · IC/ICIR · Factor Ensemble
         </div>
 

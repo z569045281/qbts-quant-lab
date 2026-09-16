@@ -17,7 +17,7 @@ const VAL: Record<string, { border: string; bg: string; chip: string }> = {
   "中性": { border: "border-amber-200",   bg: "bg-amber-50/30",   chip: "bg-amber-100 text-amber-700" },
   "偏贵": { border: "border-red-200",      bg: "bg-red-50/30",     chip: "bg-red-100 text-red-600" },
 };
-const FALLBACK = { border: "border-hairline", bg: "bg-surface", chip: "bg-gray-100 text-gray-500" };
+const FALLBACK = { border: "border-hairline", bg: "bg-surface", chip: "bg-gray-100 text-ink-faint" };
 
 const signed = (n: number | null | undefined, d = 1) =>
   typeof n === "number" && isFinite(n) ? `${n >= 0 ? "+" : ""}${(n * 100).toFixed(d)}%` : "—";
@@ -30,7 +30,7 @@ function DcaCard({ r }: { r: DcaResult }) {
       <div className="rounded-card border border-hairline bg-surface p-4 flex items-center gap-3">
         <span className="text-section">⚠️</span>
         <span className="font-bold text-gray-800">{r.ticker}</span>
-        <span className="text-body text-gray-400">{r.name} · 数据拉取失败</span>
+        <span className="text-body text-ink-faint">{r.name} · 数据拉取失败</span>
       </div>
     );
   }
@@ -40,8 +40,8 @@ function DcaCard({ r }: { r: DcaResult }) {
       {/* 头行 */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-section font-bold text-gray-900">{r.ticker}</span>
-        <span className="text-meta px-1.5 py-0.5 rounded-inner bg-gray-100 text-gray-500 font-medium">{r.name}</span>
-        {r.role && <span className="text-meta text-gray-400">{r.role}</span>}
+        <span className="text-meta px-1.5 py-0.5 rounded-inner bg-gray-100 text-ink-faint font-medium">{r.name}</span>
+        {r.role && <span className="text-meta text-ink-faint">{r.role}</span>}
         <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${v.chip}`}>{r.valuation_emoji} {r.valuation}</span>
         <span className="ml-auto text-card font-mono text-gray-900">${r.price?.toFixed(2)}</span>
         <span className={`text-card font-semibold ${up ? "text-emerald-600" : "text-down"}`}>{signed(r.today_change)}</span>
@@ -59,15 +59,15 @@ function DcaCard({ r }: { r: DcaResult }) {
       {/* 估值 + 目标权重 */}
       <div className="mt-2.5 grid grid-cols-3 gap-2 text-body">
         <div className="bg-surface/70 rounded-inner px-2.5 py-1.5">
-          <div className="text-meta text-gray-400">P/E</div>
+          <div className="text-meta text-ink-faint">P/E</div>
           <div className="font-mono font-semibold text-gray-700">{r.pe ?? "—"}</div>
         </div>
         <div className="bg-surface/70 rounded-inner px-2.5 py-1.5" title="盈利收益率 1/PE ≈ 粗略的长期预期年化(实际)">
-          <div className="text-meta text-gray-400">粗估长期年化</div>
+          <div className="text-meta text-ink-faint">粗估长期年化</div>
           <div className="font-mono font-semibold text-gray-700">{r.earnings_yield != null ? `~${(r.earnings_yield * 100).toFixed(1)}%` : "—"}</div>
         </div>
         <div className="bg-surface/70 rounded-inner px-2.5 py-1.5">
-          <div className="text-meta text-gray-400">建议权重</div>
+          <div className="text-meta text-ink-faint">建议权重</div>
           <div className="font-mono font-semibold text-brand">{r.target_weight != null ? `${r.target_weight}%` : "—"}</div>
         </div>
       </div>
@@ -77,14 +77,14 @@ function DcaCard({ r }: { r: DcaResult }) {
         <div className="mt-2.5 rounded-inner px-2.5 py-2 bg-surface/70 border border-black/5">
           <div className="text-body font-semibold text-gray-800">{r.deploy.emoji} {r.deploy.tag}</div>
           <p className="mt-0.5 text-body leading-relaxed text-gray-600">{r.deploy.text}</p>
-          <div className="mt-1 text-meta text-gray-400 font-mono">
+          <div className="mt-1 text-meta text-ink-faint font-mono">
             距52周高点 {signed(r.drawdown_pct)} · vs 200日线 {signed(r.vs_200dma_pct)}{r.below_200 ? "(下方)" : ""}
           </div>
         </div>
       )}
 
       {/* 季节性(次要参考)*/}
-      <div className="mt-2 text-meta text-gray-400 leading-relaxed">
+      <div className="mt-2 text-meta text-ink-faint leading-relaxed">
         历史最强 {mo(r.best_month)}({signed(r.best_month_avg)}) · 最弱 {mo(r.worst_month)}({signed(r.worst_month_avg)})
         · ❄️冬 {signed(r.winter_avg)} vs ☀️夏 {signed(r.summer_avg)}/月
       </div>
@@ -113,7 +113,7 @@ export default function DcaPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-section">📥</span>
           <span className="text-card font-semibold text-gray-800">定投专区 · 全球估值菜单</span>
-          {genAt && <span className="ml-auto text-meta text-gray-400 font-mono">更新于 {genAt}</span>}
+          {genAt && <span className="ml-auto text-meta text-ink-faint font-mono">更新于 {genAt}</span>}
         </div>
         {state?.macro && (
           <div className="mt-3 rounded-inner px-4 py-2.5 text-body leading-relaxed bg-blue-50 text-blue-800 border border-blue-200">
@@ -122,7 +122,7 @@ export default function DcaPage() {
             <p className="mt-1 text-body text-blue-700/90">{state.macro.note}</p>
           </div>
         )}
-        {state?.principle && <p className="mt-2 text-meta text-gray-500 leading-relaxed">{state.principle}</p>}
+        {state?.principle && <p className="mt-2 text-meta text-ink-faint leading-relaxed">{state.principle}</p>}
       </section>
 
       {/* 建议配置 */}
@@ -139,7 +139,7 @@ export default function DcaPage() {
               </div>
             ))}
           </div>
-          <p className="mt-2 text-meta text-gray-500 leading-relaxed">{state.allocation.note}</p>
+          <p className="mt-2 text-meta text-ink-faint leading-relaxed">{state.allocation.note}</p>
         </section>
       )}
 
@@ -155,7 +155,7 @@ export default function DcaPage() {
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-brand animate-pulse" /> 读取定投建议…
         </div>
       ) : !state || state.results.length === 0 ? (
-        <div className="bg-surface rounded-card border border-hairline p-8 text-center text-card text-gray-400">
+        <div className="bg-surface rounded-card border border-hairline p-8 text-center text-card text-ink-faint">
           尚未生成 — 运行一次 <code className="font-mono bg-gray-100 px-1 rounded-inner">publish.py</code>(或等每日自动任务)后这里就会有数据。
         </div>
       ) : (
@@ -197,7 +197,7 @@ export default function DcaPage() {
         </section>
       )}
 
-      <footer className="text-center text-meta text-gray-400 pb-4 leading-relaxed">
+      <footer className="text-center text-meta text-ink-faint pb-4 leading-relaxed">
         📥 定投专区 · 估值/季节性是<b>长周期的弱倾斜、不是择时</b>,单一年份可能完全相反 · 长期持续投入 &gt; 精准择时 · 非投资建议
       </footer>
     </main>
