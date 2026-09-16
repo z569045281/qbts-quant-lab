@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MiniChart } from "./_components/mini-chart";
 import { AuditModal } from "./_components/audit-modal";
 import { ControlPanel } from "./_components/control-panel";
+import { ChampionsCard } from "./_components/champions-card";
 import PositionsCard from "./_components/positions-card";
 import { RetrospectivePanel } from "./_components/retrospective-panel";
 import { SiteCheckOverview } from "./_components/self-check";
@@ -345,6 +346,9 @@ export default function Dashboard() {
     const ts = snap.waiting_for?.triggers ?? [];
     return ts.find(t => t.fired === true) ?? ts.find(t => t.fired === false) ?? null;
   })();
+  /* 观望日(台账实测 91%)不渲染交易计划卡 —— 它在那些日子唯一能说的话是
+     「暂不持仓」,而裁决卡那两个大字已经说完了。 */
+  const showPlan = !!d && d.action !== "HOLD";
 
   return (
     <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-4">
@@ -362,54 +366,11 @@ export default function Dashboard() {
           ═════════════════════════════════════════════════════════════════════ */}
 
       <section className="space-y-2.5">
-      {/* ── 🏆 策略冠军(2026-08-05 用户点单,置顶)──────────────────────
-          08-05 全板块审计在 36 个交易日 / 16 个大波动日上给 15 个板块排了序,
-          这里只放前三名 + 大盘闸门。**它是排序显示卡,不是已验证信号**:
-          前两名 n 只有 7/8、Wilson 下界 ≈47%,打不过「无脑喊跌」的 56.2% 基线,
-          所以卡上常驻 UNPROVEN 提示,别让排名看起来像背书。
-          实测这两个月 TRIGGER 0 次(偏多表态 4 天、大盘绿灯 10 天,不重叠)——
-          原因写在 backend/dashboard/champions.py 文件头。 */}
-      {(() => {
-        const ch = snap.champions;
-        if (!ch) return null;
-        const tone =
-          ch.state === "TRIGGER" ? "border-emerald-400 bg-emerald-50"
-          : ch.state === "GATED" ? "border-amber-300 bg-amber-50"
-          : ch.state === "SHORT_MUTED" ? "border-red-200 bg-red-50/60"
-          : "border-hairline bg-sunken";
-        return (
-          <div className={`rounded-card border-2 ${tone} px-4 py-3`}>
-            <div className="flex items-center gap-2 flex-wrap mb-2">
-              <span className="text-body font-bold text-ink">🏆 策略冠军</span>
-              <span className="text-meta px-2 py-0.5 rounded-full bg-surface/70 font-mono text-ink-muted">
-                共识 {ch.consensus}
-              </span>
-              <span className="text-meta px-2 py-0.5 rounded-full bg-surface/70 font-medium">
-                {ch.gate.cn}
-              </span>
-              <span className="ml-auto text-body font-semibold text-ink">{ch.state_cn}</span>
-            </div>
-            <div className="space-y-1">
-              {ch.members.map((m) => (
-                <div key={m.key} className="flex items-start gap-2 text-body leading-snug">
-                  <span className={
-                    m.stance === "up" ? "text-emerald-600 font-bold"
-                    : m.stance === "down" ? "text-red-600 font-bold" : "text-gray-300"}>
-                    {m.stance === "up" ? "▲" : m.stance === "down" ? "▼" : "○"}
-                  </span>
-                  <span className="font-medium text-ink shrink-0">{m.name}</span>
-                  <span className="text-meta font-mono text-ink-faint shrink-0">
-                    大波动日 {m.big_hit}%·n={m.big_n}
-                  </span>
-                  <span className="text-ink-faint ml-auto text-right truncate">{m.read}</span>
-                </div>
-              ))}
-            </div>
-            <p className="mt-2 text-meta text-ink-muted leading-snug">{ch.gate.note}</p>
-            <p className="mt-1 text-meta text-amber-700 leading-snug">{ch.unproven_note}</p>
-          </div>
-        );
-      })()}
+      {/* ── 🏆 策略冠军 —— 只在真触发那天插队 ────────────────────────────
+          常驻版搬去「战绩」标签(理由写在 _components/champions-card.tsx 文件头:
+          142 天实测 TRIGGER 0、97.9% 的日子等于「今天不用管它」)。这里沿用警报槽
+          的规矩 —— 不出事零像素。 */}
+      {snap.champions?.state === "TRIGGER" && <ChampionsCard ch={snap.champions} />}
 
       {/* ── 警报槽:平时一个像素都不占,出事才插队 ─────────────────────── */}
       {planBreached && d && (
@@ -502,16 +463,12 @@ export default function Dashboard() {
         </span>
       </div>
 
-      {/* ── 🌡️ 超买/超卖一行(用户 2026-07-30 点单)。贴着价格轨放,因为它回答的
-          就是"这个价现在贵还是便宜";逐项细节在「结构」标签。 ───────────── */}
-      {snap.oscillators && (
-        <OscillatorStrip osc={snap.oscillators} onOpen={() => changeTab("structure")} />
-      )}
-
       {/* ── 裁决 · 交易计划 · 四条军规 ──────────────────────────────────
           三栏宽度不等是刻意的:裁决最窄但字号最大(它是结论),军规最宽
           (它是四条并列的执行口径)。 ────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1fr)_minmax(0,1.18fr)] gap-2.5">
+      <div className={`grid grid-cols-1 gap-2.5 ${showPlan
+        ? "lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1fr)_minmax(0,1.18fr)]"
+        : "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]"}`}>
 
         {/* ① 裁决 —— 全页唯一的大字号,颜色即结论 */}
         <div className={`rounded-card border-2 p-4 flex flex-col justify-center ${meta ? meta.cls : "bg-surface border-hairline"}`}>
@@ -558,6 +515,33 @@ export default function Dashboard() {
                   </div>
                 </div>
               )}
+
+              {/* ⏳ 在等什么 —— 2026-09-16 从交易计划卡搬到这里。
+                  台账实测 91% 的日子是观望;观望日首屏如果只剩「观望」两个字,
+                  这个仪表盘 91% 的日子等于白开。所以观望态必须带内容:不是
+                  「今天没事」,是「在等 $X,还差 Y%」。六个一级扳机的完整读数
+                  在「今日决策」标签,这里只提第一名。 */}
+              {topWait && (
+                <div className="mt-2.5 pt-2.5 border-t border-current/10">
+                  <div className="text-meta mb-0.5">⏳ 在等</div>
+                  <div className="text-card font-semibold leading-snug">{topWait.name}</div>
+                  <div className="text-meta">{topWait.hint}</div>
+                </div>
+              )}
+
+              {/* 失效条件常是一大段(双向作废条件全写在里面)—— 夹成一行,点开看全文 */}
+              {d.invalidation && (
+                <details className="group mt-2.5 text-meta bg-current/[0.06] rounded-inner px-2 py-1.5 leading-snug">
+                  <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+                    ⚠️ 失效条件:
+                    <span className="group-open:hidden">
+                      {d.invalidation.length > 36 ? d.invalidation.slice(0, 36) : d.invalidation}
+                      {d.invalidation.length > 36 && <span className="font-medium">… 展开</span>}
+                    </span>
+                  </summary>
+                  <div className="mt-1">{d.invalidation}</div>
+                </details>
+              )}
             </>
           ) : (
             <div className="text-card text-ink-faint mt-1">
@@ -566,15 +550,17 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* ② 交易计划摘要 —— 只留能直接下单的数字;推理/波动档/ETF 换算在「今日决策」里 */}
+        {/* ② 交易计划摘要 —— 只留能直接下单的数字;推理/波动档/ETF 换算在「今日决策」里。
+            2026-09-16:**观望日整张卡不渲染**。台账实测 91% 的日子是观望,这张卡在
+            那些日子占满一整格,只为说一句「📭 暂不持仓」—— 而左边裁决卡那两个大字
+            已经说完了。敞口上限和「在等什么」都搬进裁决卡,这里只留能照着下单的数字。 */}
+        {showPlan && (
         <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] p-4">
           <div className="flex items-baseline justify-between mb-2">
             <span className="text-card font-semibold text-gray-800">📋 交易计划</span>
             {d && (
               <span className="text-meta text-ink-faint">
-                {d.action === "HOLD" ? "观望 · 0 仓位"
-                  : d.plan_valid === false ? "价位不自洽 · 已隐藏"
-                  : d.trade_plan.etf_ticker}
+                {d.plan_valid === false ? "价位不自洽 · 已隐藏" : d.trade_plan.etf_ticker}
               </span>
             )}
           </div>
@@ -594,38 +580,12 @@ export default function Dashboard() {
               ))}
             </div>
           ) : (
-            <div className="text-body text-ink-muted leading-relaxed">
-              {d?.plan_valid === false
-                ? <span className="text-red-700">⚠️ 止损/目标方向异常,价位已隐藏以防误用 —— 重跑 publish.py。</span>
-                : <>📭 <b className="text-gray-700">暂不持仓</b>,没有入场 / 止损 / 目标,仓位 0%。
-                   {expPct != null && (
-                     <span className="block mt-1 text-body text-indigo-700">
-                       📐 投机仓整体敞口仍受 ≤{(expPct * 100).toFixed(0)}% 约束(与今日方向无关)。
-                     </span>
-                   )}</>}
+            <div className="text-body text-red-700 leading-relaxed">
+              ⚠️ 止损/目标方向异常,价位已隐藏以防误用 —— 重跑 publish.py。
             </div>
-          )}
-          {/* 观望日最该看的一行:到底在等什么 */}
-          {topWait && (
-            <div className="mt-2 text-body text-ink-muted bg-sunken rounded-inner px-2.5 py-1.5 leading-snug">
-              ⏳ 在等:<b className="text-gray-700">{topWait.name}</b> · {topWait.hint}
-            </div>
-          )}
-          {/* 失效条件常是一大段(双向作废条件全写在里面)——夹成一行,点开看全文,
-              否则它一个人就能把计划卡撑到两倍高。 */}
-          {d?.invalidation && (
-            <details className="group mt-2 text-meta text-[#B45309] bg-amber-50 border border-amber-200 rounded-inner px-2.5 py-1.5 leading-snug">
-              <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                ⚠️ 失效条件:
-                <span className="group-open:hidden">
-                  {d.invalidation.length > 42 ? d.invalidation.slice(0, 42) : d.invalidation}
-                  {d.invalidation.length > 42 && <span className="font-medium">… 展开</span>}
-                </span>
-              </summary>
-              <div className="mt-1">{d.invalidation}</div>
-            </details>
           )}
         </div>
+        )}
 
         {/* ③ 四条军规 —— 254 套回测的最终提炼,数字全实时 */}
         {snap.champs ? (
@@ -715,6 +675,44 @@ export default function Dashboard() {
         ) : <div />}
       </div>
 
+      </section>
+
+
+      {/* ══ 二级导航(sticky):滚动时价格 + 裁决 + 分区永远不离开视野 ══════ */}
+      <TabBar
+        tab={tab}
+        onChange={changeTab}
+        dots={{
+          events: (geo?.risk_level === "alert") || catItems.some(c => c.impact === "high"),
+          system: !!(snap.data_health && !snap.data_health.ok),
+        }}
+        rail={
+          <span className="flex items-baseline gap-2 text-body">
+            <span className="font-mono font-bold text-gray-900 tabular-nums">${qPrice.toFixed(2)}</span>
+            <span className={`font-mono tabular-nums ${qUp ? "text-emerald-600" : "text-down"}`}>
+              {qUp ? "▲" : "▼"}{Math.abs(qChg * 100).toFixed(2)}%
+            </span>
+            {meta && (
+              <span className={`px-2 py-0.5 rounded-full text-meta font-bold border ${meta.cls}`}>
+                {meta.title}
+              </span>
+            )}
+          </span>
+        }
+      />
+
+      {tab === "today" && (
+        <div className="space-y-4">
+      {/* ══ 2026-09-16 从首屏搬来的三块 ═══════════════════════════════════
+          🌡️摆动条 / 🧭一句话结论 / 💌给 Vivienne —— 三块都是「读」的内容,
+          不是「做」的内容。首屏的预算只留给「今天动不动手、按什么价」,
+          想读为什么就点进这个标签,一次点击的距离。 */}
+      {/* ── 🌡️ 超买/超卖一行(用户 2026-07-30 点单)。贴着价格轨放,因为它回答的
+          就是"这个价现在贵还是便宜";逐项细节在「结构」标签。 ───────────── */}
+      {snap.oscillators && (
+        <OscillatorStrip osc={snap.oscillators} onOpen={() => changeTab("structure")} />
+      )}
+
       {/* ── 一段话总结 + 给 Vivienne ────────────────────────────────────
           两条都是"人话",放一起;技术细节全在标签页里。 ───────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
@@ -790,34 +788,7 @@ export default function Dashboard() {
           })()}
         </div>
       </div>
-      </section>
 
-
-      {/* ══ 二级导航(sticky):滚动时价格 + 裁决 + 分区永远不离开视野 ══════ */}
-      <TabBar
-        tab={tab}
-        onChange={changeTab}
-        dots={{
-          events: (geo?.risk_level === "alert") || catItems.some(c => c.impact === "high"),
-          system: !!(snap.data_health && !snap.data_health.ok),
-        }}
-        rail={
-          <span className="flex items-baseline gap-2 text-body">
-            <span className="font-mono font-bold text-gray-900 tabular-nums">${qPrice.toFixed(2)}</span>
-            <span className={`font-mono tabular-nums ${qUp ? "text-emerald-600" : "text-down"}`}>
-              {qUp ? "▲" : "▼"}{Math.abs(qChg * 100).toFixed(2)}%
-            </span>
-            {meta && (
-              <span className={`px-2 py-0.5 rounded-full text-meta font-bold border ${meta.cls}`}>
-                {meta.title}
-              </span>
-            )}
-          </span>
-        }
-      />
-
-      {tab === "today" && (
-        <div className="space-y-4">
       {/* ══ 1.6 💼 当前持仓 — 你的真金仓位 + AI 每日逐笔操作建议 ═══════════ */}
       <PositionsCard
         initial={snap.user_positions ?? []}
@@ -1894,6 +1865,10 @@ export default function Dashboard() {
 
       {tab === "record" && (
         <div className="space-y-4">
+      {/* 🏆 策略冠军常驻位(2026-09-16 从首屏搬来)。它是一张把已有读数排序
+          显示的卡、零决策权,归属「战绩」比归属「今天做什么」准确。 */}
+      {snap.champions && <ChampionsCard ch={snap.champions} />}
+
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* 历史战绩 */}
         <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
