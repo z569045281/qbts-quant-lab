@@ -587,44 +587,65 @@ export default function Dashboard() {
         </div>
         )}
 
-        {/* ③ 四条军规 —— 254 套回测的最终提炼,数字全实时 */}
+        {/* ③ 军规 —— 254 套回测的最终提炼,数字全实时。
+            2026-09-16 压成两行:四条里每天真的会变的只有①(今天买不买)和②③
+            (什么价)。⓪总闸、④拿什么载具是**不变的规矩**,天天摊开占六行,
+            读的人第 30 天就不看了 —— 收进展开区,留在一次点击的距离。
+            HIG disclosure-controls.md:「Place controls that people are most likely
+            to use at the top of the disclosure hierarchy… more advanced
+            functionality hidden by default」。 */}
         {snap.champs ? (
           <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] p-4">
-            <div className="flex items-baseline justify-between mb-2">
-              <span className="text-card font-semibold text-gray-800">🚦 四条军规</span>
-              <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${
-                snap.champs.risk_on ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
+            {/* 第一行 = ① 大盘红绿灯,直接写成结论句,不写"红绿灯"这个抽象名 */}
+            <div className={`text-card font-semibold leading-snug ${
+              snap.champs.risk_on ? "text-ink" : "text-down"}`}>
+              🚦 {snap.champs.risk_on ? "大盘顺风 · 可以按计划做" : "今天什么都不买"}
+              <span className="text-meta font-normal text-ink-muted ml-1.5">
                 大盘{snap.champs.risk_on ? "🟢 顺风" : "🔴 逆风"}
               </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-body leading-snug">
-              <div className="bg-sunken rounded-inner px-2.5 py-1.5">
-                <div className="text-meta text-ink-faint">① 大盘红绿灯</div>
-                {snap.champs.risk_on ? <span>🟢 可以玩</span> : <span>🔴 <b>今天什么都不买</b></span>}
-              </div>
-              <div className="bg-sunken rounded-inner px-2.5 py-1.5">
-                <div className="text-meta text-ink-faint">② 什么价买</div>
-                跌到 <b className="font-mono text-emerald-700">${snap.champs.swing.lo5.toFixed(2)}</b> · 永不追涨
-              </div>
-              <div className="bg-sunken rounded-inner px-2.5 py-1.5">
-                <div className="text-meta text-ink-faint">③ 什么价卖</div>
-                弹回 <b className="font-mono text-red-600">${(snap.champs.swing.open?.hi5 ?? snap.champs.swing.hi5).toFixed(2)}</b> · 最多 10 天
-              </div>
-              <div className="bg-sunken rounded-inner px-2.5 py-1.5">
-                <div className="text-meta text-ink-faint">④ 买多少 · 拿什么</div>
-                ≤<b className="font-mono">{((expPct ?? snap.champs.vt_pct) * 100).toFixed(0)}%</b> 投机资金,其余现金
-                <span className="block text-meta text-ink-faint">≤5 天用 QBTX,更久用 QBTS 正股</span>
-              </div>
-            </div>
-            <div className="mt-1.5 bg-amber-50 rounded-inner px-2.5 py-1.5 text-meta leading-snug text-amber-900">
-              <b>⓪ 总闸(先于一切)</b>:QBTS 投机仓 ≤ 你全部资产的 <b>10%</b> —— 这只票可能单日 −40%、
-              可能增发腰斩,止损保护不了隔夜跳空,<b>仓位小是唯一真防御</b>。
-              DCA 核心仓(📥定投专区)永远另册,<b>两边不许挪钱</b>。
+            {/* 第二行 = ②③④ 三个数字并排 */}
+            <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-body">
+              <span>
+                <span className="text-meta text-ink-muted">买 </span>
+                <b className="font-mono text-emerald-700 tabular-nums">${snap.champs.swing.lo5.toFixed(2)}</b>
+              </span>
+              <span>
+                <span className="text-meta text-ink-muted">卖 </span>
+                <b className="font-mono text-red-600 tabular-nums">${(snap.champs.swing.open?.hi5 ?? snap.champs.swing.hi5).toFixed(2)}</b>
+              </span>
+              <span>
+                <span className="text-meta text-ink-muted">最多 </span>
+                <b className="font-mono tabular-nums">10</b>
+                <span className="text-meta text-ink-muted"> 天</span>
+              </span>
+              <span>
+                <span className="text-meta text-ink-muted">≤</span>
+                <b className="font-mono tabular-nums">{((expPct ?? snap.champs.vt_pct) * 100).toFixed(0)}%</b>
+                <span className="text-meta text-ink-muted"> 投机仓</span>
+              </span>
             </div>
 
-            {/* 载具选择(2026-08-24,mining 第 42 轮):军规原本只教「怎么少受伤」,
-                从没说过「其实有不受这个伤的东西」。这块补的就是那句话。 */}
-            {d?.vehicle?.candidates?.length ? (
+            {/* 展开区:不变的规矩 */}
+            <details className="group mt-2 border-t border-hairline pt-2">
+              <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden
+                                  text-meta text-ink-muted hover:text-ink">
+                <span className="group-open:hidden">⓪ 总闸 · 永不追涨 · 拿什么载具 ›</span>
+                <span className="hidden group-open:inline">收起</span>
+              </summary>
+              <div className="mt-1.5 bg-amber-50 rounded-inner px-2.5 py-1.5 text-meta leading-snug text-amber-900">
+                <b>⓪ 总闸(先于一切)</b>:QBTS 投机仓 ≤ 你全部资产的 <b>10%</b> —— 这只票可能单日 −40%、
+                可能增发腰斩,止损保护不了隔夜跳空,<b>仓位小是唯一真防御</b>。
+                DCA 核心仓(📥定投专区)永远另册,<b>两边不许挪钱</b>。
+              </div>
+              <div className="mt-1.5 bg-sunken rounded-inner px-2.5 py-1.5 text-meta leading-snug text-ink-muted">
+                <b className="text-ink">② 永不追涨</b> —— 只在跌到 ${snap.champs.swing.lo5.toFixed(2)} 才买。
+                <b className="text-ink ml-1.5">④ 拿什么</b> —— ≤5 天用 QBTX,更久用 QBTS 正股。
+              </div>
+
+              {/* 载具选择(2026-08-24,mining 第 42 轮):军规原本只教「怎么少受伤」,
+                  从没说过「其实有不受这个伤的东西」。这块补的就是那句话。 */}
+              {d?.vehicle?.candidates?.length ? (
               <details className="mt-1.5 bg-indigo-50 rounded-inner px-2.5 py-1.5 text-meta leading-snug text-indigo-900 group">
                 <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
                   <b>🔁 载具:QBTX 不是长持工具</b> —— 同窗实测 QBTS <b>+171%</b> 而 QBTX 只 <b>+16%</b>
@@ -670,7 +691,8 @@ export default function Dashboard() {
                   </div>
                 </div>
               </details>
-            ) : null}
+              ) : null}
+            </details>
           </div>
         ) : <div />}
       </div>
