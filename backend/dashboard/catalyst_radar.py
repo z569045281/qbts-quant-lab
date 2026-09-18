@@ -65,14 +65,25 @@ _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
 _FRESH_SECONDS     = 5 * 60      # 缓存 <5min 直接用(盘中节拍 10min,所以每跳都会真拉)
 _REANALYZE_SECONDS = 4 * 3600    # 即便无新头条,分析 >4h 也重跑一次 Haiku
 _PER_TRACK_LIMIT   = 10
-_PROMPT_CAP        = 18          # 喂给 Haiku 的条数上限
+_PROMPT_CAP        = 24          # 喂给 Haiku 的条数上限(3 条 track × 前 10 → 去重后挑最新的)
 
 # (track, 中文标签, Google News 检索式) — `when:1d` 由 `_fetch_track` 统一追加
+#
+# ⚠️ 2026-09-18 漏推事故:09-16 IonQ + NVIDIA + 橡树岭的「AI 生成量子优化电路」新闻稿
+# 发出,次日 IONQ +9.6% / QBTS +8.7% / RGTI +8.1%,雷达一条都没推。回放 09-16 当天:
+# 旧 sector 检索式 `"quantum computing" stock OR IonQ OR ...` 的前 **40** 条里
+# 一条 IonQ-NVIDIA 都没有 —— 前 10 条(生产只取前 10)被 Blockchain Council 科普稿、
+# 「Quantum Computing Inc.」(QUBT,公司名本身就叫这个,每条都命中)的卡塔尔合作刷满。
+# 而只按同行名字检索,同一天前 15 条里有 4-5 条就是它。
+# 所以同行必须**点名单独一条 track**,泛行业词另起一条、并收窄到"钱/合同"类事件。
+_PEERS = ("IonQ", "Rigetti", "Infleqtion", '"IBM quantum"', "Quantinuum")
 _TRACKS = [
     ("company", "公司",
      '"D-Wave Quantum" OR "D-Wave" QBTS OR QBTS stock'),
-    ("sector", "板块同行",
-     '"quantum computing" stock OR IonQ OR Rigetti OR "quantum computing" contract'),
+    ("peers", "板块同行",
+     " OR ".join(_PEERS)),
+    ("sector", "行业",
+     '"quantum computing" (contract OR award OR CHIPS OR funding OR Nvidia OR breakthrough)'),
 ]
 
 # 硬时效闸(2026-08-25 事故修复)。
@@ -118,6 +129,10 @@ _UBIQUITOUS = {
     "falls", "fall", "drops", "drop", "sinks", "slides", "tumbles",
     "deal", "deals", "partnership", "agreement", "expands", "expand",
     "boost", "boosting", "buy", "sell", "hold", "today", "week", "year",
+    # 同行名字/代码(2026-09-18):peers track 每条都带它们,零区分度。
+    # 不排除的话,推过一条「IonQ 拿奖」之后,同日的「IonQ + NVIDIA 突破」会因为
+    # 共享 "ionq" 被判成同一件事、静默吞掉。
+    "ionq", "rigetti", "rgti", "infleqtion", "infq", "ibm", "quantinuum", "qubt",
 }
 
 
@@ -251,7 +266,11 @@ _ANALYSIS_PROMPT = """你是给 QBTS(D-Wave Quantum,高贝塔量子股,通过 2�
   - impact    : "high" | "medium" | "low" — 对 QBTS 股价的驱动力。
       high   = 公司层面的硬事件:商用合同/大客户签约、重大订单、产品或技术突破、
                财报、融资或增发、并购、上市地/指数变更、监管处罚、管理层变动;
-               或板块级的重大共振(同行拿下标志性合同、国家级量子预算落地)。
+               或板块级的重大共振(同行拿下标志性合同、国家级量子预算落地、
+               **同行与 NVIDIA/Google/Microsoft/IBM 等巨头或国家实验室联合发布的技术突破**)。
+               ⚠️ 量子股是**同涨同跌**的:2026-09-16 IonQ+NVIDIA+橡树岭发布一篇
+               「AI 生成量子优化电路」,D-Wave 自己一个字没发,次日 QBTS 照样 +8.7%。
+               所以同行的这类硬消息对 QBTS 是 high,不是「同行一般性进展」。
       medium = 有信息量但不改变基本面:分析师评级、板块轮动评论、同行一般性进展。
       low    = 纯观点/复述/旧闻改写/「该不该买」这类内容农场稿。
   - direction : "bullish" | "bearish" | "neutral" — 对 QBTS 股价方向。

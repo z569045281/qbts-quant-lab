@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-09-18 · [opus] 催化剂雷达漏推 IonQ-NVIDIA · 用户:「这种大新闻要推给我」。**查证**:09-16 IonQ+NVIDIA+ORNL 新闻稿 → 09-17 IONQ +9.6%/QBTS +8.7%,雷达零推送。回放 09-16:旧 sector 检索式前 **40** 条里没有一条 IonQ-NVIDIA(被 Blockchain Council 科普稿和 QUBT「Quantum Computing Inc.」刷满,生产只取前 10);按同行点名检索前 15 条里有 4-5 条。**三修**:①拆出 peers track(IonQ/Rigetti/Infleqtion/IBM quantum/Quantinuum),泛行业 track 收窄到合同/拨款/NVIDIA/突破 ②同行名/代码加进 `_UBIQUITOUS`(否则推过一条 IonQ 后当日所有 IonQ 新闻被判同一故事吞掉)③提示词:同行+巨头/国家实验室联合突破 = high。**实测**:新配置真跑 Haiku 重放 09-16 → IonQ-NVIDIA 判 high 进推送(15:04 ET,比大涨早一天)。前端 track 类型加 peers,v3.11.1。files: backend/dashboard/catalyst_radar.py, frontend/app/_lib/data.ts, frontend/public/version.json
+
 - [done] 2026-09-16 · [opus] btc-weekend-推送刷屏修复 · 用户报「昨天疯狂推周一BTC,大概5分钟一条」。**查证**:`ntfy_log` 拉出 09-13 20:01 ET–09-14 09:36 ET **18 条**「QBTS weekend BTC signal」(该 1 条);CloudWatch(us-east-1 / qbts-jobs-QuoteFunction)显示 Supabase 那天整天 502/504/500/401,堆栈直指 `lambda_handlers.py:245 push_payload → postgrest APIError`,还有一次 90s timeout。**病根**不在 btc_weekend 而在 `quote_handler` 读 `live_quote` 的 `except: prev_data = {}` —— 读失败与「表里真没有」不可区分,而这个 blob 是**整块覆写**的、装着全仓 8 个模块的去重键,于是每次读失败 = 所有去重键蒸发 + 把不含键的 payload 写回去焊死。**三修**:①读 prev 改 `.limit(1)` + 重试 3 次,仍失败就**整跳放弃**(不写不推);②`push_payload` 重试 3 次(推送先于写库发出,写失败=标记丢失=下一跳重推);③`notify.pushed_since()` 新增,btc_weekend 推之前查 `ntfy_log` 这张独立表(第二道去重,查失败一律放行不许哑火)。**实测**:以 prev=None 重放 09-14 09:25 那一跳 → 返回 `pushed=True` 且零推送(旧代码此处会再推一条)。files: aws/lambda_handlers.py, quote_pusher.py, backend/dashboard/notify.py, backend/dashboard/btc_weekend.py, docs/LESSONS.md
 
 - [done] 2026-09-10 · Codex · 只读梳理项目架构、前端数据流和决策模块；未运行发布、通知或交易任务。files: COORDINATION.md（仅协作记录）

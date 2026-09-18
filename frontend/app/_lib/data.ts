@@ -60,7 +60,7 @@ export interface GeoRadar {
 
 export interface CatalystItem {
   key:        string;
-  track:      "company" | "sector";
+  track:      "company" | "peers" | "sector";
   track_cn:   string;
   title:      string;
   source:     string;
