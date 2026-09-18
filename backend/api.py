@@ -1113,13 +1113,6 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["squeeze"]        = squeeze
     payload["journal"]        = journal
     payload["user_positions"] = user_positions
-    # 🔬 第二考场:只读回台账给 /mu 页面渲染。**不进决策 prompt**(纪律 3)。
-    try:
-        from dashboard.second_ticker import load_all_boards
-        payload["second_ticker"] = load_all_boards()
-    except Exception as e:
-        logger.warning(f"second_ticker board failed: {e}")
-        payload["second_ticker"] = None
     payload["strategy_replay"] = strategy_replay
     # 「今天在等什么」卡:六个一级扳机的距触发读数(纯展示,复用上面已算好的
     # champs/rel_strength/btc_weekend/market_light,零新拉取,不进决策权重)
@@ -1479,19 +1472,6 @@ async def refresh_decision():
         # 一直"没动静",没有任何线索可查。同一条教训在 fetcher.py 写过:
         # 「剔除本身是对的,但不能静默」。
         logger.warning("refresh_decision: 校准/台账块失败(已跳过) — %s", e)
-
-    # 🔬 第二考场(MU 表态测量轨,2026-07-30):独立一张表、零决策权于 QBTS。
-    # **必须独立于上面那个块** —— 它是测量轨,不该被 QBTS 的校准/台账连坐;
-    # 而且它自己会取 MU 的行情,不依赖上面的 df_d(第一版把它塞在块里就是这么
-    # 一次都没跑成的)。失败只记日志,绝不影响 QBTS 决策(second_ticker.py 纪律 3)。
-    # ⚠️ 成功路径故意用 warning 级:Lambda 的日志只捕获 WARNING 以上,`logger.info`
-    # 在 CloudWatch 里根本不存在 —— 查这个 bug 时"日志里搜不到 second_ticker"
-    # 曾经既可能是成功也可能是没执行,无法区分。留个能看见的脚印。
-    try:
-        from dashboard.second_ticker import run_daily as _second_daily
-        logger.warning("second_ticker: %s", await asyncio.to_thread(_second_daily))
-    except Exception as e:
-        logger.warning("second_ticker failed: %s", e)
 
     decision, gen_at, fresh = await asyncio.to_thread(
         get_or_generate_decision, snap, True, extras
