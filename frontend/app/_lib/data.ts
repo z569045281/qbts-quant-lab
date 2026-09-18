@@ -34,30 +34,6 @@ export interface NewsItem {
   };
 }
 
-/* ── 🌍 地缘政治/政策雷达(伊朗战局/川普政策/量子政策) ────────────────────── */
-export interface GeoItem {
-  key:       string;
-  track:     "iran" | "trump" | "quantum";
-  track_cn:  string;
-  title:     string;
-  source:    string;
-  published: string;              // 美东时间 "YYYY-MM-DDTHH:MM ET"(2026-07-10 起,曾是 UTC)
-  url:       string;
-  relevance: "high" | "medium" | "low";
-  stance:    "risk_off" | "risk_on" | "neutral";
-  note_cn:   string;
-}
-export interface GeoRadar {
-  as_of:       string;
-  /** "unknown" = Haiku 分级那一跳挂了,只有原始头条,条目上的 relevance/stance 是兜底假值 */
-  risk_level:  "alert" | "watch" | "calm" | "unknown";
-  risk_cn:     string;
-  headline_cn: string;
-  summary_cn:  string;
-  items:       GeoItem[];
-  alerted?:    string[];          // live_quote 携带的已推送 key(去重用)
-}
-
 export interface CatalystItem {
   key:        string;
   track:      "company" | "peers" | "sector";
@@ -157,7 +133,6 @@ export interface Snapshot {
     risk_window: boolean;
     risk_note:   string;
   } | null;
-  geopolitics?: GeoRadar | null;
   catalyst?:    CatalystRadar | null;
   event_day?:   EventDay | null;
   /** 数据源健康。上游给过坏 bar / 最新一根倒退时 ok=false —— 坏数据已被拦在
@@ -592,7 +567,7 @@ export interface WaitingFor {
 }
 
 /** 🏆 策略冠军(2026-08-05):08-05 全板块审计排出的大波动日前三名 + 大盘闸门。
- *  零决策权 —— 它只是把 volume_profile / intrabar_profile / geopolitics 已有的
+ *  零决策权 —— 它只是把 volume_profile / intrabar_profile 已有的
  *  表态按记分卡排序显示。成绩字段是**历史读数快照**,不是实时算的。 */
 export interface ChampionMember {
   key:        string;
@@ -927,8 +902,6 @@ export interface LiveQuote {
     date: string; weekend_ret: number; green: boolean;
     last_utc_day?: string; pushed?: boolean;
   } | null;
-  // 🌍 地缘政治雷达(云端 ~30min 刷新,比每日快照新 → 页面优先读它)
-  geo?: GeoRadar | null;
   // 📣 公司催化剂雷达(云端 ~10min 刷新,同上优先读 live 版)
   catalyst?: CatalystRadar | null;
   // ⚠️ 事件日熔断(每分钟判,盘前就能亮 —— 等 09:00 的 publish 就晚了,
@@ -1318,49 +1291,6 @@ export interface SectorRotation {
   benchmark: string;
   sectors: SectorPoint[];
   note: string;
-}
-
-/* ── 🎯 极度超卖游击战(TradingView webhook 观察模块,零决策权) ─────────── */
-export interface GuerrillaTrade {
-  ticker: string; entry: number; stop: number; target: number; rr: number;
-  shares?: number; opened_at: string;
-  exit?: number; exit_why?: "stop" | "target"; ret_pct?: number; pnl?: number;
-  closed_at?: string; status: "open" | "closed";
-}
-export interface GuerrillaState {
-  open: GuerrillaTrade[];                                   // 在场仓位(open:* 行)
-  ledger: { trades: GuerrillaTrade[]; n_trades?: number;
-            n_win?: number; realized?: number } | null;     // 已结算流水
-  cooldowns: { ticker: string; until_iso: string; until_epoch: number;
-               reason?: string }[];                          // 冷却中的标的
-}
-
-/** 游击战状态 — 直读 guerrilla_state 表(webhook 驱动,不随每日快照)。
- *  表不存在/未建 → null(页面不渲染该卡,优雅缺席)。 */
-export async function getGuerrillaState(): Promise<GuerrillaState | null> {
-  try {
-    const { data, error } = await supabase.from("guerrilla_state").select("id,data");
-    if (error || !data) return null;
-    const open: GuerrillaTrade[] = [];
-    const cooldowns: GuerrillaState["cooldowns"] = [];
-    let ledger: GuerrillaState["ledger"] = null;
-    const now = Date.now() / 1000;
-    for (const row of data) {
-      const d = row.data as Record<string, unknown>;
-      if (row.id.startsWith("open:")) open.push(d as unknown as GuerrillaTrade);
-      else if (row.id === "ledger") ledger = d as GuerrillaState["ledger"];
-      else if (row.id.startsWith("cooldown:")) {
-        const until = Number(d.cooldown_until_epoch ?? 0);
-        if (until > now)
-          cooldowns.push({ ticker: row.id.slice(9), until_epoch: until,
-                           until_iso: String(d.cooldown_until_iso ?? ""),
-                           reason: d.armed_reason as string | undefined });
-      }
-    }
-    return { open, ledger, cooldowns };
-  } catch {
-    return null;
-  }
 }
 
 /** Latest challenge state (single 'current' row; null until the bot first pushes). */

@@ -5,8 +5,7 @@
  * 数据由后端 dashboard/replay.py 在每日发布时算好,随 snapshot 下发。 */
 
 import { useEffect, useState } from "react";
-import { getSnapshot, getGuerrillaState, type StrategyReplay, type ReplayStrategy,
-         type GuerrillaState } from "../_lib/data";
+import { getSnapshot, type StrategyReplay, type ReplayStrategy } from "../_lib/data";
 import { SelfCheckCard } from "../_components/self-check";
 
 const pct = (v: number | null | undefined, digits = 0) =>
@@ -89,79 +88,8 @@ function StrategyCard({ s }: { s: ReplayStrategy }) {
   );
 }
 
-/* 🎯 极度超卖游击战 — TradingView webhook 观察卡(零决策权;guerrilla_state 直读) */
-function GuerrillaCard({ g }: { g: GuerrillaState }) {
-  const led = g.ledger;
-  const hasAny = g.open.length > 0 || (led?.trades?.length ?? 0) > 0 || g.cooldowns.length > 0;
-  return (
-    <section className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] p-5">
-      <div className="flex items-center justify-between gap-2 flex-wrap mb-1.5">
-        <span className="text-card font-bold text-ink">🎯 极度超卖游击战 · Extreme Reversion</span>
-        <span className="text-meta font-bold px-2.5 py-1 rounded-full bg-red-50 text-red-600">
-          高危观察 · 收盘自算
-        </span>
-      </div>
-      <p className="text-body text-ink-faint leading-relaxed mb-3">
-        Bear Lock 下的逆宏观顺订单流游击线程:VMC&lt;−70 + 连续两根日线 Intrabar POC 重合≤$0.05(停机坪)
-        + RR≥2.5,<b>服务端收盘后自算</b>,命中即 ntfy 推送 + $1000/枪纸面;止盈/止损即平仓并进入
-        <b>24h 强制冷却</b>。零决策权、UNPROVEN,8/15 与观察组同审。
-      </p>
-      {!hasAny && (
-        <div className="text-body text-ink-faint bg-sunken rounded-inner px-3 py-3 text-center">
-          待第一枪 —— 三条件极端合取,尚未触发过(常态是长期静默)
-        </div>
-      )}
-      {g.cooldowns.map(c => (
-        <div key={c.ticker} className="mb-2 text-body bg-indigo-50 text-indigo-700 rounded-inner px-3 py-2">
-          ❄️ {c.ticker} 冷却中(至 {c.until_iso.slice(5, 16).replace("T", " ")} UTC)
-          {c.reason ? ` · 上一枪 ${c.reason}` : ""} —— 24h 内无视一切多头信号
-        </div>
-      ))}
-      {g.open.map(p => (
-        <div key={p.ticker} className="mb-2 text-body bg-emerald-50 rounded-inner px-3 py-2 font-mono">
-          <span className="font-bold text-emerald-700">在场 {p.ticker}</span>
-          {" "}入 ${p.entry.toFixed(2)} · 止损 ${p.stop.toFixed(2)} · 目标 ${p.target.toFixed(2)} · RR {p.rr.toFixed(1)}
-        </div>
-      ))}
-      {(led?.trades?.length ?? 0) > 0 && (
-        <>
-          <div className="grid grid-cols-3 gap-1.5 text-center my-3">
-            {([
-              ["已结算", `${led!.n_trades ?? led!.trades.length}`, "text-ink-muted"],
-              ["胜率", led!.n_trades ? `${(((led!.n_win ?? 0) / led!.n_trades) * 100).toFixed(0)}%` : "—",
-               (led!.n_win ?? 0) / Math.max(led!.n_trades ?? 1, 1) >= 0.5 ? "text-emerald-600" : "text-red-500"],
-              ["累计盈亏", `${(led!.realized ?? 0) >= 0 ? "+" : ""}$${(led!.realized ?? 0).toFixed(0)}`,
-               (led!.realized ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"],
-            ] as [string, string, string][]).map(([label, val, color]) => (
-              <div key={label} className="bg-sunken rounded-inner px-1 py-2">
-                <div className="text-meta text-ink-faint">{label}</div>
-                <div className={`text-body font-bold font-mono ${color}`}>{val}</div>
-              </div>
-            ))}
-          </div>
-          <div className="space-y-1">
-            {led!.trades.slice(0, 6).map(t => (
-              <div key={t.opened_at} className="flex items-center gap-2 text-body font-mono border-t border-hairline py-1.5">
-                <span className="font-bold">{t.ticker}</span>
-                <span>{t.opened_at.slice(5, 10)} 入 ${t.entry.toFixed(2)}</span>
-                <span className={t.exit_why === "target" ? "text-emerald-600" : "text-red-500"}>
-                  {t.exit_why === "target" ? "止盈" : "止损"} ${t.exit?.toFixed(2)}
-                </span>
-                <span className={`ml-auto font-bold ${(t.pnl ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                  {(t.pnl ?? 0) >= 0 ? "+" : ""}${(t.pnl ?? 0).toFixed(0)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </section>
-  );
-}
-
 export default function StrategyRecordPage() {
   const [replay, setReplay] = useState<StrategyReplay | null>(null);
-  const [guerrilla, setGuerrilla] = useState<GuerrillaState | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -171,7 +99,6 @@ export default function StrategyRecordPage() {
         else setErr("战绩数据还没生成 — 跑一次「生成今日决策」(publish)后就有了。");
       })
       .catch(e => setErr(e instanceof Error ? e.message : "加载失败"));
-    getGuerrillaState().then(setGuerrilla).catch(() => {});
   }, []);
 
   return (
@@ -210,9 +137,6 @@ export default function StrategyRecordPage() {
           {replay.strategies.filter(s => s.tier === "watch").map(s => <StrategyCard key={s.key} s={s} />)}
         </>
       )}
-
-      {/* 🎯 极度超卖游击战:TradingView webhook 高危观察模块(表未建/未开火不渲染空卡) */}
-      {guerrilla && <GuerrillaCard g={guerrilla} />}
 
       <div className="text-center text-meta text-ink-faint">
         规则与回测口径见 mining.md · 仅供研究参考,非投资建议

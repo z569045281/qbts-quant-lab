@@ -1,4 +1,9 @@
-"""🏆 策略冠军 —— 记分卡前三名 + 大盘闸门,同向就推 ntfy。
+"""🏆 策略冠军 —— 记分卡前几名 + 大盘闸门,同向就推 ntfy。
+
+⚠️ 2026-09-18 瘦身:地缘雷达整个模块已删(推送占 56%、第三十一轮定性后视镜),
+这里只剩两名。它在册时**从没投过一次看多**(偏多 0),所以删掉它对看多共识只有
+一个影响:以前「两名看多 + 地缘看空」被判无共识,现在两名一致看多就算共识。
+下面保留的历史叙述里提到"三名/地缘"的,是当时的记录。
 
 出身(2026-08-05,用户点单):当天的全板块回测审计(docs/AUDIT-AND-EDGE.md)
 把 15 个板块在 36 个交易日 / 16 个大波动日上排了一次序:
@@ -78,8 +83,6 @@ CHAMPIONS: list[tuple[str, str, dict]] = [
      {"big_n": 8, "big_hit": 87.5, "all_n": 16, "all_hit": 81.2}),
     ("intrabar", "日内画像 Intrabar",
      {"big_n": 7, "big_hit": 85.7, "all_n": 10, "all_hit": 80.0}),
-    ("geopolitics", "地缘政治雷达",
-     {"big_n": 8, "big_hit": 75.0, "all_n": 17, "all_hit": 70.6}),
 ]
 
 # 大波动日「无脑喊跌」的命中率 —— 任何板块低于它就不如一句看空。
@@ -115,7 +118,7 @@ def _market_gate(snapshot: dict) -> dict:
 
 
 def build(snapshot: dict, extras: dict | None = None) -> dict:
-    """三名投票 + 大盘闸门 → 一张卡的 payload。纯函数,无 I/O。"""
+    """冠军投票 + 大盘闸门 → 一张卡的 payload。纯函数,无 I/O。"""
     readings = collect_readings(snapshot or {}, extras or {})
 
     members, votes = [], []
@@ -146,7 +149,7 @@ def build(snapshot: dict, extras: dict | None = None) -> dict:
 
     # ── 状态机(纪律③④)────────────────────────────────────────────
     if direction is None:
-        state, state_cn = "IDLE", ("冠军没凑齐共识" if n_voice else "三名今天都没表态")
+        state, state_cn = "IDLE", ("冠军没凑齐共识" if n_voice else "冠军今天都没表态")
         action = "wait"
     elif direction == "down":
         # 纪律④:方向照常显示、照常记账,但不推送、不给动作

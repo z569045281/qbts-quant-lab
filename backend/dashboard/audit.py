@@ -17,7 +17,6 @@ CLAUDE.md 的常设提醒:edge.py 的所有权重都是硬编码先验,等各源
 该数由设计常数推出,任何人重算同值,无看结果调参空间:
   · 方向表态类(edge逐源/daily_call/三影子/HOLD判读):无止损/目标,p*=0.5 不变
   · 自选扫描 v2(scan.py 1.5R 门):p*=0.40;v1 老仓无 RR 门,p*=0.5
-  · 游击战(guerrilla.py _RR_MIN=2.5):p*=1/3.5≈0.286
   · AI 方向单:按各单记录的 stop/target 现算平均计划 RR → p*=1/(1+RR̄)
 统计机器不变(仍 Wilson 二项,小样本功效最高);期望R(胜率×平均盈R/平均
 亏R)**只做展示列,不做判决依据**(肥尾下均值 CI 需 n≈60-170,8/15 前判不
@@ -840,32 +839,6 @@ def run_audit() -> dict:
     except Exception as e:
         report["sections"]["scan_paper"] = {"error": str(e)[:120]}
 
-    # ── ⑤ 游击战账本(2026-07-24 接入 — 此前根本不在审判范围)────────────
-    #     开仓门 _RR_MIN=2.5 → 保本线 p*=1/3.5≈0.286。表缺/无记录 → 静默跳过。
-    try:
-        from dashboard.guerrilla import _sb, _get, _RR_MIN
-        sb = _sb()
-        led = (_get(sb, "ledger") or {}) if sb else {}
-        trades = led.get("trades") or []
-        if trades:
-            wins = sum(1 for t in trades if (t.get("pnl") or 0) > 0)
-            rs = []
-            for t in trades:
-                try:
-                    entry, stop = float(t["entry"]), float(t["stop"])
-                    risk = (entry - stop) / entry
-                    if risk > 0 and t.get("ret_pct") is not None:
-                        rs.append(float(t["ret_pct"]) / risk)
-                except (KeyError, TypeError, ValueError, ZeroDivisionError):
-                    continue
-            report["sections"]["guerrilla"] = {
-                **_verdict(wins, len(trades), breakeven=1 / (1 + _RR_MIN)),
-                "expectancy": _expectancy_r(rs),
-                "realized_usd": led.get("realized"),
-            }
-    except Exception as e:
-        report["sections"]["guerrilla"] = {"error": str(e)[:120]}
-
     _OUT.parent.mkdir(parents=True, exist_ok=True)
     _OUT.write_text(json.dumps(report, ensure_ascii=False, indent=2))
     return report
@@ -1061,11 +1034,6 @@ def format_report(report: dict) -> str:
             L.append(f"   {ep:<4s} n={d['n']:<3d} 胜率{d['hit_rate']*100:3.0f}% "
                      f"CI[{d['ci95'][0]*100:.0f},{d['ci95'][1]*100:.0f}] {d['verdict']}"
                      f"{_fmt_be(d)} 已实现 ${d.get('realized_usd')}")
-    gu = report["sections"].get("guerrilla", {})
-    if "n" in gu:
-        L.append(f"\n⑤ 游击战纸面 — n={gu['n']} 胜率{gu['hit_rate']*100:.0f}% "
-                 f"CI[{gu['ci95'][0]*100:.0f},{gu['ci95'][1]*100:.0f}] {gu['verdict']}"
-                 f"{_fmt_be(gu)} 已实现 ${gu.get('realized_usd')}")
     L.append("\n结论应用:仅『✅ 转正』与『❌ 剔除』触发 edge.py 权重改动(人工 review);"
              "其余一律继续测量。")
     return "\n".join(L)

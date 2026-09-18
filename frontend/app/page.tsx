@@ -300,13 +300,6 @@ export default function Dashboard() {
     .filter(n => n.ai?.impact !== "low")
     .slice(0, 5);
 
-  // 🌍 地缘政治雷达:云端 ~30min 刷新的 live 版优先于每日快照
-  const geo = live?.geo ?? snap.geopolitics ?? null;
-  const geoLive = !!live?.geo;
-  const geoItems = (geo?.items ?? [])
-    .filter(g => g.relevance !== "low")
-    .slice(0, 7);
-
   // 📣 公司催化剂雷达:云端 ~10min 刷新的 live 版优先于每日快照
   const cat = live?.catalyst ?? snap.catalyst ?? null;
   const catLive = !!live?.catalyst;
@@ -705,7 +698,7 @@ export default function Dashboard() {
         tab={tab}
         onChange={changeTab}
         dots={{
-          events: (geo?.risk_level === "alert") || catItems.some(c => c.impact === "high"),
+          events: catItems.some(c => c.impact === "high"),
           system: !!(snap.data_health && !snap.data_health.ok),
         }}
         rail={
@@ -1731,78 +1724,6 @@ export default function Dashboard() {
                 )}
               </div>
             ))}
-          </div>
-        </section>
-      )}
-
-      {/* ══ 4.95 🌍 地缘政治雷达 — 伊朗战局/川普政策/量子政策(07-07 暴跌的驱动)═══ */}
-      {geo && (
-        <section className={`rounded-card p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)] border ${
-          geo.risk_level === "alert" ? "bg-red-50/70 border-red-200"
-            : geo.risk_level === "watch" ? "bg-amber-50/50 border-amber-200"
-            : "bg-surface border-transparent"}`}>
-          <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <span className="text-section font-semibold text-gray-900">
-              🌍 地缘政治雷达 · 伊朗战局 / 川普政策 / 量子政策
-            </span>
-            <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${
-              geo.risk_level === "alert" ? "bg-red-600 text-on-solid"
-                : geo.risk_level === "watch" ? "bg-amber-400 text-amber-950"
-                // unknown = 分级挂了 → 画灰,绝不能落到绿色(那是「平静」的意思)
-                : geo.risk_level === "unknown" ? "bg-gray-200 text-gray-600"
-                : "bg-emerald-100 text-emerald-700"}`}>
-              {geo.risk_cn}
-            </span>
-            {geoLive && (
-              <span className="text-meta px-1.5 py-0.5 rounded-inner bg-sky-100 text-sky-700 font-semibold animate-pulse">
-                盘中实时
-              </span>
-            )}
-            <span className="ml-auto text-meta text-ink-faint font-mono">
-              {fmtLocalDateTime(geo.as_of) ?? ""}
-            </span>
-          </div>
-
-          <div className="text-card font-bold text-gray-900 mb-1.5">{geo.headline_cn}</div>
-          {geo.summary_cn && (
-            <p className="text-card leading-relaxed text-gray-700 mb-3">{geo.summary_cn}</p>
-          )}
-
-          {geoItems.length > 0 && (
-            <div className="space-y-2 border-t border-black/5 pt-3">
-              {geoItems.map(g => (
-                <a key={g.key} href={g.url || "#"} target="_blank" rel="noopener noreferrer"
-                   className="block group">
-                  <div className="flex items-start gap-2">
-                    <span className={`shrink-0 mt-1 w-1.5 h-1.5 rounded-full ${
-                      g.stance === "risk_off" ? "bg-down"
-                        : g.stance === "risk_on" ? "bg-emerald-500" : "bg-gray-300"}`} />
-                    <div className="min-w-0">
-                      <div className="text-card text-gray-900 group-hover:text-brand transition-colors leading-snug">
-                        <span className={`mr-1.5 text-meta px-1.5 py-0.5 rounded-inner font-semibold align-[1px] ${
-                          g.track === "iran" ? "bg-red-100 text-red-700"
-                            : g.track === "trump" ? "bg-indigo-100 text-indigo-700"
-                            : "bg-violet-100 text-violet-700"}`}>
-                          {g.track_cn}
-                        </span>
-                        {g.title}
-                        {g.relevance === "high" && (
-                          <span className="ml-1.5 text-meta px-1 py-0.5 rounded-inner bg-red-600 text-on-solid font-bold">高影响</span>
-                        )}
-                      </div>
-                      <div className="text-meta text-ink-muted mt-0.5">
-                        {g.note_cn} <span className="text-ink-faint">· {g.source} · {g.published?.slice(5, 16)} UTC</span>
-                      </div>
-                    </div>
-                  </div>
-                </a>
-              ))}
-            </div>
-          )}
-
-          <div className="mt-3 text-meta text-ink-faint">
-            Google News 每~30分钟盘中自动扫描(伊朗谈判/停火/空袭 · 川普关税/行政令 · 量子国防/出口管制)
-            · 出现新高影响条目或风险级别翻转 → ntfy 手机推送 · AI 分级仅供参考
           </div>
         </section>
       )}

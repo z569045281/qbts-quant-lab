@@ -961,14 +961,6 @@ async def dashboard_snapshot(force_refresh: bool = False):
     except Exception:
         macro_cal = None
     try:
-        # 🌍 地缘政治/政策雷达(伊朗战局/川普政策/量子政策 — 07-07 暴跌这类
-        # 事件驱动是机械信号的盲区,这里补上)
-        from dashboard.geopolitics import get_geo_snapshot
-        geo_sig = await asyncio.to_thread(get_geo_snapshot, force_refresh)
-    except Exception as e:
-        geo_sig = None
-        logger.warning(f"geopolitics failed: {e}")
-    try:
         # 📣 公司催化剂雷达(D-Wave 自身消息 + 板块同行)。07-27 的 +20.4% 是
         # AT&T 签约驱动的,而机械信号对公司事件全盲 —— 这里补上。零 edge 权重:
         # news.py 已占 _NEWS_WEIGHT=0.15,同一个消息面不计两次。
@@ -1105,7 +1097,6 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["sentiment"]      = sentiment_sig
     payload["holdings"]       = holdings_sig
     payload["macro"]          = macro_cal
-    payload["geopolitics"]    = geo_sig
     payload["catalyst"]       = catalyst_sig
     payload["market_light"]   = market_light
     payload["smc"]            = smc

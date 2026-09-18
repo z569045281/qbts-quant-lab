@@ -176,7 +176,7 @@ D2. **载具优先于信号**（第四十二轮实测,2026-08-24 新增）：
              与 action 完全解耦——HOLD 照样要押。这是测量场不是钱：错了没有任何代价，
              真实资金的谨慎由 action/conviction 把关；这里拒绝表态才是唯一的错误答案。
              历史教训：过去21天 p_up 有 95% 挤在 [0.45,0.55] 骑墙区，导致整月方向能力
-             不可测量。用你读到的全部证据（一级信号/宏观/地缘/SMC）咬牙选一边>,
+             不可测量。用你读到的全部证据（一级信号/宏观/SMC）咬牙选一边>,
   "summary": "<2-3 句话：今天的核心判断和为什么>",
   "trade_plan": {
     "qbts_entry": <入场触发价>, "qbts_stop": <止损价>, "qbts_target": <目标价>,
@@ -423,37 +423,6 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
                 f"({n.get('published','')[:10]}) {n.get('title','')[:70]}"
                 for n in news_items]
         parts.append("## 近期新闻（已 AI 初筛，只列标题+情绪/影响档）\n" + "\n".join(rows))
-
-    # ── 🌍 地缘政治/政策雷达（伊朗战局/川普政策/量子政策）────────
-    # risk_level == "unknown" = Haiku 分级那一跳挂了,条目的 relevance/stance 全是
-    # 兜底填的假值 —— 整块跳过,宁可模型看不到地缘,也别喂它一份编的分级。
-    geo = snapshot.get("geopolitics")
-    if geo and geo.get("risk_level") and geo["risk_level"] != "unknown":
-        # 瘦身:6 条带 note → 3 条只留标题(note_cn 是 LLM 写给人看的复述,
-        # 对模型是冗余)。整块 982 字 → 约 300 字。
-        rows = [f"  [{it.get('track_cn','?')}/{it.get('stance','?')}] {it.get('title','')[:70]}"
-                for it in (geo.get("items") or [])
-                if it.get("relevance") == "high"][:3]
-        # 交叉验证:新闻情绪(雷达)与市场定价(VIX/大盘)矛盾时明说,
-        # 免得模型各信各的(AI 自检 07-12 报过两模块直接打架)
-        ml_ = snapshot.get("market_light") or {}
-        cross = ""
-        if geo.get("risk_level") == "alert" and ml_.get("regime") == "risk_on":
-            cross = (f"\n  ⚠️ 交叉验证:雷达 alert 但盘面并未定价该风险(VIX {ml_.get('vix')}、"
-                     "大盘 risk-on)——两种解释:市场自满(风险真实,波动将至)或新闻滞后于"
-                     "实际缓和。处理:以盘面为主、雷达降为『提高警觉』,不机械降信心;"
-                     "但失效条件仍须写明「若 VIX 抬头/避险资产异动则按 alert 全额处理」。")
-        elif geo.get("risk_level") == "calm" and ml_.get("regime") == "risk_off":
-            cross = (f"\n  ⚠️ 交叉验证:雷达 calm 但盘面 risk-off(VIX {ml_.get('vix')})——"
-                     "市场在担心雷达三条战线之外的东西(宏观/流动性),勿因地缘平静而放松。")
-        parts.append(
-            f"## 🌍 地缘政治/政策雷达 {geo.get('risk_cn','?')} — {geo.get('headline_cn','')}\n"
-            + ("\n".join(rows) + "\n" if rows else "")
-            + "  （alert 级下技术买点让位:降信心/缩仓,「局势再升级」写进失效条件。"
-              "⚠️ 第三十一轮实测它是后视镜:标🔴的日子前一天平均 −2.26%、标🟡的前一天 +7.58%，"
-              "当情境材料可以，当择时信号不行。）"
-            + cross
-        )
 
     # ── 📣 公司催化剂雷达（D-Wave 自身消息 + 板块同行）────────────
     # 07-27 教训:AT&T 签约驱动的 +20.4% 单日暴涨,机械信号全盲。这一段专门回答

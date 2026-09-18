@@ -57,7 +57,7 @@ def quote_handler(event, context):
     # Previous live data (SMC rising-edge dedup + btc_weekend push dedup + carry-forward).
     #
     # ⚠️ 2026-09-14 事故:Supabase 抖了一整天(502/504/401/500),这一行读失败时旧代码
-    # 静默地把 prev_data 当成 `{}` —— 于是**所有**住在这个 blob 里的去重键(smc / geo /
+    # 静默地把 prev_data 当成 `{}` —— 于是**所有**住在这个 blob 里的去重键(smc /
     # catalyst / event_day / earnings_alert / dec_trigger / btc_weekend / tiaojiu)一起
     # 蒸发,各模块当成"第一次"重推一遍,然后把没有这些键的 payload 整块写回去,把状态
     # 彻底焊死成丢失。周末BTC 信号那天因此推了 18 条(该推 1 条)。
@@ -101,18 +101,6 @@ def quote_handler(event, context):
             payload["tiaojiu"] = tj
     except Exception as e:
         print(f"! tiaojiu skipped: {type(e).__name__}: {e}")
-
-    # 🌍 地缘政治雷达(伊朗/川普/量子政策):minute%30==8 刷新(RSS 免费,Haiku
-    # 只在头条变了才跑),新高影响条目/风险级别翻转 → ntfy;off-tick carry-forward。
-    try:
-        from dashboard.geopolitics import maybe_geo_refresh
-        geo = maybe_geo_refresh(prev_data.get("geo"), now_et)
-        if geo:
-            payload["geo"] = geo
-    except Exception as e:
-        print(f"! geo radar skipped: {type(e).__name__}: {e}")
-        if prev_data.get("geo"):
-            payload["geo"] = prev_data["geo"]
 
     # 📣 公司催化剂雷达(D-Wave 自身消息 + 板块同行):minute%10==3 刷新。
     # 07-27 那波 +20.4% 是 AT&T 签约驱动的,机械信号全盲、news.py 一天只跑一次,
@@ -186,19 +174,6 @@ def quote_handler(event, context):
     except Exception as e:
         print(f"! challenge2 skipped: {type(e).__name__}: {e}")
 
-    # 🎯 游击战(服务端自算,无 webhook):收盘后 16:05–20:00 ET 每日算一次信号,
-    # 命中 → ntfy + 开纸面仓;分钟 tick(minute%5==4)盯 stop/target 出场。两者都
-    # 只在窗口/有仓位时才拉数据,平时秒退。
-    try:
-        from dashboard.guerrilla import check_exits, maybe_guerrilla_signal
-        gsig = maybe_guerrilla_signal(now_et)
-        if gsig:
-            print(f"guerrilla signal: {gsig}")
-        ger = check_exits(now_et)
-        if ger:
-            print(f"guerrilla exits: {ger}")
-    except Exception as e:
-        print(f"! guerrilla skipped: {type(e).__name__}: {e}")
     # 🌙 夜盘采样(2026-08-05):20:00–04:00 ET 没有任何 15m bar 源(yfinance /
     # Alpaca iex 都停在 15:45;Alpaca 的 overnight feed 只有 latest,没有历史)——
     # 所以把我们每分钟本来就在拉的 NBBO 中间价存下来,自己聚合成 15m。

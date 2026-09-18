@@ -3,7 +3,7 @@
 出身(2026-07-31,用户点单"那三分之二要开始记分"):噪音审计数出来的账 ——
 决策 prompt 每天一万字、26 个板块喂给 LLM,其中只有 8 个源在 `audit.py` §1 有
 命中率记分卡(edge 元模型的那 8 个)。剩下的 SMC 结构 / playbook / NW 包络 /
-成交量画像 / 日内画像 / 空头动向 / 地缘雷达 / SEC 三件套 —— **天天在影响判断,
+成交量画像 / 日内画像 / 空头动向 / SEC 三件套 —— **天天在影响判断,
 从来没人问过它们对不对**。
 
 这个模块只做一件事:**每天把每个板块的表态原样存进决策台账**,之后用与
@@ -104,19 +104,6 @@ def _squeeze(s, _e):
     return _sig(v.get("signal")), f"空量比 z={v.get('short_z')} · {v.get('stance_cn') or ''}"
 
 
-def _geopolitics(s, _e):
-    v = s.get("geopolitics") or {}
-    lvl = v.get("risk_level")
-    if not lvl:
-        return None, "(缺)"
-    # 升温=看空 / 缓和=看多 / 其余中性。这是雷达自己的口径,不是我新造的判据。
-    # ⚠️ 与 mining.md 第三十一轮为 8/15 预注册的五条线是**同一个被告**:
-    # 那边测的是"升温后是不是真的跌",这里是同一问题的日频台账版。
-    # 两边结论必须一致;若打架,以第三十一轮预注册的线为准。
-    st = {"alert": "down", "calm": "up"}.get(lvl, "neutral")
-    return st, f"{v.get('risk_cn') or lvl}"
-
-
 def _catalyst(s, _e):
     v = s.get("catalyst") or {}
     lvl = v.get("impact_level")
@@ -188,7 +175,6 @@ _RULES: list[tuple[str, str, Callable]] = [
     ("volume_profile", "成交量画像/POC",    _volume_profile),
     ("intrabar",       "日内画像 Intrabar", _intrabar),
     ("squeeze",        "空头动向(FINRA)",   _squeeze),
-    ("geopolitics",    "地缘政治雷达",      _geopolitics),
     ("catalyst",       "公司催化剂雷达",    _catalyst),
     ("regime",         "波动率 Regime",     _regime),
     ("event_day",      "事件日熔断",        _event_day),
