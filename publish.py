@@ -6,7 +6,7 @@ Run this after you've mined / refreshed locally:
 
     .venv/bin/python publish.py
 
-It recomputes the dashboard snapshot, the AI decision, the calibration table,
+It recomputes the dashboard snapshot, the AI decision,
 and every factor's chart — then writes them to Supabase. The deployed Next.js
 site reads straight from Supabase (no backend). See sql/supabase_schema.sql.
 
@@ -62,7 +62,6 @@ def main() -> None:
     # api.py inserts backend/ onto sys.path and re-exports these in its namespace.
     from backend.api import (  # noqa: E402
         dashboard_snapshot,
-        dashboard_calibration,
         refresh_decision,
         get_leaderboard,
         get_factor_chart,
@@ -125,14 +124,6 @@ def main() -> None:
         except Exception:
             pass
 
-        # 3. Calibration -----------------------------------------------------
-        try:
-            print("→ computing calibration…")
-            cal = loop.run_until_complete(dashboard_calibration())
-        except Exception as e:
-            print(f"  ! calibration skipped: {e}")
-            cal = None
-
 
         # 🏆 策略冠军推送(2026-08-05):上升沿才响,状态从上一份 dashboard_state 读回。
         # 放在 snapshot 之后、写库之前 —— 此时"最后一行"还是上一次,正好当去重基准。
@@ -146,7 +137,7 @@ def main() -> None:
         # 4. Write the dashboard_state row -----------------------------------
         print("→ writing dashboard_state…")
         ins = sb.table("dashboard_state").insert(
-            {"snapshot": clean(snap), "calibration": clean(cal)}
+            {"snapshot": clean(snap)}
         ).execute()
         state_row_id = (ins.data or [{}])[0].get("id")
 

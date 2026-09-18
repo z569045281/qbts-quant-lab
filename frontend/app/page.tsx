@@ -104,7 +104,6 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   // 👀 隐藏点击审计:版本号 1.5s 内连点 3 次打开
   const [auditOpen, setAuditOpen] = useState(false);
-  const [modelView, setModelView] = useState<"fable" | "ds">("fable");  // 决策卡 Claude/DeepSeek 切换
   const [tab, setTab] = useState<TabKey>("today");                      // 二级导航;首屏永远是驾驶舱
   const versionClicks = useRef<number[]>([]);
 
@@ -195,10 +194,7 @@ export default function Dashboard() {
   }
   if (!snap) return null;
 
-  // DeepSeek 影子决策(同一份数据、同一套规则、零决策权)—— 切换只换展示,
-  // 台账/推送/持仓建议的"官方口径"永远是 Fable 主决策
-  const dsd = snap.decision?.shadow_ds ?? null;
-  const d = modelView === "ds" && dsd ? dsd : (snap.decision ?? null);
+  const d = snap.decision ?? null;
   const meta = d ? getActionMeta(d.action, d.conviction) : null;
   const genAt = fmtLocalDateTime(snap.decision_generated_at);   // UTC → 浏览器本地时区
 
@@ -734,19 +730,6 @@ export default function Dashboard() {
         <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 py-3">
           <div className="flex items-center gap-2 mb-1.5">
             <span className="text-card font-semibold text-gray-800">🧭 一句话结论</span>
-            {dsd && (
-              <span className="ml-auto flex items-center gap-1">
-                {(["fable", "ds"] as const).map(m => (
-                  <button key={m} onClick={() => setModelView(m)}
-                    className={`text-meta px-2 py-0.5 rounded-full border font-medium transition-colors ${
-                      modelView === m
-                        ? "bg-brand text-on-solid border-brand"
-                        : "bg-surface text-ink-muted border-hairline hover:border-gray-300"}`}>
-                    {m === "fable" ? "主决策" : "影子"}
-                  </button>
-                ))}
-              </span>
-            )}
           </div>
           {/* 总结常有十来行 —— 夹到 4 行,想看全文再点。首屏的预算很紧。 */}
           {d ? (
@@ -762,11 +745,6 @@ export default function Dashboard() {
             </details>
           ) : (
             <p className="text-card leading-relaxed text-ink-faint">还没有 AI 决策。</p>
-          )}
-          {modelView === "ds" && (
-            <div className="mt-1.5 text-meta text-amber-600">
-              影子对照:不驱动交易/推送/台账;方向表态另记分,8/15 与 Fable 同框宣判
-            </div>
           )}
         </div>
 
@@ -964,75 +942,6 @@ export default function Dashboard() {
                 </div>
               </details>
 
-              {/* 🥊 另一位考生的独立判断 — 同卷对照,常驻显示(不用切换) */}
-              {dsd && snap.decision && (() => {
-                const other = modelView === "ds" ? snap.decision : dsd;
-                const isDs = modelView !== "ds";   // 对照区显示的是不是 DeepSeek
-                const tp = other.trade_plan;
-                const agree = other.action === d.action;
-                return (
-                  <div className={`mt-3 rounded-inner border px-3 py-2.5 ${
-                    isDs ? "bg-violet-50/60 border-violet-200" : "bg-blue-50/60 border-blue-200"}`}>
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="text-meta font-bold text-gray-700">
-                        {isDs ? "🤖 DeepSeek 影子判断" : "🧠 Fable 5 主决策"}(同卷对照)
-                      </span>
-                      <span className={`text-meta px-1.5 py-0.5 rounded-full font-semibold ${
-                        agree ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                        {agree ? "两模型同向 ✓" : "两模型分歧 ⚠️"}
-                      </span>
-                    </div>
-                    <div className="mt-1.5 text-body text-gray-700">
-                      {other.action === "LONG_QBTX" ? "📈 做多 — 买 QBTX"
-                       : other.action === "SHORT_QBTZ" ? "📉 做空 — 买 QBTZ" : "⏸️ 观望"}
-                      <span className="text-ink-faint"> · </span>信心 {other.conviction}/10
-                      <span className="text-ink-faint"> · </span>
-                      押{other.bold_call_5d === "up" ? "涨 ▲" : "跌 ▼"}(P(up) {(other.p_up_5d * 100).toFixed(0)}%)
-                    </div>
-                    {other.action !== "HOLD" && other.plan_valid !== false && tp?.etf_ticker && (
-                      <div className="mt-1 text-meta font-mono text-gray-600">
-                        {tp.etf_ticker} {fmtPx(tp.etf_entry)} / <span className="text-down">{fmtPx(tp.etf_stop)}</span> / <span className="text-emerald-600">{fmtPx(tp.etf_target)}</span>
-                        <span className="text-ink-faint"> · </span>1:{tp.rr_ratio?.toFixed(1) ?? "—"}
-                        <span className="text-ink-faint"> · </span>{tp.suggested_position_pct}% 投机仓
-                      </div>
-                    )}
-                    {tp?.entry_condition && (
-                      <div className="mt-1 text-meta text-ink-faint leading-snug">
-                        入场条件:{tp.entry_condition.slice(0, 90)}
-                      </div>
-                    )}
-                    {isDs && (
-                      <div className="mt-1 text-meta text-amber-600">
-                        影子判断 · 不驱动交易/推送/台账;方向表态每日记分,8/15 与主决策同框宣判
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* 🔬 v1 反向影子(2026-07-21,纯机械$0测量,零决策权,不可切换查看) */}
-              {snap.decision?.shadow_v1_inverse && (() => {
-                const v1i = snap.decision!.shadow_v1_inverse!;
-                return (
-                  <div className="mt-3 rounded-inner border px-3 py-2 bg-gray-50/60 border-gray-200">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <span className="text-meta font-bold text-gray-600">🔬 v1 反向影子(测量用)</span>
-                      <span className="text-meta px-1.5 py-0.5 rounded-full font-semibold bg-gray-100 text-ink-faint">
-                        零决策权
-                      </span>
-                    </div>
-                    <div className="mt-1 text-body text-gray-600">
-                      原始 v1 表态{v1i.v1_call === "up" ? "看涨" : "看跌"}(P(up) {(v1i.v1_p_up * 100).toFixed(0)}%)
-                      <span className="text-ink-faint"> → </span>
-                      本影子反着押{v1i.bold_call_5d === "up" ? "涨 ▲" : "跌 ▼"}
-                    </div>
-                    <div className="mt-1 text-meta text-ink-faint leading-snug">
-                      v1(2026-07-17 前上线版)22 条已判 21% 命中 · 劣于随机;反向是否有真 edge 未证实,
-                      8/15 与 Fable/DeepSeek 同框宣判
-                    </div>
-                  </div>
-                );
-              })()}
             </div>
 
             {/* 关键驱动 + 风险 */}

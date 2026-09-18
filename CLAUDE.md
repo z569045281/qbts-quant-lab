@@ -14,7 +14,7 @@ when a literal phrase is available, use it
 | 如果任务涉及… | 必须先读 |
 |---|---|
 | **任何任务(第一步)** | [COORDINATION.md](COORDINATION.md) — 看别的会话在改什么,并登记自己 |
-| 第一次进这个仓库 / 数据怎么流 / 本地怎么跑 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| 第一次进这个仓库 / 数据怎么流 / 本地怎么跑 / **已删模块清单** | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
 | 提交 / push / 发版 / 前端可见改动 | [docs/DEPLOY.md](docs/DEPLOY.md) |
 | 新增或改动 API key、"云端没生效" | [docs/SECRETS.md](docs/SECRETS.md) |
 | `aws/**`、Lambda、定时调度、盘中分钟槽位 | [docs/AWS-LAMBDA.md](docs/AWS-LAMBDA.md) |
@@ -22,10 +22,10 @@ when a literal phrase is available, use it
 | Supabase 表、迁移、写库、"页面空白" | [docs/SUPABASE.md](docs/SUPABASE.md) |
 | 决策提示词、`decision.py`、模型选择、影子决策 | [docs/DECISION.md](docs/DECISION.md) |
 | SMC、playbook、15m 扳机、TRIGGER 推送 | [docs/SMC-PLAYBOOK.md](docs/SMC-PLAYBOOK.md) |
-| 任何信号模块(NW/地缘/SEC/情绪/游击战/等什么卡/宏观) | [docs/SIGNALS.md](docs/SIGNALS.md) |
-| edge 权重、校准、台账评分、8/15 审判、`audit.py` | [docs/AUDIT-AND-EDGE.md](docs/AUDIT-AND-EDGE.md) |
+| 任何信号模块(NW/SEC/情绪/等什么卡/宏观) | [docs/SIGNALS.md](docs/SIGNALS.md) |
+| 台账评分、8/15 审判、`audit.py`(edge 元模型已于 09-18 删除) | [docs/AUDIT-AND-EDGE.md](docs/AUDIT-AND-EDGE.md) |
 | 「系统到底有没有用」/ 月度复盘 / 为什么天天观望 | [docs/REVIEW-2026-07.md](docs/REVIEW-2026-07.md) — 首次全面体检 |
-| `/watch` 扫描、`/dca` 定投、`/factors` 战绩、`/mu` 第二考场、产品判断 | [docs/SURFACES.md](docs/SURFACES.md) |
+| `/watch` 扫描、`/dca` 定投、`/factors` 战绩、产品判断 | [docs/SURFACES.md](docs/SURFACES.md) |
 | 千元挑战 bot / `/challenge` | [docs/CHALLENGE.md](docs/CHALLENGE.md) |
 | SpaceX `/spacex` | [docs/SPACEX.md](docs/SPACEX.md) |
 | **改任何前端代码** | [frontend/AGENTS.md](frontend/AGENTS.md) — Next 16 有破坏性改动 |

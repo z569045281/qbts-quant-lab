@@ -55,3 +55,20 @@ yfinance/EDGAR/FRED/RSS/Alpaca → backend snapshot → decision.py(LLM) → pub
 Running cost ≈ **$20/mo**, almost all of it the one daily decision call at **09:00 ET**
 (≈ 23:00 Melbourne in AU winter / 01:00 in AU summer)。DeepSeek 影子 ~$0.02/天;
 盘中重算全是本地 pandas(~$0);Haiku 新闻/反思/地缘按需。
+
+## ✂️ 已删除模块(2026-09-18 系统瘦身,用户拍板)
+
+依据是同日的决策台账全量回测(78 条 → 56 份独立决策)与推送台账。代码已从 `main` 删除,
+**git 历史可找回;Supabase 里的历史表/行一律未动**。别在没有新证据时把它们加回来。
+
+| 删掉的 | 为什么 | 连带删掉 |
+|---|---|---|
+| 地缘雷达 `geopolitics.py` | 推送 239 条里占 135 条(56%);第三十一轮定性后视镜,记分卡命中 0%;每 30 分钟调一次 Haiku | 决策 prompt 段、readings 行、champions 成员、lambda `%30==8` 槽位、主页卡片 |
+| 机械元模型 `edge.py` + `calibration.py` | `p_up` 两代实测负相关(07-30 −0.41;09-18 v2 n=38 −0.21,喊 BUY 后 5 日 −4.6%、喊 SELL 后 +1.9%) | api 快照 `edge`、`predictions` 记账、学习权重、audit ①、月度复盘里的校准段、未被引用的 calibration-card |
+| v1 反向影子 | 依赖 edge.py 的 v1;n 小且 5 日窗重叠,不能据此反着用 | journal `v1inv_*` 新字段、决策卡灰卡 |
+| DeepSeek 影子决策 | 表态命中 44% vs 同比例瞎猜 58%;每天多一次付费调用 | journal `ds_*` 新字段、决策卡切换钮与对照卡(SpaceX 页的 DeepSeek 主模型**保留**) |
+| 游击战 `guerrilla.py` | 上线以来 0 单触发,却每天收盘后拉数据计算 | lambda 槽位、audit ⑤、/factors 观察卡 |
+| /mu 第二考场 `second_ticker.py` | 四个视界技巧值全负(5 日 50% vs 基线 64%),每天多一次 LLM | /mu 页面、导航、快照字段 |
+
+经典策略摘除名单(`_REDUNDANT` / `_DEAD_SOURCE` / `_EVENT_DAY_MUTED`)原住 edge.py,已搬进 `decision.py` 顶部,
+决策 prompt 照旧用它过滤。

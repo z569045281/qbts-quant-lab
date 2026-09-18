@@ -1,5 +1,7 @@
 # 页面与产品约定(不可随手回退)
 
+> ✂️ **2026-09-18 系统瘦身**:下文涉及的部分模块已删除,清单与理由见 [ARCHITECTURE.md §已删除模块](ARCHITECTURE.md)。下文保留为历史记录。
+
 > 读这份文件的时机:改 `/watch` 自选扫描、`/dca` 定投、`/factors` 战绩页,或任何
 > "要不要加个功能"的产品判断。改前端代码前另读 [../frontend/AGENTS.md](../frontend/AGENTS.md)。
 

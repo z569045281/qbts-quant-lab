@@ -1,5 +1,7 @@
 # 信号模块目录
 
+> ✂️ **2026-09-18 系统瘦身**:下文涉及的部分模块已删除,清单与理由见 [ARCHITECTURE.md §已删除模块](ARCHITECTURE.md)。下文保留为历史记录。
+
 > 读这份文件的时机:改任何一个信号模块、加新数据源、"这个卡片的数字哪来的"。
 > SMC playbook 单独一份:[SMC-PLAYBOOK.md](SMC-PLAYBOOK.md)。策略回测档案:[../mining.md](../mining.md)。
 

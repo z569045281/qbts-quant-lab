@@ -3,8 +3,7 @@
 One container image, two handlers (template.yaml picks each via
 ImageConfig.Command):
 
-  publish_handler — recompute the dashboard snapshot + Opus 4.8 decision +
-                    calibration and write ONE dashboard_state row to Supabase.
+  publish_handler — recompute the dashboard snapshot + decision and write ONE dashboard_state row to Supabase.
                     Triggered by the dashboard "出今天的决策" button (Function URL)
                     and a daily EventBridge schedule.
 
@@ -255,7 +254,7 @@ def _phase(t0, name: str) -> float:
 
 
 def _publish_decision_only() -> dict:
-    """Slim publish: snapshot + decision + calibration → one dashboard_state row.
+    """Slim publish: snapshot + decision → one dashboard_state row.
 
     Mirrors publish.py steps 1–4 but SKIPS the factor table (steps 5–6), which
     would otherwise be wiped by the empty in-memory leaderboard on Lambda.
@@ -263,7 +262,7 @@ def _publish_decision_only() -> dict:
     import asyncio
     from supabase import create_client
     from backend.api import (
-        dashboard_snapshot, dashboard_calibration, refresh_decision, _Encoder,
+        dashboard_snapshot, refresh_decision, _Encoder,
         journal_recent,
     )
 
@@ -328,14 +327,8 @@ def _publish_decision_only() -> dict:
         except Exception:
             pass
 
-        try:
-            cal = loop.run_until_complete(dashboard_calibration())
-        except Exception as e:
-            print(f"! calibration skipped: {e}")
-            cal = None
-
         ins = sb.table("dashboard_state").insert(
-            {"snapshot": clean(snap), "calibration": clean(cal)}
+            {"snapshot": clean(snap)}
         ).execute()
         state_row_id = (ins.data or [{}])[0].get("id")
 

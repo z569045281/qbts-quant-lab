@@ -30,7 +30,6 @@ import logging
 import math
 import os
 import re
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -242,6 +241,44 @@ _LIVE_AWARE = "SMC 折价/溢价区 · POC/成交量画像 · 日内画像 · NW
 _CLOSE_DERIVED = "特调快慢%R · regime 波动率档 · 经典策略(RSI2/CLV/均线等) · 相对估值 z40"
 
 
+# ── 经典策略摘除名单(2026-07-31 噪音审计)─────────────────────────────
+# 原住在 edge.py(机械元模型)。2026-09-18 瘦身删掉 edge.py 时搬到这里 ——
+# 决策 prompt 仍用它们过滤经典策略段,理由原样保留。
+# ① 同一个事实被读了两遍 → 制造假共振。log-odds 相加的前提是证据独立。
+_REDUNDANT: dict[str, str] = {
+    # 实证:2026-07-30 这天「相对强度 +0.143」与「Quantum Peer Lead/Lag +0.08」
+    # 吃的是同一组数(IONQ +11.8% / RGTI +12.4%),同向,合计 +0.223 —— 一个事实
+    # 顶了两票。第十八轮已判「量子篮子横截面落后追赶推广判死,正确内核=在册的
+    # QBTS-IONQ 配对」,这条经典策略就是那个被判死推广的残留。
+    "Quantum Peer Lead/Lag": "与『相对强度』同源(IONQ/RGTI 横截面);第十八轮已判死推广",
+    # 决策 prompt 里早就写了「经典策略 Short Flow 与空头动向段同一数据源同一
+    # 方向,勿当成两个独立确认」—— 但那只是给 LLM 看的一句话,元模型这边一直
+    # 在裸加。把警告落实到代码。
+    "Short Flow (Informed Shorts)": "与『空头动向』同一 FINRA 空量比,同向重复计权",
+}
+
+# ② 数据源本身失效 → 不是"信号弱",是"这个数已经没有出处了"。
+_DEAD_SOURCE: dict[str, str] = {
+    # Adanos 的散户情绪对外声称来自 Reddit,而 Reddit API 自 2026-06-05 起
+    # 审批制 + 明令禁止 AI/ML 用途(记忆 reddit-api-dead)。2026-07-30 当天
+    # 全网只有 38 条提及在撑一个 ±0.12 的权重,出处已不可核。
+    # 保留展示与记账,只摘决策权。
+    "散户情绪": "Reddit API 2026-06-05 起关闭;Adanos 二手代理出处不可核,当日仅 38 条提及",
+}
+
+# ③ 事件日:跳空 ≥8% 那天,**读当日这根 bar 的源**没有分辨力。
+# 这不是新判断,是系统自己在第二十八轮预注册过的:n=37 · t=+0.36 · p=0.72
+# (对照跳空 3~8% 档 t=−2.02 · p=0.045 有效)。event_day.py 拿这条约束了
+# 决策 LLM,却从没约束元模型 —— 2026-07-30 +11% 那天,元模型照样用那根 bar
+# 算出 Post-News Overreaction −0.20 并写进 prompt 当"交叉验证"。
+# 只摘输入就是当日 bar 的源;不碰机制项/期权/13F 这些跨日证据。
+_EVENT_DAY_MUTED: dict[str, str] = {
+    "Post-News Overreaction": "输入=当日涨跌幅",
+    "Gap-and-Trap":           "输入=当日跳空幅度",
+    "盘中量能":                "输入=当日 bar 内部量能",
+}
+
+
 def _price_basis_note(snapshot: dict, extras: dict | None) -> str:
     """把「日线收盘口径」和「实时价」的差异摊开说清楚(2026-07-28 AI 自检①④)。
 
@@ -374,10 +411,7 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
         parts.append("## 最近10个交易日 OHLC\n" + "\n".join(rows))
 
     # ── 8 个经典策略 ──────────────────────────────────────────
-    # 元模型摘掉的源,prompt 这边也不能照抄给 LLM —— 否则元模型不算它了,LLM 还
-    # 在算,假共振只是换了个地方发生(2026-07-31 噪音审计)。摘除名单的定义与理由
-    # 全在 edge.py 文件头,这里只是执行同一份名单。
-    from dashboard.edge import _DEAD_SOURCE, _EVENT_DAY_MUTED, _REDUNDANT
+    # 摘除名单(_REDUNDANT / _DEAD_SOURCE / _EVENT_DAY_MUTED)定义在本文件顶部。
     _ev = snapshot.get("event_day") or {}
     _on_event = bool(_ev.get("is_event_day") and _ev.get("technical_muted"))
     strat_lines, strat_pruned = [], []
@@ -900,43 +934,6 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
             f"一律以上面这个本票口径为准——聚合数字对单票没有信息量,别按它定方向。"
             f"高管常有 10b5-1 预设计划,占流通 <1% 属常规减持,不等于看空信号。")
 
-    # ── 量化元模型（机械加权参考值）──────────────────────────
-    edge = snapshot.get("edge")
-    if edge and not edge.get("error"):
-        line = (f"## 量化元模型参考（log-odds 机械加权，仅作交叉验证）\n"
-                f"  {edge.get('label','?')} · P(up)={edge.get('p_up',0)*100:.0f}% · "
-                f"EV={edge.get('expected_return_pct',0)*100:+.1f}%")
-        for p in (edge.get("pruned") or []):
-            line += (f"\n  ✂️ 已摘除 {p.get('source')}（{p.get('rule')}，"
-                     f"本可贡献 {p.get('would_have_been'):+.2f}）：{p.get('why')}")
-        # 用它自己的实盘校准记录给读数定性(AI 自检 07-16):n≥15 且 Wilson95% 上界
-        # <50% = 显著劣于随机 → 顺向引用禁令。只改标注不改权重——权重重推等 8/15 审判。
-        cal0 = extras.get("calibration") or {}
-        n0, hr0 = cal0.get("n_graded", 0), cal0.get("overall_hit_rate")
-        if n0 >= 15 and hr0 is not None:
-            import math as _math
-            _z = 1.96
-            _den = 1 + _z * _z / n0
-            _ctr = hr0 + _z * _z / (2 * n0)
-            _mrg = _z * _math.sqrt(hr0 * (1 - hr0) / n0 + _z * _z / (4 * n0 * n0))
-            if (_ctr + _mrg) / _den < 0.5:
-                line += (f"\n  ⚠️ 此元模型历史 {n0} 条命中率 {hr0*100:.0f}%"
-                         f"(Wilson95%上界 {(_ctr+_mrg)/_den*100:.0f}%<50%)——显著劣于随机。"
-                         f"它的 BUY/SELL 本日只可作【反向或零权重】参考,严禁当顺向交叉验证;"
-                         f"权重正式重推等 8/15 审判。")
-        parts.append(line)
-
-    # ── 历史校准 ─────────────────────────────────────────────
-    cal = extras.get("calibration")
-    if cal and cal.get("n_graded", 0) >= 5:
-        hr = cal["overall_hit_rate"]
-        parts.append(f"## 系统历史预测表现\n  {cal['n_graded']} 条已评判，"
-                     f"方向命中率 {hr*100:.0f}%（{_hit_ci(hr, cal['n_graded'])}）\n"
-                     f"  （评判口径:此命中率只统计【量化元模型 edge 的非观望信号】——"
-                     f"信号方向 vs 其后 5 个交易日实际涨跌;你(决策)的 HOLD 不计入此数,"
-                     f"HOLD 的影子评判(按 p_up_5d)在决策台账里另行记录。两套数字口径不同,"
-                     f"别互相换算;样本仍小,按 CI 读,勿当定论）")
-
     # ── 💼 用户实盘持仓(真金)→ position_advice ───────────────
     upos = snapshot.get("user_positions") or []
     if upos:
@@ -1390,77 +1387,6 @@ def generate_decision(snapshot: dict, extras: dict | None = None) -> dict:
     return decision
 
 
-def _invert_v1_shadow(snapshot: dict) -> dict | None:
-    """反向影子(2026-07-21,用户拍板 · 承 AI 自检建议):把原始 v1 元模型
-    (2026-07-17 前上线版,22 条已判 21% 命中、Wilson95% 上界 38%<50%,显著劣于
-    随机)的表态整个倒过来,当零决策权的测量对照——若 v1 稳定地"错",反过来押
-    可能有正 edge;但这只是假设,n 太小(21~24)不能排除只是小样本噪声,不能
-    默认成立。纯机械(edge.compute_edge_v1,不调任何 LLM,$0),从不进真决策
-    或 edge.py 的 compute_edge(v2)。8/15 与 Fable/DeepSeek 同框判分。"""
-    v1 = snapshot.get("edge_v1_shadow")
-    if not v1 or v1.get("error") or v1.get("p_up") is None:
-        return None
-    p_up_v1 = float(v1["p_up"])
-    v1_call = "up" if p_up_v1 > 0.5 else "down"        # v1 的原始(未反向)表态
-    inv_call = "down" if v1_call == "up" else "up"      # 本影子实际下注的方向
-    return {
-        "source_model": "v1(原始未改元模型,已判21%命中·劣于随机)",
-        "v1_p_up": round(p_up_v1, 4),
-        "v1_call": v1_call,
-        "bold_call_5d": inv_call,      # 与 bold_call_5d/ds_bold_call 同名同口径,journal 复用同一套 fwd5 评分
-        "p_up_5d": round(1 - p_up_v1, 4),
-        "note": "v1 表态整体反向,零决策权测量;8/15 判是真反向alpha还是巧合",
-    }
-
-
-_DS_MODEL = "deepseek-v4-pro"
-_DS_URL = "https://api.deepseek.com/chat/completions"
-
-
-def generate_shadow_decision(snapshot: dict, extras: dict | None = None) -> dict | None:
-    """DeepSeek V4 Pro 影子决策(2026-07-13,用户要求 Claude/DeepSeek 切换对照)。
-
-    同一份 system+user prompt、同一套 _sanitize 硬化;零决策权 —— 不推送、不驱动
-    交易、不进 edge;唯一的记账是 journal 顺带记它的 bold_call_5d 每日评分,
-    8/15 与 Fable 同框宣判(影子考场)。无 DEEPSEEK_API_KEY 或任何失败 → None,
-    主决策完全不受影响。成本 ~$0.02/天(V4 Pro $0.435/M in)。
-    """
-    key = os.getenv("DEEPSEEK_API_KEY")
-    if not key:
-        return None
-    try:
-        import requests
-        r = requests.post(_DS_URL, timeout=150, headers={
-            "Authorization": f"Bearer {key}", "Content-Type": "application/json",
-        }, json={
-            "model": _DS_MODEL,
-            "messages": [{"role": "system", "content": _SYSTEM},
-                         {"role": "user", "content": _build_user_msg(snapshot, extras)}],
-            # prompt 本身已要求"只输出一个 JSON 对象"(json_object 模式的前置条件)
-            "response_format": {"type": "json_object"},
-            "max_tokens": 8000,
-            "stream": False,
-        })
-        r.raise_for_status()
-        text = (r.json()["choices"][0]["message"]["content"] or "").strip()
-        if text.startswith("```"):                     # 保险:围栏剥离
-            text = text.split("```", 2)[1]
-            text = text[4:] if text.startswith("json") else text
-            text = text.rsplit("```", 1)[0]
-        d = json.loads(text)
-        if d.get("action") not in ("LONG_QBTX", "SHORT_QBTZ", "HOLD"):
-            raise ValueError(f"bad action: {d.get('action')}")
-        d["conviction"] = max(0, min(10, int(d.get("conviction", 0) or 0)))
-        d["system_notes"] = (d.get("system_notes") or [])[:4]
-        d["position_advice"] = (d.get("position_advice") or [])[:6]
-        d["model"] = _DS_MODEL
-        d["shadow"] = True
-        return _sanitize_decision(d, snapshot, extras)
-    except Exception as e:
-        logger.warning(f"deepseek shadow decision failed: {e}")
-        return None
-
-
 def get_or_generate_decision(
     snapshot: dict,
     force_refresh: bool = False,
@@ -1482,35 +1408,13 @@ def get_or_generate_decision(
         except Exception:
             pass
 
-    # 主决策(Fable adaptive 思考)与 DeepSeek 影子(推理模型,30-60s)用同一份
-    # prompt、互相独立 —— 并发跑,墙钟从「两者相加」降到「取大」。影子零决策权,
-    # 只是随决策带过去记账;串行等它纯属浪费用户时间(2026-07-24 延迟优化)。
-    # 用显式 executor(不用 `with`):`with` 退出会 shutdown(wait=True),主决策失败
-    # 的错误路径上会白白再等影子跑完;这里让错误路径立即返回、影子线程弃置后台。
-    _pool = ThreadPoolExecutor(max_workers=1)
-    _ds_future = _pool.submit(generate_shadow_decision, snapshot, extras)
+    # DeepSeek 影子与 v1 反向影子已于 2026-09-18 瘦身删除(台账实测:DeepSeek
+    # 表态 44% vs 同比例瞎猜 58%;v1 所依赖的机械元模型 edge.py 一并删除)。
     try:
         decision = generate_decision(snapshot, extras)
     except Exception as e:
         logger.warning(f"Decision generation failed: {e}")
-        _pool.shutdown(wait=False, cancel_futures=True)   # 主决策没了,影子弃置
         return None, None, False
-    # 主决策成了才取影子(此时它多半已跑完,几乎不再额外等待);失败=没有,零影响
-    try:
-        ds = _ds_future.result()
-    except Exception as e:
-        logger.warning(f"deepseek shadow future failed: {e}")
-        ds = None
-    finally:
-        _pool.shutdown(wait=False)
-    if ds:
-        decision["shadow_ds"] = ds
-
-    # v1 反向影子(2026-07-21 用户拍板,承 AI 自检建议):零成本(纯机械,不调模型),
-    # 零决策权,只记账供 8/15 判是否是真反向alpha还是小样本噪声
-    v1inv = _invert_v1_shadow(snapshot)
-    if v1inv:
-        decision["shadow_v1_inverse"] = v1inv
 
     # NOTE: the intraday consistency guard (flip-flop detection) lives in
     # journal.record() — it reads/writes Supabase, so a phone tap on the deployed

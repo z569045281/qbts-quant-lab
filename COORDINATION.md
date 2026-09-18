@@ -13,7 +13,7 @@ Format (newest at top):
 
 ## Entries
 
-- [active] 2026-09-18 · [opus] 系统瘦身(用户拍板删 5 项,彻底删代码):地缘雷达 geopolitics · 机械 p_up(edge.py)+v1 反向影子 · DeepSeek 影子决策 · 游击战 guerrilla · /mu 第二考场 second_ticker · files: backend/dashboard/{geopolitics,edge,guerrilla,second_ticker,decision,journal,audit,calibration,...}.py, backend/api.py, aws/lambda_handlers.py, aws/template.yaml, frontend/app/**, docs/**
+- [done] 2026-09-18 · [opus] 系统瘦身(用户拍板删 5 项,彻底删代码):地缘雷达 geopolitics · 机械 p_up(edge.py)+v1 反向影子 · DeepSeek 影子决策 · 游击战 guerrilla · /mu 第二考场 second_ticker · files: backend/dashboard/{geopolitics,edge,guerrilla,second_ticker,decision,journal,audit,calibration,...}.py, backend/api.py, aws/lambda_handlers.py, aws/template.yaml, frontend/app/**, docs/** · **结果**:删 9 个文件(geopolitics/edge/calibration/guerrilla/second_ticker .py + /mu 页 + second-board/calibration-card 组件),DeepSeek 影子与 v1 反向影子从决策/台账/前端摘除;摘除名单搬进 decision.py;本地快照+决策 prompt+champions+audit 冒烟通过,前端 build 绿,v3.12.0;清单见 docs/ARCHITECTURE.md §已删除模块
 
 - [done] 2026-09-18 · [opus] QBTS 决策台账全量回测(用户:「系统跑了这么久,回测一下 qbts 的决策」)· 只读:78 条→同信息集去重 56 份,yfinance 实价重算 · 结论:方向单 8 单 3 赚 5 亏(QBTX 复利 −31.6%)、4/8 方向单次日同数据被改回观望、表态命中 47% vs 瞎猜 48%、p_up corr −0.23、同期 QBTX −70% · 结论写入记忆 system-no-timing-edge · files: COORDINATION.md(仅协作记录)
 

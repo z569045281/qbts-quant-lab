@@ -635,7 +635,6 @@ def _p_up_diagnostic(recs: list[dict]) -> dict:
 
 def run_audit() -> dict:
     from data.fetcher import load_or_fetch
-    from dashboard.calibration import grade_predictions
     from dashboard import journal as jr
     from dashboard.qbts_paper import analyze_champs
 
@@ -643,28 +642,6 @@ def run_audit() -> dict:
     _, df_d = load_or_fetch(force_refresh=True)
     report: dict = {"as_of": datetime.now(timezone.utc).isoformat(),
                     "n_min": _N_MIN, "sections": {}}
-
-    # ── ① edge 逐源校准(核心审判对象:edge.py 的权重先验)────────────────
-    # 2026-07-22 AI 自检抓到:grade_predictions 从不读 model 标签,v1(已于
-    # 07-17 停用)的陈年记录混进"当前"校准,把 v1 的 21% 拖成"25条23%"顶替
-    # v2 汇报——v2 才 3 条记录、仅 1 条够格评分(部分窗口),远不到能下结论的
-    # 量。现在默认只算 v2(见 calibration.py），v1 的历史成绩单独留档对照,
-    # 不再混进当前判决。
-    cal = grade_predictions(df_d)                    # v2-only(新默认)
-    cal_v1_legacy = grade_predictions(df_d, model="v1")
-    sources = {}
-    for src, d in (cal.get("by_source") or {}).items():
-        sources[src] = _verdict(d.get("hits", 0), d.get("n", 0))
-        sources[src]["current_learned_mult"] = d.get("weight_mult")
-    report["sections"]["edge_sources"] = {
-        "n_graded_days": cal.get("n_graded"),
-        "overall_hit_rate": cal.get("overall_hit_rate"),
-        "sources": sources,
-        "v1_legacy_frozen": {                          # 仅供对照,不参与判决
-            "n_graded": cal_v1_legacy.get("n_graded"),
-            "overall_hit_rate": cal_v1_legacy.get("overall_hit_rate"),
-        },
-    }
 
     # ── ② AI 决策台账(决策本身当一个"源"审)────────────────────────────
     try:
@@ -768,10 +745,8 @@ def run_audit() -> dict:
         report["sections"]["decision_journal"]["exposure"] = _exposure_audit(recs, df_d)
         # 📋 板块记分卡(2026-07-31 建账):prompt 里有发言权、§1 却没记分卡的那些
         report["sections"]["decision_journal"]["readings"] = _readings_audit(recs)
-        # 影子考场:Fable vs DeepSeek vs v1反向影子(2026-07-21,用户拍板) 的
-        # bold_call 按统一 fwd5 口径同框
-        for fld, key in (("bold_correct", "bold_fable"), ("ds_bold_correct", "bold_deepseek"),
-                         ("v1inv_bold_correct", "bold_v1inv")):
+        # bold_call 按 fwd5 口径(DeepSeek / v1 反向两个影子 2026-09-18 已删)
+        for fld, key in (("bold_correct", "bold_fable"),):
             vals = [bool((r.get("result") or {}).get(fld))
                     for r in recs if (r.get("result") or {}).get(fld) is not None]
             if vals:
@@ -864,20 +839,6 @@ def format_report(report: dict) -> str:
     L = ["⚖️ 审判报告 " + report["as_of"][:16].replace("T", " ") + " UTC",
          f"(判决门槛 n≥{report['n_min']};规则预注册于 audit.py,不得临场更改;"
          f"2026-07-24 修订:交易池判决线=各池保本胜率 1/(1+RR_design),期望R仅展示)", ""]
-    es = report["sections"].get("edge_sources", {})
-    L.append(f"① edge 逐源校准(v2,2026-07-17起)— 已评判 {es.get('n_graded_days')} 天,"
-             f"整体方向命中 {(es.get('overall_hit_rate') or 0)*100:.0f}%"
-             f"{' ⚠️n太小,远不到能下结论的量' if (es.get('n_graded_days') or 0) < _N_MIN else ''}")
-    v1l = es.get("v1_legacy_frozen") or {}
-    if v1l.get("n_graded"):
-        L.append(f"   （v1 历史存档,已停用,不参与本次判决:n={v1l['n_graded']} "
-                 f"命中{(v1l.get('overall_hit_rate') or 0)*100:.0f}%）")
-    rows = sorted((es.get("sources") or {}).items(), key=lambda x: -x[1]["n"])
-    for src, d in rows:
-        mult = f" → 建议mult {d['recommended_mult']}" if d["recommended_mult"] is not None else ""
-        L.append(f"   {src:<22s} n={d['n']:<3d} 命中{d['hit_rate']*100:3.0f}% "
-                 f"CI[{d['ci95'][0]*100:.0f},{d['ci95'][1]*100:.0f}] {d['verdict']}{mult}"
-                 f"(现自学习mult {d.get('current_learned_mult')})")
     dj = report["sections"].get("decision_journal", {})
     if "n" in dj:
         pp = dj.get("paper") or {}
@@ -897,9 +858,7 @@ def format_report(report: dict) -> str:
                      f"CI[{dc['ci95'][0]*100:.0f},{dc['ci95'][1]*100:.0f}] {dc['verdict']}"
                      + (f" · p_up骑墙率 {fence*100:.0f}%(目标应随 bold_call 上线归零)"
                         if fence is not None else ""))
-        for key, label in (("bold_fable", "🥊 表态vs5日 Fable"),
-                           ("bold_deepseek", "🥊 表态vs5日 DeepSeek影子"),
-                           ("bold_v1inv", "🥊 表态vs5日 v1反向影子")):
+        for key, label in (("bold_fable", "🥊 表态vs5日 Fable"),):
             b = dj.get(key)
             if b and b.get("n"):
                 L.append(f"   {label} n={b['n']} 命中{b['hit_rate']*100:.0f}% "
@@ -1034,7 +993,7 @@ def format_report(report: dict) -> str:
             L.append(f"   {ep:<4s} n={d['n']:<3d} 胜率{d['hit_rate']*100:3.0f}% "
                      f"CI[{d['ci95'][0]*100:.0f},{d['ci95'][1]*100:.0f}] {d['verdict']}"
                      f"{_fmt_be(d)} 已实现 ${d.get('realized_usd')}")
-    L.append("\n结论应用:仅『✅ 转正』与『❌ 剔除』触发 edge.py 权重改动(人工 review);"
+    L.append("\n结论应用:仅『✅ 转正』与『❌ 剔除』触发改动(人工 review);"
              "其余一律继续测量。")
     return "\n".join(L)
 

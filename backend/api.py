@@ -33,7 +33,6 @@ from data.enricher import enrich
 from data.altdata import altdata_health_check, get_latest_etf_prices, fetch_adanos_sentiment
 from dashboard.strategies import run_all_strategies, aggregate_consensus
 from dashboard.news       import get_news_snapshot
-from dashboard.edge        import compute_edge, compute_edge_v1
 from dashboard.options     import get_options_signal
 from dashboard.intraday    import get_intraday_signal
 from dashboard.holdings    import get_holdings_signal
@@ -48,7 +47,6 @@ from dashboard.squeeze           import analyze_squeeze
 from dashboard.relative_strength import analyze_relative_strength
 from dashboard.journal     import record as journal_record, grade_pending, load_recent as journal_recent
 from dashboard.journal     import backfill_horizons
-from dashboard.calibration import log_prediction, grade_predictions, save_learned_weights
 from factors.generator import generate_and_validate, generate_and_validate_ml
 from factors.ml_factor import run_ml_walk_forward
 from backtest.engine import (
@@ -1172,32 +1170,6 @@ async def dashboard_snapshot(force_refresh: bool = False):
         "holdings": _src_status(holdings_sig),
     }
 
-    # ── Meta-model edge: combines all signal sources with learned weights ───
-    today_cached = _TODAY_CACHE.get("payload") if (
-        _TODAY_CACHE.get("payload") and (now - _TODAY_CACHE.get("ts", 0) < _TODAY_CACHE_TTL)
-    ) else None
-    try:
-        payload["edge"] = compute_edge(
-            payload, today_cached, opt_sig, intr_sig, holdings_sig,
-        )
-    except Exception as e:
-        payload["edge"] = {"signal": 0, "label": "HOLD", "error": str(e)[:100]}
-    try:
-        # 原始 v1(2026-07-17 前上线版,21%命中已判劣于随机)反向影子(2026-07-21
-        # 用户拍板):零决策权,不进 edge/决策,只喂 decision.py 生成一条反向表态
-        # 存进 journal 供 8/15 与 Fable/DeepSeek 同框判分。
-        payload["edge_v1_shadow"] = compute_edge_v1(
-            payload, today_cached, opt_sig, intr_sig, holdings_sig,
-        )
-    except Exception as e:
-        payload["edge_v1_shadow"] = {"signal": 0, "label": "HOLD", "error": str(e)[:100]}
-
-    # ── Auto-log this prediction for future calibration (idempotent per day) ─
-    try:
-        log_prediction(payload["price"], payload["as_of"], payload["edge"])
-    except Exception:
-        pass
-
     _DASHBOARD_CACHE["payload"] = payload
     _DASHBOARD_CACHE["ts"]      = now
     return payload
@@ -1456,7 +1428,6 @@ async def refresh_decision():
         pass
     try:
         _, df_d = await asyncio.to_thread(load_or_fetch)
-        extras["calibration"] = await asyncio.to_thread(grade_predictions, df_d)
         # Grade past decisions FIRST so today's prompt includes fresh lessons
         await asyncio.to_thread(grade_pending, df_d)
         # 多视界字段(2026-07-30):grade_pending 只给**新评判**的记录写 horizons,而
@@ -1494,21 +1465,6 @@ async def refresh_decision():
         _DASHBOARD_CACHE["payload"]["decision"]              = decision
         _DASHBOARD_CACHE["payload"]["decision_generated_at"] = gen_at
     return {"decision": decision, "generated_at": gen_at, "fresh": fresh}
-
-
-@app.get("/dashboard/calibration")
-async def dashboard_calibration():
-    """
-    Grade all logged predictions against realized 5-bar forward returns.
-    Persists the per-source weight multipliers so edge.py auto-uses them next time.
-    """
-    _, df_d = await asyncio.to_thread(load_or_fetch)
-    result = await asyncio.to_thread(grade_predictions, df_d)
-    try:
-        save_learned_weights(result)
-    except Exception:
-        pass
-    return result
 
 
 @app.post("/control/retrospective")

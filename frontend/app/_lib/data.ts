@@ -101,24 +101,6 @@ export interface Snapshot {
   etf_prices: { qbtx: number | null; qbtz: number | null };
   user_positions?: UserPosition[];   // 💼 实盘持仓(发布时的快照;编辑后以 POST 响应为准)
   strategy_replay?: StrategyReplay | null;  // 🏇 策略战绩页(/factors)的复算数据
-  edge?: {
-    signal:              -1 | 0 | 1;
-    label:               "BUY" | "SELL" | "HOLD";
-    p_up:                number;
-    expected_return_pct: number;
-    kelly_fraction:      number;
-    log_odds:            number;
-    n_signals:           number;
-    contributions: Array<{
-      source: string;
-      kind:   "mined" | "classic" | "news";
-      signal: -1 | 0 | 1;
-      weight: number;
-      log_odds: number;
-      detail: string;
-    }>;
-    error?: string;
-  };
   sources_status?: Record<string, {
     status:    "active" | "neutral" | "needs_setup" | "error";
     label:     string;
@@ -646,15 +628,6 @@ export interface Decision {
     note?: string;                 // 五道闸全落空时的说明
   } | null;
   shadow?:            boolean;   // true = 影子决策(零决策权,仅对照)
-  shadow_ds?:         Decision;  // DeepSeek V4 Pro 影子决策(卡上可切换;8/15 同框宣判)
-  shadow_v1_inverse?: {          // 2026-07-21:原始21%命中元模型整体反向的零决策权影子(纯机械,不可切换查看,只做每日徽章)
-    source_model: string;
-    v1_p_up:      number;
-    v1_call:      "up" | "down";
-    bold_call_5d: "up" | "down";
-    p_up_5d:      number;
-    note:         string;
-  } | null;
 }
 
 /* ── 🔬 全站 AI 系统自检(publish §4.8 · 规则层+Haiku 六页体检) ──────────── */
@@ -714,26 +687,6 @@ export interface StrategyReplay {
   window_start: string;
   bh:           { ret_full: number; ret_1y: number; max_dd: number };
   strategies:   ReplayStrategy[];
-}
-
-/* ── /dashboard/calibration payload ──────────────────────────────────────── */
-export interface CalibrationBucket {
-  predicted_p_up:    number;
-  realized_hit_rate: number;
-  n:                 number;
-}
-export interface SourceCal {
-  n:           number;
-  hits:        number;
-  hit_rate:    number;
-  weight_mult: number;
-}
-export interface Calibration {
-  n_total:          number;
-  n_graded:         number;
-  overall_hit_rate: number;
-  calibration:      CalibrationBucket[];
-  by_source:        Record<string, SourceCal>;
 }
 
 /* ── factor row (factors table) ──────────────────────────────────────────── */
@@ -882,18 +835,6 @@ export async function getLiveQuote(): Promise<LiveQuote | null> {
   } catch {
     return null;
   }
-}
-
-/** Latest published calibration (may be null if it failed to compute). */
-export async function getCalibration(): Promise<Calibration | null> {
-  const { data, error } = await supabase
-    .from("dashboard_state")
-    .select("calibration")
-    .order("published_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  return (data?.calibration ?? null) as Calibration | null;
 }
 
 /* ── 🔭 自选扫描 (watchlist scan) ─────────────────────────────────────────── */

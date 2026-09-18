@@ -25,10 +25,8 @@
 |---|---|---|
 | `minute % 5 == 0` | SMC playbook 盘中重算 | pre/regular/post,off-minute 结转不闪烁 |
 | `minute % 15 == 2` | 千元挑战 bot(`challenge2`) | 偏移 2 分躲开 `%5` |
-| `minute % 30 == 8` | 地缘雷达 `maybe_geo_refresh` | 躲开 `%5` 与 `%15==2` |
-| `minute % 5 == 4` | 游击战 `check_exits` | 只在有 open 仓时才拉 1m 行情 |
-| 16:05–20:00 ET 每日一次 | 游击战信号自算 / 特调收盘推送 | `meta.last_compute_date` 去重 |
-| 周日 20:0x ET | 周末 BTC 信号 + 补一发周末地缘检查 | 分钟错开 `%5` |
+| 16:05–20:00 ET 每日一次 | 特调收盘推送 | 日期标记去重 |
+| 周日 20:0x ET | 周末 BTC 信号 | 分钟错开 `%5` |
 
 ## EventBridge 调度
 

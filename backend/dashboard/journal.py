@@ -153,20 +153,6 @@ def record(decision: dict, price_at_decision: float, as_of: str,
         # 敞口刻度(2026-08-24 上线即建账 —— 这个仓库的老毛病是「测出来有效却从没
         # 接线/从没记分」,见 REVIEW-2026-07 §5.3)。判决线见 audit._exposure_audit。
         "exposure_pct": ((decision.get("exposure") or {}) or {}).get("pct"),
-        # DeepSeek 影子考场:表态每日评分(与 Fable 同一套 fwd5 口径),
-        # 计划三价/行动一并存档供日后回测(用户 2026-07-13:决策都要存好。
-        # 全文档在 dashboard_state 行里永久累积,这里存结构化字段免挖快照)
-        "ds_bold_call": (decision.get("shadow_ds") or {}).get("bold_call_5d"),
-        "ds_p_up":      (decision.get("shadow_ds") or {}).get("p_up_5d"),
-        "ds_action":     (decision.get("shadow_ds") or {}).get("action"),
-        "ds_conviction": (decision.get("shadow_ds") or {}).get("conviction"),
-        "ds_entry":  ((decision.get("shadow_ds") or {}).get("trade_plan") or {}).get("qbts_entry"),
-        "ds_stop":   ((decision.get("shadow_ds") or {}).get("trade_plan") or {}).get("qbts_stop"),
-        "ds_target": ((decision.get("shadow_ds") or {}).get("trade_plan") or {}).get("qbts_target"),
-        # v1 反向影子(2026-07-21,用户拍板):原始 21% 命中元模型的表态整体倒过来,
-        # 零决策权,同一套 fwd5 口径评分,8/15 与 Fable/DeepSeek 同框判分
-        "v1inv_bold_call": (decision.get("shadow_v1_inverse") or {}).get("bold_call_5d"),
-        "v1inv_p_up":       (decision.get("shadow_v1_inverse") or {}).get("p_up_5d"),
         "price":      round(float(price_at_decision), 2),
         "entry":      tp.get("qbts_entry"),
         "stop":       tp.get("qbts_stop"),
@@ -283,19 +269,11 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
         fwd5 = None
         if len(after) >= _GRADE_AFTER_BARS:
             fwd5 = (float(closes.loc[after[_GRADE_AFTER_BARS - 1]]) - p0) / p0
-        bold_correct = ds_correct = None
+        bold_correct = None
         if fwd5 is not None:
             bc = r.get("bold_call_5d")
             if bc in ("up", "down"):
                 bold_correct = (bc == "up") == (fwd5 > 0)
-            dsc = r.get("ds_bold_call")
-            if dsc in ("up", "down"):
-                ds_correct = (dsc == "up") == (fwd5 > 0)
-        v1inv_correct = None
-        if fwd5 is not None:
-            vic = r.get("v1inv_bold_call")
-            if vic in ("up", "down"):
-                v1inv_correct = (vic == "up") == (fwd5 > 0)
 
         # 多视界:同一份表态,在 1/2/3/5 日上各评一次(见 _HORIZONS 注释)
         fwd_h, bold_by_h = _horizon_grades(r, p0, closes, after)
@@ -313,8 +291,6 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
             "shadow_correct": shadow_correct,
             "fwd5_ret":       round(fwd5, 4) if fwd5 is not None else None,
             "bold_correct":    bold_correct,
-            "ds_bold_correct": ds_correct,
-            "v1inv_bold_correct": v1inv_correct,
         }
         # 多视界存在**记录顶层**而不是 result 里 —— 关键设计:2 日表态不该等 5 根 bar
         # 才有结论。result 的生成被 `len(after) < _GRADE_AFTER_BARS: continue` 闸着
@@ -334,7 +310,9 @@ def grade_pending(df_daily: pd.DataFrame) -> list[dict]:
     return newly_graded
 
 
-_BOLD_FIELDS = {"fable": "bold_call_5d", "ds": "ds_bold_call", "v1inv": "v1inv_bold_call"}
+# DeepSeek 影子(ds)与 v1 反向影子(v1inv)已于 2026-09-18 瘦身删除;老记录里
+# 这两个字段与已评结果原样保留,不再产生新的。
+_BOLD_FIELDS = {"fable": "bold_call_5d"}
 
 
 def _horizon_grades(r: dict, p0: float, closes, after) -> tuple[dict, dict]:
@@ -342,7 +320,7 @@ def _horizon_grades(r: dict, p0: float, closes, after) -> tuple[dict, dict]:
 
     返回 (fwd_ret_by_h, bold_by_h):
       fwd_ret_by_h = {"2d": 0.031, …}      纯漂移收益,与 action / 止损路径无关
-      bold_by_h    = {"fable": {"2d": True, …}, "ds": {…}, "v1inv": {…}}
+      bold_by_h    = {"fable": {"2d": True, …}}
 
     视界 bar 数不足(记录太新)→ 该视界缺键,不写 None:缺键=还没到期,
     None 会被下游误读成"评过但无表态"。
@@ -396,9 +374,7 @@ def backfill_fwd5(df_daily) -> int:
         res["fwd5_ret"] = round(
             (float(closes.loc[after[_GRADE_AFTER_BARS - 1]]) - p0) / p0, 4)
         # 表态的 5 日对错同步补(同一份 fwd5,不新造口径)
-        for fld, out in (("bold_call_5d", "bold_correct"),
-                         ("ds_bold_call", "ds_correct"),
-                         ("v1inv_bold_call", "v1inv_correct")):
+        for fld, out in (("bold_call_5d", "bold_correct"),):
             c = r.get(fld)
             if c in ("up", "down") and res.get(out) is None:
                 res[out] = (c == "up") == (res["fwd5_ret"] > 0)

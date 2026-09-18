@@ -1,5 +1,7 @@
 # 元模型权重 · 台账评分 · 8/15 审判
 
+> ✂️ **2026-09-18 系统瘦身**:下文涉及的部分模块已删除,清单与理由见 [ARCHITECTURE.md §已删除模块](ARCHITECTURE.md)。下文保留为历史记录。
+
 > 读这份文件的时机:动 `edge.py` 权重、`calibration.py`、`journal.py`、`audit.py`,
 > 或任何"这个信号到底灵不灵"的问题。
 
