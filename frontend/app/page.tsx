@@ -317,6 +317,17 @@ export default function Dashboard() {
     qbtx: (liveCurrent ? live?.quotes?.qbtx?.price : null) ?? snap.etf_prices?.qbtx,
     qbtz: (liveCurrent ? live?.quotes?.qbtz?.price : null) ?? snap.etf_prices?.qbtz,
   };
+  // QBTS 价位 → QBTX/QBTZ 等价价(2026-09-18 用户点单:成交量画像每个价位旁要看到两只 ETF)。
+  // 以 QBTS 现价与 ETF 现价为锚,按 ±2× 当日换算:ETF × (1 ± 2 × (价位/QBTS现价 − 1))。
+  // 只是近似 —— 杠杆 ETF 每日再平衡,隔日就会偏;薄流动性时 ETF 现价本身也可能滞后(见 ⏱)。
+  const etfEq = (lvl: number | null | undefined): string => {
+    if (lvl == null || !qPrice) return "";
+    const r = lvl / qPrice - 1;
+    const x = etfPx.qbtx ? etfPx.qbtx * (1 + 2 * r) : null;
+    const z = etfPx.qbtz ? etfPx.qbtz * (1 - 2 * r) : null;
+    if (x == null && z == null) return "";
+    return `(QBTX ${x != null ? `$${x.toFixed(2)}` : "—"} · QBTZ ${z != null ? `$${z.toFixed(2)}` : "—"})`;
+  };
   // 薄流动性 ETF 的最后成交常比 QBTS 旧几十分钟(QBTZ 盘后尤甚)——滞后 >15 分钟标 ⏱,
   // 免得并排的涨跌幅被当成同一时刻的 2× 关系去核对。
   const etfStale = (() => {
@@ -1365,10 +1376,13 @@ export default function Dashboard() {
               </span>
             </div>
             {/* 价值区刻度 */}
-            <div className="flex items-center justify-between text-body mb-3 px-1">
-              <span className="text-red-600 font-mono">VAL {fmtPx(snap.volume_profile.val)}</span>
-              <span className="font-mono font-bold text-violet-700">POC {fmtPx(snap.volume_profile.poc)}</span>
-              <span className="text-emerald-600 font-mono">VAH {fmtPx(snap.volume_profile.vah)}</span>
+            <div className="grid grid-cols-3 gap-2 text-body mb-3 px-1">
+              <div className="text-red-600 font-mono">VAL {fmtPx(snap.volume_profile.val)}
+                <div className="text-meta text-ink-faint">{etfEq(snap.volume_profile.val)}</div></div>
+              <div className="font-mono font-bold text-violet-700 text-center">POC {fmtPx(snap.volume_profile.poc)}
+                <div className="text-meta font-normal text-ink-faint">{etfEq(snap.volume_profile.poc)}</div></div>
+              <div className="text-emerald-600 font-mono text-right">VAH {fmtPx(snap.volume_profile.vah)}
+                <div className="text-meta text-ink-faint">{etfEq(snap.volume_profile.vah)}</div></div>
             </div>
             {/* 操作提示 — 把磁吸位翻译成明确的突破/跌破触发 */}
             {snap.volume_profile.action_hint && (
@@ -1386,25 +1400,27 @@ export default function Dashboard() {
               {snap.volume_profile.nearest_magnet_up != null && (
                 <div className="flex items-center justify-between px-2.5 py-1.5 rounded-inner bg-emerald-50/60 border border-emerald-100">
                   <span className="text-emerald-700 font-medium">▲ 上方磁吸</span>
-                  <span className="font-mono text-gray-700">${snap.volume_profile.nearest_magnet_up.toFixed(2)}</span>
+                  <span className="font-mono text-gray-700 text-right">${snap.volume_profile.nearest_magnet_up.toFixed(2)}
+                    <span className="ml-1 text-meta text-ink-faint">{etfEq(snap.volume_profile.nearest_magnet_up)}</span></span>
                 </div>
               )}
               {snap.volume_profile.nearest_magnet_down != null && (
                 <div className="flex items-center justify-between px-2.5 py-1.5 rounded-inner bg-red-50/60 border border-red-100">
                   <span className="text-red-700 font-medium">▼ 下方磁吸</span>
-                  <span className="font-mono text-gray-700">${snap.volume_profile.nearest_magnet_down.toFixed(2)}</span>
+                  <span className="font-mono text-gray-700 text-right">${snap.volume_profile.nearest_magnet_down.toFixed(2)}
+                    <span className="ml-1 text-meta text-ink-faint">{etfEq(snap.volume_profile.nearest_magnet_down)}</span></span>
                 </div>
               )}
               {snap.volume_profile.naked_pocs_above.length + snap.volume_profile.naked_pocs_below.length > 0 && (
                 <div className="text-meta text-ink-muted px-2.5 py-1 leading-snug">
                   🧲 未回补 POC：
                   {[...snap.volume_profile.naked_pocs_above, ...snap.volume_profile.naked_pocs_below]
-                    .map(x => `$${x.toFixed(2)}`).join("、")}
+                    .map(x => `$${x.toFixed(2)}${etfEq(x)}`).join("、")}
                 </div>
               )}
               {snap.volume_profile.lvn.length > 0 && (
                 <div className="text-meta text-ink-faint px-2.5 leading-snug">
-                  LVN 真空带(勿设止损)：{snap.volume_profile.lvn.map(x => `$${x.toFixed(2)}`).join("、")}
+                  LVN 真空带(勿设止损)：{snap.volume_profile.lvn.map(x => `$${x.toFixed(2)}${etfEq(x)}`).join("、")}
                 </div>
               )}
             </div>
