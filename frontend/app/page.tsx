@@ -349,6 +349,29 @@ export default function Dashboard() {
   /* 观望日(台账实测 91%)不渲染交易计划卡 —— 它在那些日子唯一能说的话是
      「暂不持仓」,而裁决卡那两个大字已经说完了。 */
   const showPlan = !!d && d.action !== "HOLD";
+  /* 「什么时候动手」的两条 —— 2026-09-18 从裁决卡挪到军规卡。首屏按问题分两栏:
+     左 = 判断(多有把握、拿多大),右 = 条件(等什么、按什么价、什么情况作废)。
+     之前两条都堆在左卡,左卡越来越高,右卡被 grid 拉成同高、下半截空着。 */
+  const waitBlock = topWait && (
+    <div className="mt-2.5 pt-2.5 border-t border-hairline">
+      <div className="text-meta text-ink-muted mb-0.5">⏳ 在等</div>
+      <div className="text-card font-semibold leading-snug">{topWait.name}</div>
+      <div className="text-meta text-ink-muted">{topWait.hint}</div>
+    </div>
+  );
+  /* 失效条件常是一大段(双向作废条件全写在里面)—— 夹成一行,点开看全文 */
+  const invalidBlock = d?.invalidation && (
+    <details className="group mt-2.5 text-meta bg-sunken rounded-inner px-2.5 py-1.5 leading-snug text-ink">
+      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        ⚠️ 失效条件:
+        <span className="group-open:hidden">
+          {d.invalidation.length > 36 ? d.invalidation.slice(0, 36) : d.invalidation}
+          {d.invalidation.length > 36 && <span className="font-medium">… 展开</span>}
+        </span>
+      </summary>
+      <div className="mt-1">{d.invalidation}</div>
+    </details>
+  );
 
   return (
     <main className="max-w-[1200px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-4">
@@ -468,7 +491,7 @@ export default function Dashboard() {
           (它是四条并列的执行口径)。 ────────────────────────────────── */}
       <div className={`grid grid-cols-1 gap-2.5 ${showPlan
         ? "lg:grid-cols-[minmax(0,0.82fr)_minmax(0,1fr)_minmax(0,1.18fr)]"
-        : "lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]"}`}>
+        : "lg:grid-cols-2"}`}>
 
         {/* ① 裁决 —— 全页唯一的大字号,颜色即结论 */}
         <div className={`rounded-card border-2 p-4 flex flex-col justify-center ${meta ? meta.cls : "bg-surface border-hairline"}`}>
@@ -516,32 +539,6 @@ export default function Dashboard() {
                 </div>
               )}
 
-              {/* ⏳ 在等什么 —— 2026-09-16 从交易计划卡搬到这里。
-                  台账实测 91% 的日子是观望;观望日首屏如果只剩「观望」两个字,
-                  这个仪表盘 91% 的日子等于白开。所以观望态必须带内容:不是
-                  「今天没事」,是「在等 $X,还差 Y%」。六个一级扳机的完整读数
-                  在「今日决策」标签,这里只提第一名。 */}
-              {topWait && (
-                <div className="mt-2.5 pt-2.5 border-t border-current/10">
-                  <div className="text-meta mb-0.5">⏳ 在等</div>
-                  <div className="text-card font-semibold leading-snug">{topWait.name}</div>
-                  <div className="text-meta">{topWait.hint}</div>
-                </div>
-              )}
-
-              {/* 失效条件常是一大段(双向作废条件全写在里面)—— 夹成一行,点开看全文 */}
-              {d.invalidation && (
-                <details className="group mt-2.5 text-meta bg-current/[0.06] rounded-inner px-2 py-1.5 leading-snug">
-                  <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                    ⚠️ 失效条件:
-                    <span className="group-open:hidden">
-                      {d.invalidation.length > 36 ? d.invalidation.slice(0, 36) : d.invalidation}
-                      {d.invalidation.length > 36 && <span className="font-medium">… 展开</span>}
-                    </span>
-                  </summary>
-                  <div className="mt-1">{d.invalidation}</div>
-                </details>
-              )}
             </>
           ) : (
             <div className="text-card text-ink-faint mt-1">
@@ -599,9 +596,10 @@ export default function Dashboard() {
             {/* 第一行 = ① 大盘红绿灯,直接写成结论句,不写"红绿灯"这个抽象名 */}
             <div className={`text-card font-semibold leading-snug ${
               snap.champs.risk_on ? "text-ink" : "text-down"}`}>
-              🚦 {snap.champs.risk_on ? "大盘顺风 · 可以按计划做" : "今天什么都不买"}
+              {/* 结论(买不买)左卡已经用大字说了,这里只说大盘这个条件 */}
+              {snap.champs.risk_on ? "🟢 大盘顺风" : "🔴 大盘逆风"}
               <span className="text-meta font-normal text-ink-muted ml-1.5">
-                大盘{snap.champs.risk_on ? "🟢 顺风" : "🔴 逆风"}
+                {snap.champs.risk_on ? "可以按计划做" : "军规①:逆风日不开新仓"}
               </span>
             </div>
             {/* 第二行 = ②③④ 三个数字并排 */}
@@ -619,12 +617,17 @@ export default function Dashboard() {
                 <b className="font-mono tabular-nums">10</b>
                 <span className="text-meta text-ink-muted"> 天</span>
               </span>
-              <span>
-                <span className="text-meta text-ink-muted">≤</span>
-                <b className="font-mono tabular-nums">{((expPct ?? snap.champs.vt_pct) * 100).toFixed(0)}%</b>
-                <span className="text-meta text-ink-muted"> 投机仓</span>
-              </span>
+              {/* 敞口 % 只在左卡的刻度上出现一次;左卡没画刻度(没决策 / 没刻度)时才在这里补 */}
+              {(expPct == null || !d) && (
+                <span>
+                  <span className="text-meta text-ink-muted">≤</span>
+                  <b className="font-mono tabular-nums">{((expPct ?? snap.champs.vt_pct) * 100).toFixed(0)}%</b>
+                  <span className="text-meta text-ink-muted"> 投机仓</span>
+                </span>
+              )}
             </div>
+            {waitBlock}
+            {invalidBlock}
 
             {/* 展开区:不变的规矩 */}
             <details className="group mt-2 border-t border-hairline pt-2">
@@ -693,6 +696,11 @@ export default function Dashboard() {
               </details>
               ) : null}
             </details>
+          </div>
+        ) : (waitBlock || invalidBlock) ? (
+          <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] p-4 [&>*:first-child]:mt-0 [&>*:first-child]:pt-0 [&>*:first-child]:border-t-0">
+            {waitBlock}
+            {invalidBlock}
           </div>
         ) : <div />}
       </div>
