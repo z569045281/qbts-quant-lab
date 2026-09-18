@@ -173,6 +173,16 @@ def quote_handler(event, context):
     except Exception as e:
         print(f"! challenge2 skipped: {type(e).__name__}: {e}")
 
+    # 🎯 QBTS $1000 纸面挑战(2026-09-18):15:52–15:57 ET 窗口每天调仓一次,
+    # 状态写 crypto_challenge id='qbts1000',不走 live_quote。只碰 QBTS 正股。
+    try:
+        from dashboard.qbts_challenge import maybe_qbts_tick
+        qc = maybe_qbts_tick(now_et)
+        if qc:
+            print(f"qbts1000: {qc}")
+    except Exception as e:
+        print(f"! qbts1000 skipped: {type(e).__name__}: {e}")
+
     # 🌙 夜盘采样(2026-08-05):20:00–04:00 ET 没有任何 15m bar 源(yfinance /
     # Alpaca iex 都停在 15:45;Alpaca 的 overnight feed 只有 latest,没有历史)——
     # 所以把我们每分钟本来就在拉的 NBBO 中间价存下来,自己聚合成 15m。

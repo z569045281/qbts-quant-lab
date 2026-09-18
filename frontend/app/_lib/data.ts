@@ -1142,6 +1142,35 @@ export interface CryptoChallenge {
   equity_curve?: [string, number][]; // [iso_ts, equity] 每跳(15min)一点
 }
 
+/* 🎯 QBTS $1000 纸面挑战(Claude 自营,2026-09-18)—— crypto_challenge id='qbts1000' */
+export interface QbtsTrade {
+  ts: string; date: string; side: "buy" | "sell"; qty: number; px: number; value: number;
+  approx_px: boolean; reason: string; w: number; realized: number | null;
+}
+export interface QbtsMonth {
+  start_equity: number; end_equity: number | null; pnl: number | null;
+  paid_sub: boolean | null; pnl_so_far?: number;
+}
+export interface QbtsChallenge {
+  status: "running" | "ended";
+  started: string; start_cap: number; sub_fee: number;
+  cash: number; shares: number; avg_px: number | null;
+  equity: number; pnl: number; pnl_pct: number;
+  rule: string;
+  trades: QbtsTrade[];
+  months: Record<string, QbtsMonth>;
+  equity_curve: [string, number][];
+  last_signal: { date: string; w: number; risk_on: boolean; qqq: number; qqq_ma50: number;
+                 rv20: number; px: number; target_shares: number } | null;
+  updated_at?: string;
+}
+export async function getQbtsChallenge(): Promise<QbtsChallenge | null> {
+  const { data, error } = await supabase
+    .from("crypto_challenge").select("data").eq("id", "qbts1000").maybeSingle();
+  if (error || !data) return null;
+  return data.data as QbtsChallenge;
+}
+
 /* 挑战「今日照做」篮子 + 全场杠杆ETF扫描 —— 每日 publish 算好放进 snapshot.challenge_basket。 */
 export interface ChallengeEtf {
   ticker: string;

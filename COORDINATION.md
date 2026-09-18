@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-09-18 · [opus] QBTS $1000 纸面挑战 bot(用户点单「给你1000刀自由买卖qbts,每月赚回订阅费,记录买卖」)· 规则=在册 QQQ50×波目(交叉验证 3/3),15:52 ET 收盘前执行,Alpaca paper(与 challenge2 同账户,只动 QBTS),状态存 crypto_challenge id='qbts1000' 零迁移 · files: backend/dashboard/qbts_challenge.py(new), aws/lambda_handlers.py, frontend/app/challenge/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, docs/CHALLENGE.md · 干跑通过(当前信号:QQQ 716.34>50日线 709.98,波动率 77% → 仓位 78% = 44 股),前端 build 绿,v3.13.0
+
 - [done] 2026-09-18 · [opus] 系统瘦身(用户拍板删 5 项,彻底删代码):地缘雷达 geopolitics · 机械 p_up(edge.py)+v1 反向影子 · DeepSeek 影子决策 · 游击战 guerrilla · /mu 第二考场 second_ticker · files: backend/dashboard/{geopolitics,edge,guerrilla,second_ticker,decision,journal,audit,calibration,...}.py, backend/api.py, aws/lambda_handlers.py, aws/template.yaml, frontend/app/**, docs/** · **结果**:删 9 个文件(geopolitics/edge/calibration/guerrilla/second_ticker .py + /mu 页 + second-board/calibration-card 组件),DeepSeek 影子与 v1 反向影子从决策/台账/前端摘除;摘除名单搬进 decision.py;本地快照+决策 prompt+champions+audit 冒烟通过,前端 build 绿,v3.12.0;清单见 docs/ARCHITECTURE.md §已删除模块
 
 - [done] 2026-09-18 · [opus] QBTS 决策台账全量回测(用户:「系统跑了这么久,回测一下 qbts 的决策」)· 只读:78 条→同信息集去重 56 份,yfinance 实价重算 · 结论:方向单 8 单 3 赚 5 亏(QBTX 复利 −31.6%)、4/8 方向单次日同数据被改回观望、表态命中 47% vs 瞎猜 48%、p_up corr −0.23、同期 QBTX −70% · 结论写入记忆 system-no-timing-edge · files: COORDINATION.md(仅协作记录)

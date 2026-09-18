@@ -46,3 +46,16 @@ $1000 → $1106.97(+10.7%),5 个交易日,2/2 全胜。**这是 n=1**:回测首�
 利润落袋不滚入下一把。
 
 Secrets:`ALPACA_API_KEY` / `ALPACA_SECRET_KEY`(空 = bot 关),见 [SECRETS.md](SECRETS.md)。
+
+## 🎯 QBTS $1000 · Claude 自营(2026-09-18 起)
+
+用户点单:「给你 1000 刀自由买卖 QBTS,自己想办法赚钱,至少每月赚回订阅费,记录买卖」。
+**纸面盘**(Alpaca paper,与 challenge2 同账户;本 bot 只碰 QBTS,challenge2 只碰杠杆 ETF)。
+
+- 代码:`backend/dashboard/qbts_challenge.py`;Lambda 15:52–15:57 ET 窗口每天一次(`last_run` 去重)
+- 状态:`crypto_challenge` 表 id=`qbts1000`(零迁移);前端 `/challenge` 页顶部卡片
+- 规则:在册「QQQ50×波动率目标」原样执行(replay.py `volreg` 同一公式),收盘前 8 分钟按实时价
+  调仓,变动 <10% 权益不动,无止损。**不新造信号**。
+- 订阅费目标按 $100/月 假设(`_SUB_FEE`,用户未告知金额)。
+- 上线时写下的预期(不许事后改):近 12 月月均 −0.1%、6/12 个月亏、3/12 个月 ≥+10%;
+  定型后(07-09 起)−31% vs 同期拿着 QBTS −23%。**没有证据支持每月稳赚订阅费。**
