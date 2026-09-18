@@ -36,7 +36,9 @@ export function QbtsChallengeCard() {
   const monthKey = Object.keys(c.months ?? {}).sort().pop();
   const month = monthKey ? c.months[monthKey] : null;
   const monthPnl = month?.pnl ?? month?.pnl_so_far ?? null;
-  const subProg = monthPnl != null ? Math.min(100, Math.max(0, (monthPnl / c.sub_fee) * 100)) : 0;
+  const monthRet = month && monthPnl != null ? monthPnl / month.start_equity : null;
+  const bh = month?.bh_ret ?? month?.bh_so_far ?? null;
+  const pct = (v: number | null) => v == null ? "—" : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`;
   const sig = c.last_signal;
   const trades = [...(c.trades ?? [])].reverse();
   const pastMonths = Object.entries(c.months ?? {})
@@ -77,14 +79,11 @@ export function QbtsChallengeCard() {
       </div>
 
       {month && (
-        <div>
-          <div className="flex justify-between text-meta text-ink-muted mb-1">
-            <span>{monthKey} 本月 {money(monthPnl, true)} / 订阅费目标 {money(c.sub_fee)}</span>
-            <span className="font-mono">{subProg.toFixed(0)}%</span>
-          </div>
-          <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-            <div className={`h-full ${subProg >= 100 ? "bg-emerald-500" : "bg-brand"}`} style={{ width: `${subProg}%` }} />
-          </div>
+        <div className="text-body text-gray-700">
+          <span className="font-semibold">{monthKey} 本月:</span>{" "}
+          <span className={`font-mono ${tone(monthPnl)}`}>{money(monthPnl, true)}({pct(monthRet)})</span>
+          <span className="text-ink-faint"> · 同月一直拿着 QBTS </span>
+          <span className={`font-mono ${tone(bh)}`}>{pct(bh)}</span>
         </div>
       )}
 
@@ -129,13 +128,14 @@ export function QbtsChallengeCard() {
 
       {pastMonths.length > 0 && (
         <div>
-          <div className="text-card font-semibold text-gray-800 mb-1.5">📅 月度成绩</div>
+          <div className="text-card font-semibold text-gray-800 mb-1.5">📅 月度成绩(对照:一直拿着 QBTS)</div>
           <div className="space-y-1 text-body font-mono">
             {pastMonths.map(([k, m]) => (
               <div key={k} className="flex gap-3">
                 <span>{k}</span>
-                <span className={tone(m.pnl)}>{money(m.pnl, true)}</span>
-                <span>{m.paid_sub ? "✅ 赚回订阅费" : "❌ 没赚回"}</span>
+                <span className={tone(m.pnl)}>{money(m.pnl, true)}({pct(m.ret ?? null)})</span>
+                <span className="text-ink-faint">拿着 QBTS {pct(m.bh_ret ?? null)}</span>
+                <span>{m.ret != null && m.bh_ret != null ? (m.ret > m.bh_ret ? "✅ 跑赢" : "❌ 跑输") : ""}</span>
               </div>
             ))}
           </div>
@@ -147,7 +147,7 @@ export function QbtsChallengeCard() {
         <p className="mt-1.5 leading-relaxed">{c.rule}</p>
         <p className="mt-1 leading-relaxed">
           上线时的回测预期:近 12 个月月均 −0.1%,一半月份亏钱,12 个月里只有 3 个月赚到 ≥10%。
-          没有证据支持「每月稳赚订阅费」—— 这是公开记账的实盘测试。纸面盘,非投资建议。
+          没有证据支持「每月稳定赚钱」—— 这是公开记账的实盘测试,对照是同期一直拿着 QBTS。纸面盘,非投资建议。
         </p>
       </details>
     </section>

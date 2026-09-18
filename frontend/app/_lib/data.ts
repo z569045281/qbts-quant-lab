@@ -1148,12 +1148,12 @@ export interface QbtsTrade {
   approx_px: boolean; reason: string; w: number; realized: number | null;
 }
 export interface QbtsMonth {
-  start_equity: number; end_equity: number | null; pnl: number | null;
-  paid_sub: boolean | null; pnl_so_far?: number;
+  start_equity: number; start_px?: number; end_equity: number | null; pnl: number | null;
+  ret?: number | null; bh_ret?: number | null; pnl_so_far?: number; bh_so_far?: number;
 }
 export interface QbtsChallenge {
   status: "running" | "ended";
-  started: string; start_cap: number; sub_fee: number;
+  started: string; start_cap: number;
   cash: number; shares: number; avg_px: number | null;
   equity: number; pnl: number; pnl_pct: number;
   rule: string;

@@ -3,6 +3,7 @@
 
 用户原话:「给你 1000 刀,自由买卖 QBTS,根据已有的数据和回测自己想办法赚钱,
 至少每个月赚回订阅费,记录买入和卖出,类似隔壁的 5000 挑战」。
+同日改口:「尽可能赚钱就可以,别管订阅费」→ 月报对照改成「同月一直拿着 QBTS」。
 
 **纸面,不是真金**(铁律:真金只给建议不代下单)。Alpaca paper 真实挂单、纸面成交,
 与 challenge2 同一个纸面账户;本 bot 只碰 QBTS,challenge2 只碰杠杆 ETF,互不串仓。
@@ -20,11 +21,11 @@
 上线时写下的诚实预期(2026-09-18,yfinance 实算,0.2%/边成本):
   近 12 个月月均 −0.1%,月中位 −1.8%;12 个月里 3 个月 ≥+10%、6 个月亏损;
   规则定型(07-09)后至今 −31%,同期一直拿着 QBTS −23%。
-  **没有证据支持「每月稳赚订阅费」**。这是一个公开记账的实盘测试,不是印钞机。
+  **没有证据支持「每月稳定赚钱」**。这是一个公开记账的实盘测试,不是印钞机。
 
 记账:crypto_challenge 表 id='qbts1000'(零迁移);前端 /challenge 页直读。
   trades   每一笔买卖(时间/方向/股数/成交价/金额/原因/已实现盈亏)
-  months   逐月:月初权益 → 月末权益、盈亏、是否赚回订阅费
+  months   逐月:月初权益 → 月末权益、盈亏,对照同月一直拿着 QBTS 的涨跌
 推送:买/卖/月报 → ntfy。
 """
 
@@ -41,7 +42,6 @@ _TABLE = "crypto_challenge"
 _ROW = "qbts1000"
 _SYM = "QBTS"
 _START = 1000.0
-_SUB_FEE = 100.0            # 每月目标:赚回订阅费。用户未告知金额,按 $100/月 假设
 _TARGET_VOL = 0.60          # 与 replay.volreg / exposure.py 同一常数
 _W_MIN, _W_MAX = 0.20, 1.00
 _REBAL_MIN = 0.10           # 目标与现仓相差 < 权益 10% → 不动
@@ -68,7 +68,7 @@ def _save(sb, st: dict) -> None:
 def _seed(now_et: datetime) -> dict:
     return {
         "status": "running", "started": now_et.date().isoformat(),
-        "start_cap": _START, "sub_fee": _SUB_FEE,
+        "start_cap": _START,
         "cash": _START, "shares": 0, "avg_px": None,
         "equity": _START, "pnl": 0.0, "pnl_pct": 0.0,
         "rule": ("QQQ 在 50 日线上才持有 QBTS 正股;仓位 = 0.6 ÷ QBTS 20 日波动率(20%~100%);"
@@ -121,7 +121,7 @@ def _order(side: str, qty: int) -> tuple[float | None, bool]:
     return _latest_px(_SYM), False
 
 
-def _roll_month(st: dict, now_et: datetime) -> None:
+def _roll_month(st: dict, now_et: datetime, px: float) -> None:
     """跨月:把上个月封账并推月报;给本月开账。"""
     key = now_et.strftime("%Y-%m")
     months = st.setdefault("months", {})
@@ -131,16 +131,18 @@ def _roll_month(st: dict, now_et: datetime) -> None:
         if m.get("end_equity") is None:
             m["end_equity"] = st["equity"]
             m["pnl"] = round(st["equity"] - m["start_equity"], 2)
-            m["paid_sub"] = m["pnl"] >= st.get("sub_fee", _SUB_FEE)
+            m["ret"] = round(m["pnl"] / m["start_equity"], 4)
+            m["bh_ret"] = round(px / m["start_px"] - 1, 4) if m.get("start_px") else None
+            vs = (f"\n同月一直拿着 QBTS:{m['bh_ret']*100:+.1f}% → "
+                  f"{'✅ 跑赢' if m['ret'] > m['bh_ret'] else '❌ 跑输'}"
+                  if m["bh_ret"] is not None else "")
             _ntfy("QBTS1000 monthly",
                   f"📅 {k} 月报:${m['start_equity']:,.2f} → ${m['end_equity']:,.2f}"
-                  f"({m['pnl']:+,.2f})\n"
-                  f"订阅费目标 ${st.get('sub_fee', _SUB_FEE):.0f}:"
-                  f"{'✅ 赚回来了' if m['paid_sub'] else '❌ 没赚回来'}\n"
+                  f"({m['pnl']:+,.2f} / {m['ret']*100:+.1f}%){vs}\n"
                   f"累计 ${st['equity']:,.2f}({st['pnl_pct']:+.1f}%)",
                   tags="calendar")
-    months[key] = {"start_equity": st["equity"], "end_equity": None, "pnl": None,
-                   "paid_sub": None}
+    months[key] = {"start_equity": st["equity"], "start_px": px, "end_equity": None,
+                   "pnl": None, "ret": None, "bh_ret": None}
 
 
 def maybe_qbts_tick(now_et: datetime, force: bool = False, dry: bool = False) -> "dict | None":
@@ -170,7 +172,7 @@ def maybe_qbts_tick(now_et: datetime, force: bool = False, dry: bool = False) ->
         return {"error": "no price"}
     st["equity"] = round(st["cash"] + st["shares"] * px, 2)
     if not dry:
-        _roll_month(st, now_et)
+        _roll_month(st, now_et, px)
 
     sig = target_weight(px, qqq, now_et.date())
     target_sh = int(sig["w"] * st["equity"] // px)
@@ -220,6 +222,8 @@ def maybe_qbts_tick(now_et: datetime, force: bool = False, dry: bool = False) ->
     m = st.get("months", {}).get(now_et.strftime("%Y-%m"))
     if m:
         m["pnl_so_far"] = round(st["equity"] - m["start_equity"], 2)
+        if m.get("start_px"):
+            m["bh_so_far"] = round(px / m["start_px"] - 1, 4)
     curve = st.get("equity_curve") or []
     curve.append([now_et.date().isoformat(), st["equity"]])
     st["equity_curve"] = curve[-_CURVE_CAP:]
