@@ -169,6 +169,27 @@ def is_price_result(title: str) -> bool:
     return bool(_PRICE_RESULT_RX.search(title or ""))
 
 
+# 律所拉客户稿 + 旧闻复盘稿(2026-09-18)。
+# 事故:09-17 QBTS +8.7%(真因是同行 IonQ+NVIDIA),雷达却把
+#   「QBTS Investigation: ... Investors are Encouraged to Contact KTMC Law Firm」
+#   「D-Wave Quantum (QBTS) Faces Multiple Legal Probes After Q2 Miss And CFO Exit」
+# 判成 high → 整体 breaking → 事件日推送写「breaking:CFO离职+法律调查」当成大涨原因。
+# 可 CFO 离职是 **08-25** 宣布的(三周前),"法律调查"是股价跌过之后律所例行群发的
+# 招揽广告 —— 任何一只跌过的股票都会收到一堆。提示词里「新文章≠新事件」早就写了,
+# Haiku 照样判 high,所以护栏落在代码里。
+_LEGAL_SPAM_RX = re.compile(
+    r"(law\s+firm|investors?\s+(are\s+)?encouraged\s+to\s+contact"
+    r"|investigation\s+(notice|alert)|shareholder\s+alert|class\s+action"
+    r"|securities\s+fraud|lead\s+plaintiff|deadline\s+(reminder|alert)"
+    r"|legal\s+probes?|\bINVESTOR\s+ALERT\b"
+    r"|\bwhat\s+is\s+.{0,40}\bfacing\b)", re.I)
+
+
+def is_legal_spam(title: str) -> bool:
+    """律所招揽 / 「XX 面临什么」复盘稿 → 不是新事件,一律 low。"""
+    return bool(_LEGAL_SPAM_RX.search(title or ""))
+
+
 def _entities(title: str) -> set[str]:
     """标题 → 专名集合(故事身份)。
 
@@ -371,7 +392,15 @@ def get_catalyst_snapshot(force_refresh: bool = False) -> dict | None:
             it["impact"]    = r.get("impact", "low")
             it["direction"] = r.get("direction", "neutral")
             it["note_cn"]   = str(r.get("note_cn", ""))[:60]
+            if it["impact"] != "low" and is_legal_spam(it["title"]):
+                it["impact"] = "low"                 # 代码层护栏,不信 LLM
+                it["note_cn"] = ("律所招揽/旧闻复盘,非新事件 · " + it["note_cn"])[:60]
         level = ai.get("impact_level") if ai.get("impact_level") in _IMPACT_CN else "watch"
+        # breaking 必须有一条**过了护栏**的 high 撑着;撑它的全被护栏降级了 → 降为 watch。
+        # (event_day 读的就是这个级别,假 breaking 会直接变成一条「⚠️ 事件日」。)
+        if level == "breaking" and not any(
+                it["impact"] == "high" and not is_price_result(it["title"]) for it in items):
+            level = "watch"
         payload = {
             "as_of":        datetime.now(timezone.utc).isoformat(),
             "impact_level": level,

@@ -175,6 +175,39 @@ def detect_event_day(df_d, live_price: float | None = None,
         return None
 
 
+_RANK = {"high": 2, "medium": 1}
+
+
+def _explain(catalyst: dict | None, chg: float | None) -> tuple[str | None, bool]:
+    """给这次跳空找一条**方向吻合**的消息当线索 → (文字, 是否吻合)。
+
+    2026-09-18 事故:09-17 QBTS +8.1%,推送里写「雷达最近消息:D-Wave Q2 营收持平…
+    Rigetti 获 CHIPS 拨款」,第二条写「breaking:D-Wave CFO 离职+法律调查」—— 一条
+    偏空的旧闻被摆在「大涨」旁边当原因。真因是同行 IonQ+NVIDIA,雷达条目里其实有。
+    病根:这里直接用了雷达的**整体摘要 headline_cn**,它回答的是「最近最重要的消息
+    是什么」,不是「今天为什么涨」。
+
+    规则:只挑方向与跳空一致的 high/medium 条目(同级取最新);挑不到就**明说没找到**,
+    不拿一条对不上的消息凑数 —— 凑数比空着更误导。"""
+    items = (catalyst or {}).get("items") or []
+    if chg is None or not items:
+        return (catalyst or {}).get("headline_cn"), False
+    want = "bullish" if chg > 0 else "bearish"
+    try:
+        from dashboard.catalyst_radar import is_price_result, is_legal_spam
+    except Exception:
+        is_price_result = is_legal_spam = lambda _t: False
+    cand = [it for it in items
+            if it.get("direction") == want and it.get("impact") in _RANK
+            and not is_price_result(it.get("title", ""))
+            and not is_legal_spam(it.get("title", ""))]
+    if not cand:
+        return None, False
+    best = max(cand, key=lambda it: (_RANK[it["impact"]], it.get("published") or ""))
+    tag = f"[{best.get('track_cn', '')}] " if best.get("track_cn") else ""
+    return f"{tag}{best.get('note_cn') or best.get('title', '')}", True
+
+
 def from_quote(quotes: dict | None, catalyst: dict | None = None) -> dict | None:
     """分钟级用的轻量版:直接吃 quote_pusher 已经算好的 `change_pct`
     (= price/prev_close−1),不碰 yfinance —— 每分钟的 Lambda 里不能拉日线。"""
@@ -199,9 +232,12 @@ def from_quote(quotes: dict | None, catalyst: dict | None = None) -> dict | None
         reasons.append(f"催化剂雷达 🔴 breaking:{((catalyst or {}).get('headline_cn') or '')[:40]}")
     if not reasons:
         return None
+    why, why_ok = _explain(catalyst, float(chg) if chg is not None else None)
     return {
         "is_event_day": True,
         "reasons": reasons,
+        "why_cn": why,
+        "why_matched": why_ok,
         "gap": round(float(chg), 4) if chg is not None else None,
         "gap_basis": "实时价",
         "price": q.get("price"),
@@ -286,8 +322,13 @@ def maybe_event_day_push(prev: dict | None, now_et, quotes: dict | None,
     head = ev.get("catalyst_headline")
     body = (f"QBTS ${px:.2f}\n" if px else "")
     body += "\n".join(f"· {r}" for r in ev["reasons"])
-    if head and ev.get("catalyst_level") != "breaking":
-        # breaking 已经作为 reason 写进去了,别重复;watch 级则单独带一行当线索
+    # 线索行:只给方向对得上的消息;对不上就明说(见 _explain 的 09-17 事故)。
+    if ev.get("why_matched"):
+        body += f"\n· 可能的原因:{(ev.get('why_cn') or '')[:60]}"
+    elif ev.get("gap") is not None:
+        body += ("\n· 雷达没找到能解释这个方向的消息 —— 先看同行(IONQ/RGTI)是不是"
+                 "一起在动,量子股常常是板块联动")
+    elif head and ev.get("catalyst_level") != "breaking":
         body += f"\n· 雷达最近消息:{head[:50]}"
     body += ("\n\n技术面结论已熔断:跳空≥8% 档实测 t=+0.36 / p=0.72,"
              "超卖、折价区、均线这些读数今天没有分辨力。\n"
