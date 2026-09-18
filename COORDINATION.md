@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-09-18 · [opus] QBTS 决策台账全量回测(用户:「系统跑了这么久,回测一下 qbts 的决策」)· 只读:78 条→同信息集去重 56 份,yfinance 实价重算 · 结论:方向单 8 单 3 赚 5 亏(QBTX 复利 −31.6%)、4/8 方向单次日同数据被改回观望、表态命中 47% vs 瞎猜 48%、p_up corr −0.23、同期 QBTX −70% · 结论写入记忆 system-no-timing-edge · files: COORDINATION.md(仅协作记录)
+
 - [done] 2026-09-18 · [opus] 事件日原因写错 · 09-17 QBTS +8.1% 两条「⚠️ 事件日」:第一条线索写 Q2 营收持平/Rigetti 拨款,第二条写「breaking:CFO 离职+法律调查」—— CFO 离职是 08-25 旧闻,「法律调查」是律所招揽稿,方向还是偏空。**两修**:①catalyst_radar 新增 `is_legal_spam` 代码护栏(律所招揽/「XX 面临什么」复盘稿强制 low),撑 breaking 的 high 全被护栏降级时整体降为 watch —— 那天第二条事件日推送本不该发 ②event_day 新增 `_explain`:只拿方向与跳空一致的 high/medium 条目当「可能的原因」,找不到就明说并提示看同行联动,不再拿雷达整体摘要凑数。**实测**:喂 09-17 当时雷达状态 → 线索变成「[板块同行] IonQ 联手 NVIDIA…」;只有偏空条目时输出「没找到」。files: backend/dashboard/catalyst_radar.py, backend/dashboard/event_day.py
 
 - [done] 2026-09-18 · [opus] 催化剂雷达漏推 IonQ-NVIDIA · 用户:「这种大新闻要推给我」。**查证**:09-16 IonQ+NVIDIA+ORNL 新闻稿 → 09-17 IONQ +9.6%/QBTS +8.7%,雷达零推送。回放 09-16:旧 sector 检索式前 **40** 条里没有一条 IonQ-NVIDIA(被 Blockchain Council 科普稿和 QUBT「Quantum Computing Inc.」刷满,生产只取前 10);按同行点名检索前 15 条里有 4-5 条。**三修**:①拆出 peers track(IonQ/Rigetti/Infleqtion/IBM quantum/Quantinuum),泛行业 track 收窄到合同/拨款/NVIDIA/突破 ②同行名/代码加进 `_UBIQUITOUS`(否则推过一条 IonQ 后当日所有 IonQ 新闻被判同一故事吞掉)③提示词:同行+巨头/国家实验室联合突破 = high。**实测**:新配置真跑 Haiku 重放 09-16 → IonQ-NVIDIA 判 high 进推送(15:04 ET,比大涨早一天)。前端 track 类型加 peers,v3.11.1。files: backend/dashboard/catalyst_radar.py, frontend/app/_lib/data.ts, frontend/public/version.json
