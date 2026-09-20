@@ -317,6 +317,21 @@ export default function Dashboard() {
     qbtx: (liveCurrent ? live?.quotes?.qbtx?.price : null) ?? snap.etf_prices?.qbtx,
     qbtz: (liveCurrent ? live?.quotes?.qbtz?.price : null) ?? snap.etf_prices?.qbtz,
   };
+  // 📊 成交量画像:磁吸位与「现价在价值区哪边」按**实时价**重算(2026-09-21 用户点单)。
+  // 快照是每天 09:00 ET 发布那一刻算的 —— 价格走远后,「上方磁吸」可能已经在脚下
+  // (09-18 实况:卡上写「上方磁吸 $16.81」,而现价已经 $17.93)。
+  // 价位表(POC/HVN/naked POC/价值区)是历史成交结构,不随分钟变;变的只是现价落在
+  // 它们中间的哪一格 —— 所以只重算「在哪边、最近的是谁」,价位本身一个都不动。
+  const vpLive = (() => {
+    const vp = snap.volume_profile;
+    if (!vp || !qPrice) return null;
+    const levels = [...vp.hvn, ...vp.naked_pocs_above, ...vp.naked_pocs_below];
+    const up = levels.filter(p => p > qPrice).sort((a, b) => a - b)[0] ?? null;
+    const down = levels.filter(p => p < qPrice).sort((a, b) => b - a)[0] ?? null;
+    const where = qPrice > vp.vah ? "above" : qPrice < vp.val ? "below" : "inside";
+    // 现价离快照价 ≥1% → action_hint 那段文字是按旧价写的,标出来别当实时结论
+    return { up, down, where, stale: Math.abs(qPrice / vp.price - 1) >= 0.01, snapPx: vp.price };
+  })();
   // QBTS 价位 → QBTX/QBTZ 等价价(2026-09-18 用户点单:成交量画像每个价位旁要看到两只 ETF)。
   // 以 QBTS 现价与 ETF 现价为锚,按 ±2× 当日换算:ETF × (1 ± 2 × (价位/QBTS现价 − 1))。
   // 只是近似 —— 杠杆 ETF 每日再平衡,隔日就会偏;薄流动性时 ETF 现价本身也可能滞后(见 ⏱)。
@@ -1376,11 +1391,11 @@ export default function Dashboard() {
                 📊 成交量画像 / POC
               </span>
               <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${
-                snap.volume_profile.price_vs_value === "above" ? "bg-emerald-100 text-emerald-700"
-                : snap.volume_profile.price_vs_value === "below" ? "bg-red-100 text-red-700"
+                (vpLive?.where ?? snap.volume_profile.price_vs_value) === "above" ? "bg-emerald-100 text-emerald-700"
+                : (vpLive?.where ?? snap.volume_profile.price_vs_value) === "below" ? "bg-red-100 text-red-700"
                 : "bg-gray-100 text-ink-faint"}`}>
-                现价{snap.volume_profile.price_vs_value === "above" ? "在价值区上方"
-                  : snap.volume_profile.price_vs_value === "below" ? "在价值区下方" : "在价值区内"}
+                现价{(vpLive?.where ?? snap.volume_profile.price_vs_value) === "above" ? "在价值区上方"
+                  : (vpLive?.where ?? snap.volume_profile.price_vs_value) === "below" ? "在价值区下方" : "在价值区内"}
               </span>
             </div>
             {/* 价值区刻度 */}
@@ -1401,22 +1416,25 @@ export default function Dashboard() {
                   : "bg-gray-100 text-ink-faint"}`}>
                   👉 {snap.volume_profile.stance}
                 </span>
-                <span className="text-gray-700">{snap.volume_profile.action_hint}</span>
+                <span className="text-gray-700">{snap.volume_profile.action_hint}
+                  {vpLive?.stale && (
+                    <span className="text-meta text-ink-faint"> （这段按快照价 {fmtPx(vpLive.snapPx)} 写的,现价 {fmtPx(qPrice)}）</span>
+                  )}</span>
               </div>
             )}
             <div className="space-y-1.5 text-body">
-              {snap.volume_profile.nearest_magnet_up != null && (
+              {(vpLive ? vpLive.up : snap.volume_profile.nearest_magnet_up) != null && (
                 <div className="flex items-center justify-between px-2.5 py-1.5 rounded-inner bg-emerald-50/60 border border-emerald-100">
                   <span className="text-emerald-700 font-medium">▲ 上方磁吸</span>
-                  <span className="font-mono text-gray-700 text-right">${snap.volume_profile.nearest_magnet_up.toFixed(2)}
-                    <span className="ml-1 text-meta text-ink-faint">{etfEq(snap.volume_profile.nearest_magnet_up)}</span></span>
+                  <span className="font-mono text-gray-700 text-right">${(vpLive?.up ?? snap.volume_profile.nearest_magnet_up)!.toFixed(2)}
+                    <span className="ml-1 text-meta text-ink-faint">{etfEq(vpLive?.up ?? snap.volume_profile.nearest_magnet_up)}</span></span>
                 </div>
               )}
-              {snap.volume_profile.nearest_magnet_down != null && (
+              {(vpLive ? vpLive.down : snap.volume_profile.nearest_magnet_down) != null && (
                 <div className="flex items-center justify-between px-2.5 py-1.5 rounded-inner bg-red-50/60 border border-red-100">
                   <span className="text-red-700 font-medium">▼ 下方磁吸</span>
-                  <span className="font-mono text-gray-700 text-right">${snap.volume_profile.nearest_magnet_down.toFixed(2)}
-                    <span className="ml-1 text-meta text-ink-faint">{etfEq(snap.volume_profile.nearest_magnet_down)}</span></span>
+                  <span className="font-mono text-gray-700 text-right">${(vpLive?.down ?? snap.volume_profile.nearest_magnet_down)!.toFixed(2)}
+                    <span className="ml-1 text-meta text-ink-faint">{etfEq(vpLive?.down ?? snap.volume_profile.nearest_magnet_down)}</span></span>
                 </div>
               )}
               {snap.volume_profile.naked_pocs_above.length + snap.volume_profile.naked_pocs_below.length > 0 && (
