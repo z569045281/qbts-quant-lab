@@ -265,6 +265,17 @@ export interface WaveState {
   legs: { up: WaveLegStats | null; down: WaveLegStats | null };
   since: string;
   note: string;
+  best?: {   // 🧪 第四十六轮样本内冠军(过拟合,观察项,不进决策不推送)
+    params: { th: number; tp: number; tmax: number; stop: number };
+    study: { window: string; ret: number; bh: number; oos_note: string };
+    state: {
+      in_position: boolean; wave_trend: "up" | "down" | "none";
+      wave_extreme: number; wave_extreme_date: string;
+      entry?: number; entry_date?: string; held?: number;
+      tp_price?: number; stop_price?: number; days_left?: number; trigger?: number;
+    };
+    trades: { buy_date: string; buy: number; sell_date: string; sell: number; ret: number; why: string }[];
+  };
 }
 
 export interface VolumeProfile {

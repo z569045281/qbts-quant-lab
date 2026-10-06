@@ -97,6 +97,60 @@ def _legs(pivots: list[dict]) -> dict:
     return {"up": summary(up), "down": summary(down)}
 
 
+# 🧪 第四十六轮的样本内冠军(2026-10-06 用户点单「把最佳组合的海浪放上去」)。
+# **观察项,不是信号**:11,200 组里事后挑出来的,样本外第 2 年 −43%(排 10,241/11,200),
+# 两年排名秩相关 −0.48。按铁律「判死的策略不复活」—— 只显示,不进决策 prompt、不推送。
+BEST = {"th": 0.12, "tp": 1.00, "tmax": 20, "stop": 0.10}
+BEST_STUDY = {   # 第四十六轮原始数字,写死(不随每天滚动改变)
+    "window": "2024-10-07 → 2026-10-05", "ret": 46.89, "bh": 15.29,
+    "oos_note": "用第 1 年挑出的冠军,第 2 年 −43%(排 10,241/11,200);两年排名负相关 −0.48",
+}
+
+
+def best_combo(close: pd.Series) -> dict:
+    """按冠军规则逐日走(因果):12% 浪确认起浪当天收盘买;+100% 止盈 / −10% 止损 / 满 20 天卖。"""
+    c, idx = close.values, close.index
+    th, tp, tmax, stop = BEST["th"], BEST["tp"], BEST["tmax"], BEST["stop"]
+    trend, a, e = 0, 0, 0
+    pos, ent, ent_i = False, 0.0, 0
+    trades = []
+    for i in range(1, len(c)):
+        p, flip_up = c[i], False
+        if trend >= 0 and p > c[e]:
+            e = i
+        elif trend == -1 and p < c[e]:
+            e = i
+        if trend == 0:
+            if p >= c[a] * (1 + th):
+                trend, e, flip_up = 1, i, True
+            elif p <= c[a] * (1 - th):
+                trend, e = -1, i
+        elif trend == 1 and p <= c[e] * (1 - th):
+            trend, a, e = -1, e, i
+        elif trend == -1 and p >= c[e] * (1 + th):
+            trend, a, e, flip_up = 1, e, i, True
+        if pos:
+            held = i - ent_i
+            why = ("止损" if p <= ent * (1 - stop) else "止盈" if p >= ent * (1 + tp)
+                   else "到期" if held >= tmax else None)
+            if why:
+                trades.append({"buy_date": str(pd.Timestamp(idx[ent_i]).date()), "buy": round(float(ent), 2),
+                               "sell_date": str(pd.Timestamp(idx[i]).date()), "sell": round(float(p), 2),
+                               "ret": round(float(p / ent - 1), 4), "why": why})
+                pos = False
+        elif flip_up:
+            pos, ent, ent_i = True, float(p), i
+    state = {"in_position": pos, "wave_trend": {1: "up", -1: "down"}.get(trend, "none"),
+             "wave_extreme": round(float(c[e]), 2), "wave_extreme_date": str(pd.Timestamp(idx[e]).date())}
+    if pos:
+        state.update({"entry": round(ent, 2), "entry_date": str(pd.Timestamp(idx[ent_i]).date()),
+                      "held": int(len(c) - 1 - ent_i), "tp_price": round(ent * (1 + tp), 2),
+                      "stop_price": round(ent * (1 - stop), 2), "days_left": int(tmax - (len(c) - 1 - ent_i))})
+    elif trend == -1:
+        state["trigger"] = round(float(c[e]) * (1 + th), 2)     # 收盘站上这里 = 12% 起浪确认 = 买入
+    return {"params": BEST, "study": BEST_STUDY, "state": state, "trades": trades[-6:]}
+
+
 def compute_wave(df_d: pd.DataFrame) -> dict | None:
     """日线 → 浪潮状态。失败返回 None(前端不显示这条状态栏)。"""
     try:
@@ -113,6 +167,10 @@ def compute_wave(df_d: pd.DataFrame) -> dict | None:
             "note": ("地图,不是买卖信号:历史回测里,浪走到哪一步对之后 10/20 天的涨跌"
                      "没有稳定的预测力(前后两半样本结论相反)。高抛低吸已判死。"),
         }
+        try:
+            out["best"] = best_combo(close)
+        except Exception as e:
+            logger.warning(f"wave best_combo failed: {e}")
         return out
     except Exception as e:
         logger.warning(f"wave compute failed: {e}")

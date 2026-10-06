@@ -15,6 +15,28 @@ function rank(stats: WaveLegStats | null, mag: number, up: boolean): number | nu
   return k / stats.mags.length;
 }
 
+type Best = NonNullable<WaveState["best"]>;
+
+/** 收起状态下的一行:回测冠军现在空仓还是持仓、什么价位会动 */
+function BestLine({ best, price, eq }: { best: Best; price: number; eq?: (lvl: number) => string }) {
+  const s = best.state;
+  let text: string;
+  if (s.in_position && s.entry != null) {
+    text = `持有中:${s.entry_date?.slice(5)} 买在 $${s.entry.toFixed(2)}(${pct(price / s.entry - 1)})· 止盈 $${s.tp_price?.toFixed(2)} / 止损 $${s.stop_price?.toFixed(2)} / 还剩 ${s.days_left} 天`;
+  } else if (s.trigger != null) {
+    text = price >= s.trigger
+      ? `空仓 · 现价已过 $${s.trigger.toFixed(2)},今天收盘守住就会买入`
+      : `空仓 · 收盘站上 $${s.trigger.toFixed(2)}${eq ? ` ${eq(s.trigger)}` : ""} 会买入(还差 ${pct(s.trigger / price - 1)})`;
+  } else {
+    text = "空仓 · 等下一次回落后起浪";
+  }
+  return (
+    <div className="mt-1 text-meta text-violet-700">
+      🧪 回测冠军(过拟合,只观察):{text}
+    </div>
+  );
+}
+
 export function WaveBar({ wave, price, eq }: {
   wave: WaveState; price: number; eq?: (lvl: number) => string;
 }) {
@@ -69,6 +91,7 @@ export function WaveBar({ wave, price, eq }: {
           </span>
           <span className="ml-auto text-meta text-brand group-open:hidden">展开 ›</span>
         </div>
+        {wave.best && <BestLine best={wave.best} price={price} eq={eq} />}
       </summary>
 
       <div className="mt-3 space-y-3 text-body text-gray-700">
@@ -121,6 +144,40 @@ export function WaveBar({ wave, price, eq }: {
         <p className="text-meta text-ink-muted">
           切法:收盘价反向走满 {Math.round(th * 100)}% 才算一浪结束(数据自 {wave.since})。⚠️ {wave.note}
         </p>
+
+        {wave.best && (
+          <div className="rounded-inner border border-violet-200 bg-violet-50/60 px-2.5 py-2 text-meta text-gray-700">
+            <div className="font-semibold text-violet-800">
+              🧪 回测冠军(第四十六轮,11,200 组里事后挑出来的)
+            </div>
+            <div className="mt-0.5">
+              规则:12% 浪「确认起浪」(从低点反弹 12%)当天收盘买 · 涨 +{Math.round(wave.best.params.tp * 100)}% 止盈
+              · 跌 −{Math.round(wave.best.params.stop * 100)}% 止损 · 最多拿 {wave.best.params.tmax} 天
+            </div>
+            <div className="mt-0.5">
+              {wave.best.study.window}:回测 <b>+{Math.round(wave.best.study.ret * 100).toLocaleString()}%</b>,
+              一直拿着 +{Math.round(wave.best.study.bh * 100).toLocaleString()}%。
+              <b className="text-down"> 但这是过拟合:</b>{wave.best.study.oos_note}。只观察,不是买卖建议,不推送。
+            </div>
+            {wave.best.trades.length > 0 && (
+              <div className="mt-1.5 overflow-x-auto">
+                <table className="w-full font-mono">
+                  <thead className="text-ink-faint text-left"><tr><th className="pr-2">买入</th><th className="pr-2">卖出</th><th className="pr-2 text-right">结果</th><th>原因</th></tr></thead>
+                  <tbody>
+                    {[...wave.best.trades].reverse().map((t, i) => (
+                      <tr key={i} className="border-t border-violet-100">
+                        <td className="pr-2 whitespace-nowrap">{t.buy_date.slice(5)} ${t.buy.toFixed(2)}</td>
+                        <td className="pr-2 whitespace-nowrap">{t.sell_date.slice(5)} ${t.sell.toFixed(2)}</td>
+                        <td className={`pr-2 text-right ${t.ret >= 0 ? "text-emerald-600" : "text-down"}`}>{pct(t.ret)}</td>
+                        <td className="font-sans">{t.why}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </details>
   );
