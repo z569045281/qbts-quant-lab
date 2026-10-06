@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-10-06 · [opus] 定投区复核(用户「里面的股有没有过时」):7 只 ETF 都没过时(费率/规模仍是同类最好;VTI 7-29 改名 Morningstar 只是改名、指数方法不变;VWO 费率降到 0.06%);写死的 CAPE 更新 40.4→41.1(美)、27.7→29.1(全球)· files: backend/dashboard/dca.py
+
 - [done] 2026-10-06 · [opus] 恢复定投专区(用户「我的定投区呢?」):/dca 页面、dca-calculator、DcaState 类型逐字节恢复;买房基金挪到 /house + 导航新增一项 · v3.15.1 · files: frontend/app/{dca,house}/page.tsx, frontend/app/_components/{nav,dca-calculator}.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, docs/SURFACES.md
 
 - [done] 2026-10-06 · [opus] /dca 定投专区改成「🏠 买房基金 · 人生财富积累」(用户点单,真金用)· 澳洲/维州首置政策 + 当前利率实查 + 个人情况计算器 · files: frontend/app/dca/page.tsx, frontend/app/_components/nav.tsx, frontend/public/version.json, docs/SURFACES.md · 8 条办法+计算器,外链全部 curl 验证(4 个 404 已换官方地址),默认输入核对印花税 $11,357/5% 路线 $47,857/FHSS 3 年 +$9,649,v3.15.0;删无用的 dca-calculator 与 DcaState 类型;后端 dca.py 未动

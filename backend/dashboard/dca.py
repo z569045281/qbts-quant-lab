@@ -216,10 +216,11 @@ def compute_dca(tickers: list[str] | None = None) -> dict:
         # macro valuation backdrop (CAPE — re-verify periodically; cross-country CAPE
         # should be judged vs each market's OWN history, not compared absolutely)
         "macro": {
-            "us_cape": 40.4, "global_cape": 27.7, "as_of": "2026-07",
-            "note": "美股 Shiller CAPE ≈40.4(GuruFocus 2026-07-01;近互联网泡沫极值,Shiller 模型"
-                    "预期未来十年年化仅 ~1–2%);全球整体 ≈27.7(Siblis 2026-01)。便宜在非美/新兴。"
-                    "这是 7–10 年的弱倾斜信号、不是择时,数据需定期复核。",
+            # 2026-10-06 复核(用户问「定投区的股有没有过时」):两个数都旧了,结论没变。
+            "us_cape": 41.1, "global_cape": 29.1, "as_of": "2026-10",
+            "note": "美股 Shiller CAPE ≈41.1(GuruFocus 2026-10-01;史上第二高,仅次于 1999 年的 44.2,"
+                    "5 月起一直在 40 以上);全球整体 ≈29.1、除美 ≈21.0、新兴 ≈19.4(Siblis 2026-06/07)。"
+                    "便宜在非美/新兴。这是 7–10 年的弱倾斜信号、不是择时,数据需定期复核。",
         },
         "ballast": "压舱石已纳入配置(BND 12% + GLDM 8%):债缓冲股灾,黄金对冲 2022 那种"
                    "股债双杀(机构界 2026 年已把 5~10% 黄金当主流配置)。十年不用 + 扛得住 → "
