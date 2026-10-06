@@ -5,6 +5,7 @@
    ⚠️ 地图,不是买卖信号:回测里浪的位置对之后涨跌没有稳定预测力;高抛低吸已判死。 */
 
 import type { WaveState, WaveLegStats } from "../_lib/data";
+import { WaveScene, type ScenePivot } from "./wave-scene";
 
 const pct = (v: number, d = 1) => `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(d)}%`;
 
@@ -63,13 +64,21 @@ export function WaveBar({ wave, price, eq }: {
   const daysRank = stats && !flipped
     ? stats.days.filter(d => d < c.days).length / stats.days.length : null;
 
-  // 刻度:把当前幅度放在历史同向浪的 25/50/75 分位旁边
-  const scaleMax = up ? Math.max(1.5, mag * 1.1) : Math.min(-0.6, mag * 1.1);
-  const pos = (v: number) => `${Math.min(100, Math.max(0, (v / scaleMax) * 100))}%`;
+  // 动画用的转折点:已确认的 + 这一浪目前的极值(还没被反向 20% 确认,标「暂定」)
+  const scenePivots: ScenePivot[] = wave.pivots.slice(-6).map(p => ({ ...p }));
+  const lastDate = scenePivots[scenePivots.length - 1]?.date ?? "";
+  if (flipped) {
+    scenePivots.push({ kind: up ? "trough" : "peak", date: c.extreme_date, price: anchor });
+  } else if (c.extreme_date > lastDate && Math.abs(c.extreme_price / price - 1) > 0.005) {
+    scenePivots.push({ kind: up ? "peak" : "trough", date: c.extreme_date, price: c.extreme_price, tentative: true });
+  }
+  const sceneLabel = `QBTS 浪潮图:${up ? "上涨浪" : "回落浪"},从${up ? "浪底" : "浪尖"} $${anchor.toFixed(2)} ${up ? "涨了" : "回落"} ${pct(mag)};`
+    + `${up ? "跌回" : "反弹到"} $${confirm.toFixed(2)} 才算${up ? "这一浪结束" : "新一浪开始"}。`
+    + scenePivots.map(p => `${p.kind === "peak" ? "浪尖" : "浪底"} ${p.date} $${p.price.toFixed(2)}`).join(",");
 
   return (
-    <details className={`group min-w-0 rounded-card border px-4 py-2.5 ${
-      up ? "border-sky-200 bg-sky-50/60" : "border-amber-200 bg-amber-50/50"}`}>
+    <details className="group min-w-0 rounded-card border border-hairline bg-surface px-4 py-3
+                        shadow-[0_1px_2px_rgba(0,0,0,0.05),0_6px_20px_rgba(0,0,0,0.05)]">
       <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
         <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-body">
           <span className={`text-meta px-2 py-0.5 rounded-full font-semibold ${
@@ -92,28 +101,16 @@ export function WaveBar({ wave, price, eq }: {
           <span className="ml-auto text-meta text-brand group-open:hidden">展开 ›</span>
         </div>
         {wave.best && <BestLine best={wave.best} price={price} eq={eq} />}
+        {scenePivots.length >= 2 && (
+          <div className="mt-2.5 overflow-hidden rounded-inner">
+            <WaveScene pivots={scenePivots} price={price} up={up} confirm={confirm}
+              trigger={wave.best?.state.in_position ? null : wave.best?.state.trigger ?? null}
+              ariaLabel={sceneLabel} />
+          </div>
+        )}
       </summary>
 
       <div className="mt-3 space-y-3 text-body text-gray-700">
-        {/* 刻度条 */}
-        {stats && (
-          <div>
-            <div className="relative h-2.5 rounded-full bg-white border border-hairline">
-              <div className={`absolute top-0 h-full rounded-full ${up ? "bg-sky-300" : "bg-amber-300"}`}
-                // 色块从「离 0 较近的四分位」画到「较远的四分位」(回落浪的 p75 比 p25 浅)
-                style={{ left: pos(up ? stats.mag_p25 : stats.mag_p75),
-                         width: `calc(${pos(up ? stats.mag_p75 : stats.mag_p25)} - ${pos(up ? stats.mag_p25 : stats.mag_p75)})` }} />
-              <div className="absolute top-[-3px] h-4 w-0.5 bg-gray-500" style={{ left: pos(stats.mag_median) }} />
-              <div className={`absolute top-[-4px] h-[18px] w-[18px] -ml-[9px] rounded-full border-2 border-white ${up ? "bg-sky-600" : "bg-amber-600"}`}
-                style={{ left: pos(mag) }} title={`现在 ${pct(mag)}`} />
-            </div>
-            <div className="mt-1 flex justify-between text-meta text-ink-faint font-mono">
-              <span>0%</span>
-              <span>{pct(scaleMax, 0)}</span>
-            </div>
-            <div className="text-meta text-ink-faint">色块 = 历史一半的浪落在这里 · 竖线 = 中位 {pct(stats.mag_median, 0)} · 圆点 = 现在</div>
-          </div>
-        )}
 
         <div className="grid gap-2 sm:grid-cols-2 text-meta">
           {wave.legs.up && (

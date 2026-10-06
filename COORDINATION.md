@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-10-06 · [opus] 决策引擎换 Opus 5.5 + 网站能实时的都实时(用户 /apple-design 点单)· files: backend/dashboard/decision.py, aws/lambda_handlers.py, backend/dashboard/intraday_smc.py?, frontend/app/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, docs/DECISION.md · Opus 5.5(effort high + 服务端拒答兜底 + 4.8 客户端兜底)真实快照跑通;实时化:大盘红绿灯/z40 进 5 分钟重算,军规卡大盘条件、等什么卡三条扳机盘中读数、深坑报警器、K 线现价线接实时价;🌊 黄条换成动画海浪(wave-scene.tsx),浅/深/375px 截图核对;v3.18.0
+
 - [done] 2026-10-06 · [opus] 浪潮栏挂上第四十六轮「最佳组合」(用户点单)· 观察项:浪 12%·确认起浪·止盈+100%·最多20天·止损10%;只显示状态/触发价/最近交易 + 过拟合警示,不进决策不推送(铁律判死不复活)· files: backend/dashboard/wave.py, frontend/app/_components/wave-bar.tsx, frontend/app/_lib/data.ts, frontend/public/version.json · 当前状态:空仓,收盘站上 $17.52 会买;最近 6 笔 5 笔止损;v3.17.1
 
 - [done] 2026-10-06 · [opus] 第四十六轮:浪潮参数穷举(用户「测每一种可能性找近2年最佳组合,哪怕过拟合,先看效果」)· 纯研究只读,不接系统;高抛低吸家族已判死,本轮只为展示过拟合上限 + 样本外 · files: mining.md · 11,200 组;样本内冠军 +4,689% vs 拿着 +1,529%,但第1年冠军第2年 −43%(排 10,241),两年排名秩相关 −0.48 → 判死,写入 mining.md

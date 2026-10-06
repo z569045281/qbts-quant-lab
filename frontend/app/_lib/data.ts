@@ -520,6 +520,7 @@ export interface WaitingTrigger {
   reading: string;
   hint:    string;
   aux?:    boolean;          // 辅助腿:只加信心不独立开枪
+  trigger_px?: number | null; // 特调:收盘站上这个价才算触发(前端拿实时价比)
 }
 export interface WaitingFor {
   gate: { regime: string | null; note: string | null };
@@ -819,6 +820,15 @@ export interface LiveQuoteEntry {
   ov_ask?:    number;
   ov_trade?:  number;
 }
+/** 大盘红绿灯(SPY/QQQ 对 50 日线 + VIX)。live 版每 5 分钟重算,盘中带今天未收盘的 bar。 */
+export interface MarketLight {
+  regime: "risk_on" | "caution" | "risk_off";
+  note: string; vix: number;
+  spy_vs_50dma: number; qqq_vs_50dma: number;
+  ionq_ret_1d: number | null; rgti_ret_1d: number | null;
+  asof?: string;
+}
+
 export interface LiveQuote {
   session:    "closed" | "pre" | "regular" | "post" | "overnight";
   asof_et:    string;
@@ -832,6 +842,9 @@ export interface LiveQuote {
   // 此前它只在 09:00 ET 全量 publish 算一次、且吃 1h bar(一天 7 根喂 24 个价位桶)
   // —— 等于一张昨天的图配了个今天的价格。页面优先读这份。
   intrabar?: IntrabarProfile | null;
+  // 🟢 大盘红绿灯 + QBTS/IONQ 40 日 z(2026-10-06 实时化,同一班车每 ~5min)
+  market_light?: MarketLight | null;
+  z40?: { z40: number; asof: string } | null;
   // 周一开盘·周末BTC 信号(仅周一有值;mining.md 核心事实 #9,验证期)
   btc_weekend?: {
     date: string; weekend_ret: number; green: boolean;
