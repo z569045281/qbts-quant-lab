@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react";
 import { useDarkMode, chartTheme } from "../_lib/theme";
 import type {
   IChartApi,
+  ISeriesApi,
+  IPriceLine,
   CandlestickData,
   LineData,
   SeriesMarker,
@@ -32,16 +34,31 @@ interface MiniChartProps {
   poc?:      number | null;         // 成交量控制点
   markers?:  DecisionMarker[];      // 历史已评判决策 ✓/✗
   nwBands?:  NwBand[];              // NW 均值回归包络(上轨/下轨/买入线/卖出线/中线)
+  livePrice?: number | null;        // 实时价横线(2026-10-06):日 K 只到昨收,用它标出现在的位置
 }
 
 const CHART_HEIGHT = 460;          // 放大:之前 300 太小看不清
 
 export function MiniChart({
   candles, sma20, sma200, high_52w, low_52w,
-  plan = null, supply, demand, poc = null, markers, nwBands,
+  plan = null, supply, demand, poc = null, markers, nwBands, livePrice = null,
 }: MiniChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef     = useRef<IChartApi | null>(null);
+  // 实时价线单独维护:价格每分钟变,不能为了它把整张图销毁重建(会闪)
+  const seriesRef    = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const liveLineRef  = useRef<IPriceLine | null>(null);
+  const livePxRef    = useRef<number | null>(livePrice);
+  livePxRef.current  = livePrice;
+  const drawLive = () => {
+    const s = seriesRef.current;
+    if (!s) return;
+    if (liveLineRef.current) { s.removePriceLine(liveLineRef.current); liveLineRef.current = null; }
+    const p = livePxRef.current;
+    if (p != null && isFinite(p)) {
+      liveLineRef.current = s.createPriceLine({ price: p, color: "#0EA5E9", lineWidth: 1, lineStyle: 0, axisLabelVisible: true, title: "现价" });
+    }
+  };
   const dark         = useDarkMode();
 
   useEffect(() => {
@@ -71,6 +88,9 @@ export function MiniChart({
         wickUpColor: th.up, wickDownColor: th.down,
       });
       candleSeries.setData(candles.map(c => ({ ...c, time: c.time as Time })) as CandlestickData[]);
+      seriesRef.current = candleSeries;
+      liveLineRef.current = null;
+      drawLive();
 
       if (sma20.length > 0) {
         const s20 = chart.addLineSeries({ color: "#F59E0B", lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
@@ -161,9 +181,14 @@ export function MiniChart({
       ro?.disconnect();
       ro = null;
       chartRef.current = null;
+      seriesRef.current = null;
+      liveLineRef.current = null;
       chart?.remove();
     };
   }, [candles, sma20, sma200, high_52w, low_52w, plan, supply, demand, poc, markers, nwBands, dark]);
+
+  // 实时价变了只挪那一条线
+  useEffect(() => { drawLive(); }, [livePrice]);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasPlan = !!(plan && (plan.action === "LONG_QBTX" || plan.action === "SHORT_QBTZ"));
   const hasNw   = !!(nwBands && nwBands.length > 1);

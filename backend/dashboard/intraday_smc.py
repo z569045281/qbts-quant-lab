@@ -100,7 +100,40 @@ def compute_live_reads(live_price: float | None = None) -> dict:
         smc["asof"] = datetime.now(timezone.utc).isoformat()
         smc["synthetic_15m"] = n_syn
         out["smc"] = smc
+
+    # ③ 大盘红绿灯 + QBTS/IONQ 相对估值 z40(2026-10-06 用户「能实时的都改成实时」)。
+    #    yfinance 日线在盘中会带上今天这根未收盘的 bar,所以这两个就是实时值。
+    #    军规卡的「大盘顺风/逆风」、「今天在等什么」的同行追赶/配对两条用它们。
+    #    失败只让自己为 None(前端退回每日快照),不连坐 SMC。
+    try:
+        from dashboard.scan import _market_context
+        ml = _market_context()
+        if ml:
+            ml["asof"] = datetime.now(timezone.utc).isoformat()
+            out["market_light"] = ml
+    except Exception as e:
+        logger.warning("market light recompute skipped: %s", e)
+    try:
+        out["z40"] = _live_z40()
+    except Exception as e:
+        logger.warning("z40 recompute skipped: %s", e)
     return out
+
+
+def _live_z40() -> dict | None:
+    """QBTS 对 IONQ 的 40 日对数价差 z 值(与 replay.py「配对超涨veto」/ waiting_for 同一口径)。"""
+    import numpy as np
+    import yfinance as yf
+    px = yf.download(["QBTS", "IONQ"], period="6mo", interval="1d",
+                     auto_adjust=True, progress=False)["Close"].dropna()
+    if len(px) < 45:
+        return None
+    spread = np.log(px["QBTS"]) - np.log(px["IONQ"])
+    z = (spread - spread.rolling(40).mean()) / spread.rolling(40).std()
+    zv = float(z.iloc[-1])
+    if zv != zv:
+        return None
+    return {"z40": round(zv, 2), "asof": datetime.now(timezone.utc).isoformat()}
 
 
 from dashboard.notify import push as _ntfy   # 全仓唯一一份推送

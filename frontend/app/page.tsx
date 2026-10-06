@@ -318,6 +318,31 @@ export default function Dashboard() {
     qbtx: (liveCurrent ? live?.quotes?.qbtx?.price : null) ?? snap.etf_prices?.qbtx,
     qbtz: (liveCurrent ? live?.quotes?.qbtz?.price : null) ?? snap.etf_prices?.qbtz,
   };
+  // 🟢 实时大盘红绿灯 / z40(2026-10-06):live 每 ~5min 重算(盘中带今天未收盘的 bar),
+  // 没有就退回每日快照。军规卡的「大盘顺风/逆风」和「今天在等什么」用它。
+  const liveMl = liveCurrent ? live?.market_light ?? null : null;
+  const riskOn = liveMl ? liveMl.qqq_vs_50dma >= 0 : (snap.champs?.risk_on ?? null);
+  const liveZ40 = liveCurrent ? live?.z40?.z40 ?? null : null;
+  const sgn = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(1)}%`;
+  /** 「今天在等什么」每条扳机的盘中读数。收盘确认的规则,盘中满足只算「预览」。 */
+  const triggerLive = (t: { key: string; trigger_px?: number | null }): string | null => {
+    if (!liveCurrent) return null;
+    if (t.key === "catchup" && liveMl?.ionq_ret_1d != null && liveMl.rgti_ret_1d != null) {
+      const avg = (liveMl.ionq_ret_1d + liveMl.rgti_ret_1d) / 2;
+      const ok = avg > 0.03 && liveMl.ionq_ret_1d - qChg > 0.01;
+      return `IONQ ${sgn(liveMl.ionq_ret_1d)} / RGTI ${sgn(liveMl.rgti_ret_1d)} vs QBTS ${sgn(qChg)} → ${ok ? "盘中已满足(收盘确认才算)" : "未满足"}`;
+    }
+    if (t.key === "z40" && liveZ40 != null) {
+      return `对 IONQ 40 日 z = ${liveZ40.toFixed(2)}σ → ${liveZ40 <= -1.5 ? "在配对买点区" : "未到买点(≤ −1.5σ)"}`;
+    }
+    if (t.key === "tiaojiu" && t.trigger_px) {
+      const px = t.trigger_px;
+      return qPrice >= px
+        ? `现价 $${qPrice.toFixed(2)} 已在触发价 $${px.toFixed(2)} 上方(收盘守住才算)`
+        : `现价 $${qPrice.toFixed(2)},离触发价 $${px.toFixed(2)} 还差 ${sgn(px / qPrice - 1)}`;
+    }
+    return null;
+  };
   // 📊 成交量画像:磁吸位与「现价在价值区哪边」按**实时价**重算(2026-09-21 用户点单)。
   // 快照是每天 09:00 ET 发布那一刻算的 —— 价格走远后,「上方磁吸」可能已经在脚下
   // (09-18 实况:卡上写「上方磁吸 $16.81」,而现价已经 $17.93)。
@@ -614,12 +639,18 @@ export default function Dashboard() {
           <div className="bg-surface rounded-card shadow-[0_1px_2px_rgba(0,0,0,0.05)] p-4">
             {/* 第一行 = ① 大盘红绿灯,直接写成结论句,不写"红绿灯"这个抽象名 */}
             <div className={`text-card font-semibold leading-snug ${
-              snap.champs.risk_on ? "text-ink" : "text-down"}`}>
+              riskOn ? "text-ink" : "text-down"}`}>
               {/* 结论(买不买)左卡已经用大字说了,这里只说大盘这个条件 */}
-              {snap.champs.risk_on ? "🟢 大盘顺风" : "🔴 大盘逆风"}
+              {riskOn ? "🟢 大盘顺风" : "🔴 大盘逆风"}
               <span className="text-meta font-normal text-ink-muted ml-1.5">
-                {snap.champs.risk_on ? "可以按计划做" : "军规①:逆风日不开新仓"}
+                {riskOn ? "可以按计划做" : "军规①:逆风日不开新仓"}
               </span>
+              {liveMl && (
+                <span className="text-meta font-normal text-ink-faint ml-1.5"
+                  title={`QQQ 对 50 日线 ${sgn(liveMl.qqq_vs_50dma)} · VIX ${liveMl.vix}`}>
+                  · 实时 QQQ {sgn(liveMl.qqq_vs_50dma)} vs 50 日线
+                </span>
+              )}
             </div>
             {/* 第二行 = ②③④ 三个数字并排 */}
             <div className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-body">
@@ -1085,6 +1116,9 @@ export default function Dashboard() {
                     t.fired ? "text-emerald-700 font-medium" : "text-ink-faint"}`}>
                     {t.hint}
                   </div>
+                  {triggerLive(t) && (
+                    <div className="mt-0.5 text-meta leading-snug text-sky-700">⚡ 盘中:{triggerLive(t)}</div>
+                  )}
                 </div>
               ))}
             </div>
@@ -1154,6 +1188,7 @@ export default function Dashboard() {
           demand={smc?.demand_zones}
           poc={snap.volume_profile?.poc ?? null}
           markers={chartMarkers}
+          livePrice={liveCurrent ? qPrice : null}
           nwBands={snap.nw_envelope?.bands}
         />
       </section>
@@ -1939,8 +1974,13 @@ export default function Dashboard() {
               <span className="text-amber-700 font-semibold">⚡ 已触发!现价 ${snap.dip_buy.close.toFixed(2)} ≤ 触发线 ${snap.dip_buy.trigger_px.toFixed(2)}(恐慌深坑,明日开仓虚拟单)</span>
             ) : (
               <span className="text-gray-600">
-                未触发 · 现价 ${snap.dip_buy.close.toFixed(2)},触发线 <b className="font-mono">${snap.dip_buy.trigger_px.toFixed(2)}</b>
-                (还差 {(Math.abs(snap.dip_buy.distance_pct) * 100).toFixed(0)}%)
+                {(() => {
+                  const px = liveCurrent ? qPrice : snap.dip_buy.close;
+                  const tp = snap.dip_buy.trigger_px;
+                  return px <= tp
+                    ? <>⚡ 盘中 ${px.toFixed(2)} 已跌破触发线 <b className="font-mono">${tp.toFixed(2)}</b>(收盘确认才算)</>
+                    : <>未触发 · {liveCurrent ? "实时" : "现价"} ${px.toFixed(2)},触发线 <b className="font-mono">${tp.toFixed(2)}</b>(还差 {((1 - tp / px) * 100).toFixed(1)}%)</>;
+                })()}
               </span>
             )}
             <span className="ml-auto text-meta text-ink-faint">

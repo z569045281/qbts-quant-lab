@@ -204,6 +204,11 @@ def quote_handler(event, context):
     # 🔬 2026-09-09:intrabar 画像搭同一班车。compute_live_reads 一次拉数据出两份
     #    读数 —— 此前 intrabar 只有 09:00 ET 全量 publish 跑一次,盘中永远是昨天那张图。
     prev_ib = prev_data.get("intrabar")
+    # 实时大盘红绿灯 / z40:同一班车(%5 分钟),非重算分钟原样结转,别让前端闪回每日快照
+    live_extra_keys = ("market_light", "z40")
+    for k in live_extra_keys:
+        if prev_data.get(k):
+            payload[k] = prev_data[k]
     if recompute:
         try:
             from dashboard.intraday_smc import compute_live_reads, maybe_notify_trigger
@@ -221,6 +226,9 @@ def quote_handler(event, context):
                 payload["intrabar"] = reads["intrabar"]
             elif prev_ib:
                 payload["intrabar"] = prev_ib
+            for k in live_extra_keys:                # 算出来才覆盖,否则保留上面结转的旧值
+                if reads.get(k):
+                    payload[k] = reads[k]
         except Exception as e:
             import traceback
             payload["smc_err"] = f"{type(e).__name__}: {e}"   # surfaced for observability

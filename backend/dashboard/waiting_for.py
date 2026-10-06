@@ -69,7 +69,9 @@ def build_waiting_card(df_d: pd.DataFrame, snapshot: dict) -> dict | None:
                 hint = f"快%R需先回落到-80下方再上穿(现{fast:.0f},差{fast + 80:.0f})"
         triggers.append({"key": "tiaojiu", "name": "特调抄底腿",
                          "record": "后5天+17.4% · 十轮最强",
-                         "fired": fired, "reading": reading, "hint": hint})
+                         "fired": fired, "reading": reading, "hint": hint,
+                         # 前端拿它和实时价比(2026-10-06 实时化);只在蹲守区才有意义
+                         "trigger_px": round(float(px), 2) if (px and not fired) else None})
 
         # ② RSI2<10 且 >200日线(后5天 +9.2%)
         rsi2 = _rsi(d["close"].astype(float), 2)

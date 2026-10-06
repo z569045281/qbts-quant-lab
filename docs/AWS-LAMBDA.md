@@ -23,7 +23,7 @@
 
 | 槽位 | 任务 | 说明 |
 |---|---|---|
-| `minute % 5 == 0` | SMC playbook 盘中重算 | pre/regular/post,off-minute 结转不闪烁 |
+| `minute % 5 == 0` | SMC playbook + intrabar + **大盘红绿灯 + QBTS/IONQ z40**(2026-10-06 实时化)盘中重算 | pre/regular/post/overnight,off-minute 结转不闪烁 |
 | `minute % 15 == 2` | 千元挑战 bot(`challenge2`) | 偏移 2 分躲开 `%5` |
 | 15:52–15:57 ET 每日一次 | QBTS $1000 挑战(`qbts_challenge`) | `last_run` 日期去重;收盘前执行 |
 | 16:05–20:00 ET 每日一次 | 特调收盘推送 | 日期标记去重 |
