@@ -963,6 +963,7 @@ export interface DcaState {
   etfs:         string[];
   results:      DcaResult[];
   ballast_etfs?: DcaResult[];  // 压舱石档(BND+GLDM):有卡片有权重,与股票核心合成 100%
+  pocket_etfs?: DcaResult[];   // 📌 实际方案:Pocket 4 只(DHHF/CRED/IEM/IOO,ASX)
   watch?:       DcaResult[];   // 择机观察(不进核心配置,便宜了再买)
   watch_note?:  string;
   allocation?:  { weights: Record<string, number>; note: string };

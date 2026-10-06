@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-10-06 · [opus] 定投专区加「我的定投方案 · Pocket 4 只」(用户「按你总结的规律和结论做到网站上」):DHHF60/CRED20/IEM10/IOO10 实时卡 + 收益计算器(名义/实际)+ 不追涨证据 + 让钱变快的杠杆;旧美股菜单完整保留、折叠到下方 · files: backend/dashboard/dca.py, frontend/app/dca/page.tsx, frontend/app/_components/pocket-plan.tsx(new), frontend/app/_lib/data.ts, frontend/public/version.json, docs/SURFACES.md · 4 只 .AX 实拉通过(CRED 固定比例);计算器默认 $500×30年+3%/年 → 6% 时 $700,020 / 今天的钱 $288,399,与手算一致;v3.16.0,build 绿
+
 - [done] 2026-10-06 · [opus] 定投区复核(用户「里面的股有没有过时」):7 只 ETF 都没过时(费率/规模仍是同类最好;VTI 7-29 改名 Morningstar 只是改名、指数方法不变;VWO 费率降到 0.06%);写死的 CAPE 更新 40.4→41.1(美)、27.7→29.1(全球)· files: backend/dashboard/dca.py
 
 - [done] 2026-10-06 · [opus] 恢复定投专区(用户「我的定投区呢?」):/dca 页面、dca-calculator、DcaState 类型逐字节恢复;买房基金挪到 /house + 导航新增一项 · v3.15.1 · files: frontend/app/{dca,house}/page.tsx, frontend/app/_components/{nav,dca-calculator}.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, docs/SURFACES.md

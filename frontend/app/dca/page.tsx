@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getDcaState, type DcaState, type DcaResult } from "../_lib/data";
 import { DcaCalculator } from "../_components/dca-calculator";
 import { SelfCheckCard } from "../_components/self-check";
+import { PocketPlan } from "../_components/pocket-plan";
 
 /* ─────────────────────────────────────────────────────────────────────────
    📥 定投专区 — 闲钱定投的「全球估值菜单」。不是择时:决定结果的是 多投>早投>
@@ -39,7 +40,7 @@ function DcaCard({ r }: { r: DcaResult }) {
     <div className={`rounded-card border ${v.border} ${v.bg} p-4 shadow-sm`}>
       {/* 头行 */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-section font-bold text-gray-900">{r.ticker}</span>
+        <span className="text-section font-bold text-gray-900">{r.ticker.replace(/\.AX$/, "")}</span>
         <span className="text-meta px-1.5 py-0.5 rounded-inner bg-gray-100 text-ink-faint font-medium">{r.name}</span>
         {r.role && <span className="text-meta text-ink-faint">{r.role}</span>}
         <span className={`text-meta px-2 py-0.5 rounded-full font-bold ${v.chip}`}>{r.valuation_emoji} {r.valuation}</span>
@@ -108,6 +109,29 @@ export default function DcaPage() {
   return (
     <main className="max-w-[1100px] mx-auto px-4 sm:px-6 py-5 sm:py-6 space-y-4">
       <SelfCheckCard page="dca" />
+
+      {/* 📌 实际方案(2026-10-06):Pocket 4 只。原来的美股菜单完整保留在下面的「旧方案参考」里 */}
+      <PocketPlan />
+      {state?.pocket_etfs && state.pocket_etfs.length > 0 && (
+        <section className="space-y-2">
+          <div className="flex items-baseline gap-2 px-1">
+            <span className="text-body font-semibold text-gray-800">📊 这 4 只的实时状态</span>
+            {genAt && <span className="text-meta text-ink-faint font-mono">更新于 {genAt}</span>}
+            {state.macro && (
+              <span className="ml-auto text-meta text-ink-faint">美股 CAPE {state.macro.us_cape} · 全球 {state.macro.global_cape}</span>
+            )}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {state.pocket_etfs.map(r => <DcaCard key={r.ticker} r={r} />)}
+          </div>
+        </section>
+      )}
+
+      <details className="rounded-card border border-hairline bg-gray-50/60 p-3 sm:p-4">
+        <summary className="cursor-pointer text-body font-semibold text-gray-700">
+          📚 旧方案参考:全球估值菜单(美国上市 ETF,VTI / VEA / VWO / AVUV / AVDV / BND / GLDM)
+        </summary>
+        <div className="mt-3 space-y-4">
       {/* 标题 + 大盘估值背景 */}
       <section className="bg-surface rounded-card border border-hairline p-5 shadow-sm">
         <div className="flex items-center gap-2 flex-wrap">
@@ -196,6 +220,8 @@ export default function DcaPage() {
           <p className="text-body leading-relaxed text-rose-700">{state.separation}</p>
         </section>
       )}
+        </div>
+      </details>
 
       <footer className="text-center text-meta text-ink-faint pb-4 leading-relaxed">
         📥 定投专区 · 估值/季节性是<b>长周期的弱倾斜、不是择时</b>,单一年份可能完全相反 · 长期持续投入 &gt; 精准择时 · 非投资建议

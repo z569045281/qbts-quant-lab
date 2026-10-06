@@ -70,7 +70,20 @@ WATCH = {
     "QQQ": {"name": "纳指100", "role": "美国大科技·择机(现贵,等便宜)"},
 }
 WATCH_ETFS = list(WATCH.keys())
-_META_ALL = {**META, **WATCH, **BALLAST_META}   # 仅用于 _compute_etf 取名字/角色
+# 📌 用户的实际定投方案(2026-10-06 定):全部在 CommSec Pocket 买,4 只都是澳洲注册
+# (免 W-8BEN、无美国遗产税),Pocket 2027-03-31 前免佣金。上面的美股菜单保留作参考。
+# 依据:DHHF 一只覆盖全球约 8,000 家(澳 38/美 40/其他发达 15/新兴 7,费 0.19%);
+# CRED 澳洲公司债当压舱石(澳元、0.25%);IEM 新兴 10% 做估值倾斜(CAPE ~19 vs 美股 41,
+# 费 0.69% 偏贵所以只给 10%);IOO 全球 100 当配角(美国 80%、前 10 大占 57%,上限 25%)。
+POCKET_META = {
+    "DHHF.AX": {"name": "全球多元",   "role": "核心·约8,000家公司",     "target": 60},
+    "CRED.AX": {"name": "澳洲公司债", "role": "压舱石·澳元无汇率风险",  "target": 20},
+    "IEM.AX":  {"name": "新兴市场",   "role": "估值倾斜·最便宜的一块",  "target": 10},
+    "IOO.AX":  {"name": "全球100",    "role": "配角·科技巨头(上限25%)", "target": 10},
+}
+POCKET_ETFS = list(POCKET_META.keys())
+_FIXED_RATIO = set(BALLAST_META) | {"CRED.AX"}   # 债/金:固定比例,不套股票的回撤加码规则
+_META_ALL = {**META, **WATCH, **BALLAST_META, **POCKET_META}   # 仅用于 _compute_etf 取名字/角色
 
 _WINTER = {11, 12, 1, 2, 3, 4}   # historically strong half (kept as a minor detail)
 
@@ -177,7 +190,7 @@ def _compute_etf(ticker: str) -> dict:
             "deploy": ({"tag": "固定比例·不择时", "emoji": "⚓",
                         "text": "压舱资产:按固定权重定投 + 年度再平衡即可。上面股票的"
                                 "回撤加码打法对它不适用(那套证据来自股指历史)。"}
-                       if ticker in BALLAST_META else _deploy(drawdown, below_200)),
+                       if ticker in _FIXED_RATIO else _deploy(drawdown, below_200)),
             "best_month": best_m, "best_month_avg": round(float(by_month[best_m]), 4),
             "worst_month": worst_m, "worst_month_avg": round(float(by_month[worst_m]), 4),
             "winter_avg": round(winter, 4), "summer_avg": round(summer, 4),
@@ -195,7 +208,9 @@ def compute_dca(tickers: list[str] | None = None) -> dict:
     results = [_compute_etf(t) for t in tickers]
     watch = [_compute_etf(t) for t in WATCH_ETFS]
     ballast_etfs = [_compute_etf(t) for t in BALLAST_ETFS]
+    pocket_etfs = [_compute_etf(t) for t in POCKET_ETFS]
     return {
+        "pocket_etfs": pocket_etfs,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
         "etfs": tickers,
         "results": results,
