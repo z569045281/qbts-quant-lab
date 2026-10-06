@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-10-06 · [opus] 第四十六轮:浪潮参数穷举(用户「测每一种可能性找近2年最佳组合,哪怕过拟合,先看效果」)· 纯研究只读,不接系统;高抛低吸家族已判死,本轮只为展示过拟合上限 + 样本外 · files: mining.md · 11,200 组;样本内冠军 +4,689% vs 拿着 +1,529%,但第1年冠军第2年 −43%(排 10,241),两年排名秩相关 −0.48 → 判死,写入 mining.md
+
 - [done] 2026-10-06 · [opus] 🌊 浪潮状态栏(用户「QBTS 像海浪,做个状态栏」):20% zigzag 切浪,首页价格轨下方一条,实时价判断;**地图非信号**(回测无稳定预测力、高抛低吸已判死),不进 prompt/推送 · files: backend/dashboard/wave.py(new), backend/api.py, frontend/app/_components/wave-bar.tsx(new), frontend/app/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, docs/SIGNALS.md · 回测无稳定预测力(前后半段反向)已写进卡片;桌面+真 375px 截图核对(Chrome 无头最小宽 500px,需用 playwright 才是真手机宽);v3.17.0
 
 - [done] 2026-10-06 · [opus] 定投专区加「我的定投方案 · Pocket 4 只」(用户「按你总结的规律和结论做到网站上」):DHHF60/CRED20/IEM10/IOO10 实时卡 + 收益计算器(名义/实际)+ 不追涨证据 + 让钱变快的杠杆;旧美股菜单完整保留、折叠到下方 · files: backend/dashboard/dca.py, frontend/app/dca/page.tsx, frontend/app/_components/pocket-plan.tsx(new), frontend/app/_lib/data.ts, frontend/public/version.json, docs/SURFACES.md · 4 只 .AX 实拉通过(CRED 固定比例);计算器默认 $500×30年+3%/年 → 6% 时 $700,020 / 今天的钱 $288,399,与手算一致;v3.16.0,build 绿
