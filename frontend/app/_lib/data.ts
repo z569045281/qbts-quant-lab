@@ -122,6 +122,7 @@ export interface Snapshot {
   data_health?: { ok: boolean; issues: string[] } | null;
   smc?: SmcAnalysis | null;
   volume_profile?:    VolumeProfile | null;
+  wave?:              WaveState | null;     // 🌊 浪潮状态(地图非信号)
   intrabar_profile?:  IntrabarProfile | null;
   regime?:            VolatilityRegime | null;
   dip_buy?:           DipBuy | null;
@@ -247,6 +248,25 @@ export interface SmcAnalysis {
 }
 
 /* ── volume profile / POC ────────────────────────────────────────────────── */
+/* 🌊 浪潮状态(2026-10-06):20% zigzag 切浪。地图非信号。 */
+export interface WaveLegStats {
+  n: number; mag_median: number; mag_p25: number; mag_p75: number; days_median: number;
+  mags: number[]; days: number[];
+}
+export interface WaveState {
+  threshold: number;
+  current: {
+    trend: "up" | "down" | "none";
+    anchor_price: number; anchor_date: string;
+    extreme_price: number; extreme_date: string;
+    days: number; close: number; close_date: string;
+  };
+  pivots: { kind: "peak" | "trough"; date: string; price: number }[];
+  legs: { up: WaveLegStats | null; down: WaveLegStats | null };
+  since: string;
+  note: string;
+}
+
 export interface VolumeProfile {
   signal: -1 | 0 | 1;
   label:  "BUY" | "SELL" | "HOLD";

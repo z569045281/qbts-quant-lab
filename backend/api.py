@@ -1066,6 +1066,13 @@ async def dashboard_snapshot(force_refresh: bool = False):
         user_positions = []
         logger.warning(f"user positions load failed: {e}")
     try:
+        # 🌊 浪潮状态(2026-10-06 用户点单):20% zigzag 切浪。地图非信号 —— 不进决策 prompt。
+        from dashboard.wave import compute_wave
+        wave = await asyncio.to_thread(compute_wave, df_d)
+    except Exception as e:
+        wave = None
+        logger.warning(f"wave failed: {e}")
+    try:
         # 🏇 策略战绩复算(/factors 页;按 bar 日期文件缓存,每交易日只算一次)
         from dashboard.replay import compute_replay
         strategy_replay = await asyncio.to_thread(compute_replay, df_d)
@@ -1112,6 +1119,7 @@ async def dashboard_snapshot(force_refresh: bool = False):
     payload["journal"]        = journal
     payload["user_positions"] = user_positions
     payload["strategy_replay"] = strategy_replay
+    payload["wave"]           = wave
     # 「今天在等什么」卡:六个一级扳机的距触发读数(纯展示,复用上面已算好的
     # champs/rel_strength/btc_weekend/market_light,零新拉取,不进决策权重)
     try:

@@ -7,6 +7,7 @@ import { ControlPanel } from "./_components/control-panel";
 import { ChampionsCard } from "./_components/champions-card";
 import PositionsCard from "./_components/positions-card";
 import { RetrospectivePanel } from "./_components/retrospective-panel";
+import { WaveBar } from "./_components/wave-bar";
 import { SiteCheckOverview } from "./_components/self-check";
 import { TabBar, TABS, type TabKey } from "./_components/tab-bar";
 import { OscillatorBoard, OscillatorStrip } from "./_components/oscillator-board";
@@ -500,6 +501,9 @@ export default function Dashboard() {
           <ControlPanel compact onPublished={refresh} />
         </span>
       </div>
+
+      {/* 🌊 浪潮状态栏(地图非信号;按实时价判断这一浪走到哪) */}
+      {snap.wave && <WaveBar wave={snap.wave} price={qPrice} eq={etfEq} />}
 
       {/* ── 裁决 · 交易计划 · 四条军规 ──────────────────────────────────
           三栏宽度不等是刻意的:裁决最窄但字号最大(它是结论),军规最宽

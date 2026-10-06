@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-10-06 · [opus] 🌊 浪潮状态栏(用户「QBTS 像海浪,做个状态栏」):20% zigzag 切浪,首页价格轨下方一条,实时价判断;**地图非信号**(回测无稳定预测力、高抛低吸已判死),不进 prompt/推送 · files: backend/dashboard/wave.py(new), backend/api.py, frontend/app/_components/wave-bar.tsx(new), frontend/app/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, docs/SIGNALS.md · 回测无稳定预测力(前后半段反向)已写进卡片;桌面+真 375px 截图核对(Chrome 无头最小宽 500px,需用 playwright 才是真手机宽);v3.17.0
+
 - [done] 2026-10-06 · [opus] 定投专区加「我的定投方案 · Pocket 4 只」(用户「按你总结的规律和结论做到网站上」):DHHF60/CRED20/IEM10/IOO10 实时卡 + 收益计算器(名义/实际)+ 不追涨证据 + 让钱变快的杠杆;旧美股菜单完整保留、折叠到下方 · files: backend/dashboard/dca.py, frontend/app/dca/page.tsx, frontend/app/_components/pocket-plan.tsx(new), frontend/app/_lib/data.ts, frontend/public/version.json, docs/SURFACES.md · 4 只 .AX 实拉通过(CRED 固定比例);计算器默认 $500×30年+3%/年 → 6% 时 $700,020 / 今天的钱 $288,399,与手算一致;v3.16.0,build 绿
 
 - [done] 2026-10-06 · [opus] 定投区复核(用户「里面的股有没有过时」):7 只 ETF 都没过时(费率/规模仍是同类最好;VTI 7-29 改名 Morningstar 只是改名、指数方法不变;VWO 费率降到 0.06%);写死的 CAPE 更新 40.4→41.1(美)、27.7→29.1(全球)· files: backend/dashboard/dca.py
