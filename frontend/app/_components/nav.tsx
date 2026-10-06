@@ -80,7 +80,7 @@ function IconMine() {  // ⛏️ sparkles / AI factor lab (local only)
 const tabs = [
   { href: "/",        label: "🎯 决策仪表盘", short: "决策", Icon: IconDecision },
   { href: "/watch",   label: "🔭 自选扫描",   short: "扫描", Icon: IconScan     },
-  { href: "/dca",     label: "📥 定投专区",   short: "定投", Icon: IconDca      },
+  { href: "/dca",     label: "🏠 买房基金",   short: "买房", Icon: IconDca      },
   { href: "/factors", label: "🏇 策略战绩", short: "战绩", Icon: IconFactors  },
   { href: "/challenge", label: "🎰 千元挑战",  short: "挑战", Icon: IconChallenge },
   { href: "/spacex",  label: "🚀 SpaceX",    short: "SPCX", Icon: IconSpacex   },

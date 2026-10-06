@@ -935,51 +935,6 @@ export async function getWatchScan(): Promise<WatchScan | null> {
 /** Whether watchlist editing is available (cloud Lambda URL or a local backend). */
 export const WATCH_EDITABLE = !!(process.env.NEXT_PUBLIC_PUBLISH_URL) || !SUPABASE_CONFIGURED;
 
-/* ── 📥 定投专区 (全球估值菜单 + 证据版加码) ──────────────────────────────────── */
-export interface DcaResult {
-  ticker:           string;
-  name:             string;
-  role?:            string;      // 美国核心 / 发达除美 / 新兴 / 美股便宜角落
-  target_weight?:   number;      // 建议目标权重 %
-  price?:           number;
-  today_change?:    number;
-  pe?:              number | null;
-  earnings_yield?:  number | null;  // 1/PE ≈ 粗略长期预期年化(实际)
-  cagr?:            number | null;  // 完整历史复合年化(含分红,总回报)
-  cagr_years?:      number | null;  // CAGR 覆盖的年数
-  valuation:        string;      // 便宜 / 中性 / 偏贵 / —
-  valuation_emoji:  string;
-  drawdown_pct?:    number;      // from 52w high (≤ 0)
-  vs_200dma_pct?:   number;
-  below_200?:       boolean;
-  deploy?:          { tag: string; emoji: string; text: string };  // 证据版「何时多投」
-  best_month?:      number;  best_month_avg?:  number;
-  worst_month?:     number;  worst_month_avg?: number;
-  winter_avg?:      number;  summer_avg?:      number;
-  error?:           string | null;
-}
-export interface DcaState {
-  generated_at: string;
-  etfs:         string[];
-  results:      DcaResult[];
-  ballast_etfs?: DcaResult[];  // 压舱石档(BND+GLDM):有卡片有权重,与股票核心合成 100%
-  watch?:       DcaResult[];   // 择机观察(不进核心配置,便宜了再买)
-  watch_note?:  string;
-  allocation?:  { weights: Record<string, number>; note: string };
-  macro?:       { us_cape: number; global_cape: number; as_of: string; note: string };
-  ballast?:     string;
-  principle:    string;
-  separation?:  string;
-}
-
-/** Latest DCA seasonality read (single 'current' row; null if not generated yet). */
-export async function getDcaState(): Promise<DcaState | null> {
-  const { data, error } = await supabase
-    .from("dca_state").select("data").eq("id", "current").maybeSingle();
-  if (error || !data) return null;
-  return data.data as DcaState;
-}
-
 /* ── 🚀 SpaceX (SPCX) 第二仪表盘 · DeepSeek-only 决策 ─────────────────────────── */
 export interface SpacexData {
   ticker: string;
