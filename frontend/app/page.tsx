@@ -33,8 +33,8 @@ const SESSION_BADGE: Record<LiveQuote["session"], { label: string; cls: string }
    ───────────────────────────────────────────────────────────────────────── */
 
 /* Action display is tiered by conviction so the headline never overstates
-   the edge: 5-6 = light probe (轻仓试探), 7+ = standard size. The backend
-   prompt enforces the same tiers on position size, keeping words ≡ numbers. */
+   the edge. 2026-10-06 起后端硬闸门:≤6 一律观望(试探档已取消),所以走到这里的
+   方向单都 ≥7;下面的 probe 分支只为老决策(历史快照)保留。 */
 function getActionMeta(action: Decision["action"], conviction: number) {
   const probe = conviction <= 6;   // 5-6 → 试探档（≤4 的非 HOLD 不该出现）
   switch (action) {
@@ -57,7 +57,7 @@ function getActionMeta(action: Decision["action"], conviction: number) {
 }
 
 /* 信心刻度图例 */
-const CONVICTION_LEGEND = "0-4 观望 · 5-6 轻仓试探 · 7-8 标准仓 · 9+ 重仓";
+const CONVICTION_LEGEND = "0-6 观望 · 7-8 标准仓 · 9+ 重仓(方向单还须有在册扳机触发)";
 
 /* 页面版本号 — 右下角显示。单一来源 public/version.json(版本守卫也读它);发版时 bump 那个文件 */
 const APP_VERSION = versionData.version;
@@ -766,6 +766,11 @@ export default function Dashboard() {
             <span className="text-card font-semibold text-gray-800">🧭 一句话结论</span>
           </div>
           {/* 总结常有十来行 —— 夹到 4 行,想看全文再点。首屏的预算很紧。 */}
+          {d?.gate_note && (
+            <div className="mb-1.5 text-meta text-amber-700 bg-amber-50 border border-amber-200 rounded-inner px-2 py-1">
+              🚧 {d.gate_note}
+            </div>
+          )}
           {d ? (
             <details className="group">
               <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">

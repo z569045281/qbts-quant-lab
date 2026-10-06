@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-10-06 · [opus] 方向单硬闸门(用户「加」):09-18 瘦身后决策从天天观望翻成天天 LONG(13/16,已出结果全亏)→ LONG 需「在册主扳机触发 + conviction≥7」,SHORT 一律 HOLD · files: backend/dashboard/decision.py, frontend/app/page.tsx, frontend/public/version.json, docs/DECISION.md, docs/LESSONS.md · 回放 09-18 后 10 张 LONG 全挡;前端显示 gate_note、图例改「0-6 观望」,v3.14.0,build 绿
+
 - [done] 2026-09-18 · [opus] 成交量画像卡每个 QBTS 价位旁加 (QBTX · QBTZ) 等价价(用户点单)· files: frontend/app/page.tsx, frontend/public/version.json
 
 - [done] 2026-09-18 · [opus] QBTS $1000 纸面挑战 bot(用户点单「给你1000刀自由买卖qbts,每月赚回订阅费,记录买卖」)· 规则=在册 QQQ50×波目(交叉验证 3/3),15:52 ET 收盘前执行,Alpaca paper(与 challenge2 同账户,只动 QBTS),状态存 crypto_challenge id='qbts1000' 零迁移 · files: backend/dashboard/qbts_challenge.py(new), aws/lambda_handlers.py, frontend/app/challenge/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, docs/CHALLENGE.md · 干跑通过(当前信号:QQQ 716.34>50日线 709.98,波动率 77% → 仓位 78% = 44 股),前端 build 绿,v3.13.0

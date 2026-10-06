@@ -104,7 +104,12 @@ D2. **载具优先于信号**（第四十二轮实测,2026-08-24 新增）：
 7. 全部中文,价格两位小数;面向用户的文字要像说话,绝不出现 JSON 字段名。
 8. 宏观纪律(QBTS=高beta长久期资产):48h内有 CPI/PPI/FOMC → conviction 上限6、
    仓位减半或改为"数据落地再进";通胀升温=逆风驱动;FOMC 周方向押注打折。
-9. conviction 与 action 一致性(严格):**≤4→必须 HOLD**;5-6→入场必须带确认触发。
+9. conviction 与 action 一致性(严格,代码强制):**≤6→必须 HOLD**;LONG_QBTX 只在
+   **conviction ≥7 且至少一个一级扳机今天真的触发了**时才成立(「今天在等什么」那几个)。
+   SHORT_QBTZ 一律 HOLD(做空家族四轮判死)。不满足的方向单会被代码改成 HOLD ——
+   这时把你的方向写进 bold_call_5d 和失效条件里就够了。
+   (2026-10-06:原「5-6 试探档」取消。全台账 conviction 5-6 的 LONG 已出结果 15 张,
+   5 日平均 −3.2%;09-18→10-05 连续 13 张 LONG,已出结果的全亏。)
    ⚠️ conviction **不再决定仓位大小**(2026-08-24 用户拍板改口径):
    大小由【敞口刻度】定(见下方同名段落),因为 conviction 实测 82% 卡在 4、
    分辨力至今只有 2 条高信心样本 —— 用一把没校准的尺子定仓位,不如用波动率。
@@ -113,8 +118,8 @@ D2. **载具优先于信号**（第四十二轮实测,2026-08-24 新增）：
 9b. **仓位口径(2026-08-24 用户拍板,与旧版不同,以本条为准)**:
    `suggested_position_pct` = **占投机仓的百分比,0-100**。
    (投机仓自身 ≤ 总资产 10% 的总闸由军规卡⓪管,不在这个数字里,别重复打折。)
-   天花板 = **敞口刻度**;5-6 档再减半(试探)。代码会强制夹,你给超了会被截断。
-   例:刻度 51% + conviction 7 → 你最多给 51;刻度 51% + conviction 6 → 最多给 25。
+   天花板 = **敞口刻度**。代码会强制夹,你给超了会被截断。
+   例:刻度 51% + conviction 7 → 你最多给 51。
 
 ════ conviction 刻度锚定(2026-08-22 新增,规则 2/8/9 一字未改)════
 **为什么加这段**:实测 2026-06-16→08-21 的 56 次决策,conviction 有 **46 次(82%)
@@ -181,7 +186,7 @@ D2. **载具优先于信号**（第四十二轮实测,2026-08-24 新增）：
     "qbts_entry": <入场触发价>, "qbts_stop": <止损价>, "qbts_target": <目标价>,
     "etf_ticker": "QBTX"|"QBTZ"|null, "etf_entry": <价>, "etf_stop": <价>, "etf_target": <价>,
     "rr_ratio": <盈亏比>, "suggested_position_pct": <占投机仓的百分比 0-100，见规则 9b；
-                          天花板=敞口刻度，5-6 档再减半，超了会被代码截断>,
+                          天花板=敞口刻度，超了会被代码截断>,
     "entry_condition": "<什么条件下入场，如'放量突破$27'或'直接市价'>"
   },
   "key_drivers": [
@@ -239,6 +244,9 @@ _BASIS_WARN_PCT = 0.03      # 收盘 vs 实时背离超过这个数就明写"派
 #   其余仍是纯收盘推导 —— 背离大时只有后者会失真,得分开说
 _LIVE_AWARE = "SMC 折价/溢价区 · POC/成交量画像 · 日内画像 · NW 包络位置"
 _CLOSE_DERIVED = "特调快慢%R · regime 波动率档 · 经典策略(RSI2/CLV/均线等) · 相对估值 z40"
+
+
+_MIN_DIRECTIONAL_CONV = 7   # 方向单最低信心(2026-10-06 硬闸门,见 _sanitize_decision)
 
 
 # ── 经典策略摘除名单(2026-07-31 噪音审计)─────────────────────────────
@@ -828,7 +836,7 @@ def _build_user_msg(snapshot: dict, extras: dict | None = None) -> str:
             dir_cn = "跌" if bc_run[0] == "down" else "涨"
             inact_s += (f"\n  ⚠️ 表态与行动背离:你已连续 {len(bc_run)} 天押注「{dir_cn}」"
                         f"却全部 HOLD。若方向证据真实存在且持续,解释为什么它够你表态"
-                        f"却不够你下一张小仓位战术单(规则9的5-6档就是为这种场景设的);"
+                        f"却不够 conviction 7(规则9:≤6 一律 HOLD);"
                         f"若证据其实不足,就把 p_up_5d 老实拉回 0.50 附近。长期骑墙="
                         f"系统只敢看不敢做,台账正在记录这个背离。")
         parts.append(f"## 你自己的历史决策战绩\n  {acc_s}\n" + "\n".join(rows) + lessons_s + inact_s)
@@ -1151,6 +1159,34 @@ def _sanitize_decision(decision: dict, snapshot: dict, extras: dict | None) -> d
         action = "HOLD"
         decision["action"] = "HOLD"
 
+    # ── 🚧 方向单硬闸门(2026-10-06 用户拍板)──────────────────────────────
+    # 09-18 瘦身删掉两个偏空输入(地缘雷达只投空票;机械元模型大多喊卖,还带着
+    # 「显著劣于随机」的警告)后,同样的绿灯环境里决策从「几乎天天观望」翻成
+    # 「几乎天天喊买」:09-18→10-05 16 份决策 13 份 LONG,已出结果的 4 张全亏
+    # (5 日 −1.9% ~ −9.2%)。刹车被拆掉了,这道闸把它装回去,而且装在代码里。
+    # 只要求「有在册扳机触发」挡不住 —— 那 12 张里 11 张当天就有扳机亮着
+    # (QBTS 越跌、对 IONQ 的配对 z40 越便宜,天天亮)。所以两条同时要:
+    #   ① 至少一个在册主扳机今天触发(waiting_for.n_fired,辅助腿不算)
+    #   ② conviction ≥ 7 —— 取消 5-6 试探档:全台账 conviction 5-6 的 LONG 已出
+    #      结果 15 张,5 日平均 −3.2%,这一档从没证明过自己。
+    # SHORT_QBTZ 没有在册扳机(做空四轮判死),一律改观望 —— 等于把
+    # 「判死不复活」这条铁律也落进了代码。
+    if action in ("LONG_QBTX", "SHORT_QBTZ"):
+        n_fired = int(((snapshot or {}).get("waiting_for") or {}).get("n_fired") or 0)
+        why = []
+        if action == "SHORT_QBTZ":
+            why.append("做空家族已判死")
+        elif n_fired == 0:
+            why.append("今天没有任何在册扳机触发")
+        if conv < _MIN_DIRECTIONAL_CONV:
+            why.append(f"信心 {conv} < {_MIN_DIRECTIONAL_CONV}")
+        if why:
+            decision["gate_note"] = (f"原判断 {action}(信心 {conv}),被硬闸门改为观望:"
+                                     + "、".join(why) + "。方向表态照常记账。")
+            decision["gated_from"] = action
+            action = "HOLD"
+            decision["action"] = "HOLD"
+
     if action == "HOLD":
         tp["etf_ticker"] = None
         for k in ("qbts_entry", "qbts_stop", "qbts_target",
@@ -1216,16 +1252,12 @@ def _sanitize_decision(decision: dict, snapshot: dict, extras: dict | None) -> d
     # sizing 规则(mining 第 42 轮:回撤 −46% vs 买持 −71%,两个半窗都改善)。
     # 大小不再挂 conviction —— conviction 实测 82% 卡在 4、分辨力至今只有 2 条
     # 高信心样本(从没被验证过),用一把没校准的尺子定仓位比用波动率差。
-    # conviction 只保留它已验证的职责:≤4 → HOLD(方向闸门,上面那段,一个字没动)。
-    #
-    # 唯一保留的信心相关折扣:5-6 档减半。这不是新回测常数,是沿用旧规则 9
-    # 「5-6 = 试探档,入场必须带确认触发」的既有语义,避免顺手把一条安全性质删掉。
+    # conviction 只保留闸方向的职责(≤6 → HOLD,见上方硬闸门)。
+    # 原「5-6 档减半」随 2026-10-06 取消试探档一起删除 —— 走到这里的方向单都 ≥7。
     ladder = ((decision.get("exposure") or {}) or {}).get("pct")
     ceiling = 100.0
     if isinstance(ladder, (int, float)) and 0 < ladder <= 1:
         ceiling = min(ceiling, float(ladder) * 100.0)
-    if conv <= 6:
-        ceiling *= 0.5                      # 试探档(承旧规则 9 的语义,非新常数)
     pct = _num(tp.get("suggested_position_pct")) or 0.0
     tp["suggested_position_pct"] = int(max(0.0, min(pct, ceiling)))
 

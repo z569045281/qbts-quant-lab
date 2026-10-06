@@ -255,3 +255,12 @@ AI 自检 07-20 的旧教训)。**刻意不传本仓的 df_d**:缓存日线只�
 
 ⚠️ 状态存 live_quote(整块覆写),非工作跳一律 `return prev` —— 见 [LESSONS.md](LESSONS.md)
 2026-07-31 那条。
+
+## 🚧 方向单硬闸门(2026-10-06)
+
+`_sanitize_decision` 里,在原「conviction ≤4 → HOLD」之后再加一道,**两条同时满足**才放行 LONG_QBTX:
+1. 「今天在等什么」卡至少一个在册主扳机触发(`waiting_for.n_fired ≥ 1`,辅助腿不算);
+2. conviction ≥ 7(`_MIN_DIRECTIONAL_CONV`)—— 「5-6 试探档」取消。
+
+SHORT_QBTZ 一律改 HOLD(做空家族判死)。被挡下时写 `gate_note` / `gated_from`,前端一句话结论卡上方显示;
+`bold_call_5d` 照常记账。起因与数据见 [LESSONS.md](LESSONS.md) 2026-10-06 条。

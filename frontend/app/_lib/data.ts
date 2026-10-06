@@ -628,6 +628,8 @@ export interface Decision {
     note?: string;                 // 五道闸全落空时的说明
   } | null;
   shadow?:            boolean;   // true = 影子决策(零决策权,仅对照)
+  gate_note?:         string;    // 2026-10-06 方向单硬闸门:原判断被改成观望时的说明
+  gated_from?:        "LONG_QBTX" | "SHORT_QBTZ";
 }
 
 /* ── 🔬 全站 AI 系统自检(publish §4.8 · 规则层+Haiku 六页体检) ──────────── */
