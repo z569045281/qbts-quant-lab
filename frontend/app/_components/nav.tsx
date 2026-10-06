@@ -42,6 +42,15 @@ function IconDca() {  // 📥 download-into-tray / recurring buy-in
     </svg>
   );
 }
+function IconHouse() {  // 🏠 house / 买房基金
+  return (
+    <svg width="25" height="25" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4 11l8-6.5 8 6.5" {...ico} />
+      <path d="M6 9.5V20h12V9.5" {...ico} />
+      <path d="M10 20v-5h4v5" {...ico} />
+    </svg>
+  );
+}
 function IconFactors() {  // 🏆 ranked bars / leaderboard
   return (
     <svg width="25" height="25" viewBox="0 0 24 24" aria-hidden="true">
@@ -80,7 +89,8 @@ function IconMine() {  // ⛏️ sparkles / AI factor lab (local only)
 const tabs = [
   { href: "/",        label: "🎯 决策仪表盘", short: "决策", Icon: IconDecision },
   { href: "/watch",   label: "🔭 自选扫描",   short: "扫描", Icon: IconScan     },
-  { href: "/dca",     label: "🏠 买房基金",   short: "买房", Icon: IconDca      },
+  { href: "/dca",     label: "📥 定投专区",   short: "定投", Icon: IconDca      },
+  { href: "/house",   label: "🏠 买房基金",   short: "买房", Icon: IconHouse    },
   { href: "/factors", label: "🏇 策略战绩", short: "战绩", Icon: IconFactors  },
   { href: "/challenge", label: "🎰 千元挑战",  short: "挑战", Icon: IconChallenge },
   { href: "/spacex",  label: "🚀 SpaceX",    short: "SPCX", Icon: IconSpacex   },
