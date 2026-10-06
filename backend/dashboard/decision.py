@@ -20,7 +20,7 @@ Why this design:
     interactions a linear combiner can't (e.g. "the SMC lock is bearish but
     the macro calendar clears tomorrow — wait for the event, not the level").
 
-Cost: one claude-sonnet call per publish (~$0.05). Cached by date.
+Cost: one Claude Opus 5.5 call per publish(effort high). Cached by date.
 """
 
 from __future__ import annotations
@@ -43,14 +43,17 @@ _CLIENT = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 _CACHE_PATH = Path(__file__).parent.parent / "data" / "cache" / "daily_decision.json"
 _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-# Fable 5 — Anthropic's most capable model. This is THE call that decides
-# whether real money moves today; everything else (news triage, factor
-# generation) stays on cheaper models. Fable was disabled for us once before
-# (we ran Opus 4.8 in between), so the call falls back to Opus 4.8 on ANY
-# primary-model failure (access revoked / safety refusal / no text) — the
-# daily publish must never die because model access changed overnight.
-_MODEL = "claude-fable-5"
+# Claude Opus 5.5(2026-10-06 用户点单「出决策的引擎改成 opus5.5」,此前是 Fable 5)。
+# 这是决定真钱动不动的那一发;新闻分拣/因子生成等仍用便宜模型。
+# Opus 5.5 的差别:思考常开(不能关,只能用 effort 调)、effort 默认 medium(比上一代低一档,
+# 所以这里显式设 high)、强制 tool_choice 会 400(我们不用)。
+# 两层兜底:① 安全拒答 → 服务端 `fallbacks: "default"` 在同一个请求里按拒答类别自动换模型;
+# ② 任何其它失败(权限被收回 / 空响应 / API 错)→ 客户端换 Opus 4.8 重打一发 ——
+# 每日 publish 不能因为模型可用性变化而死掉。实际是谁答的写进 decision["model"]。
+_MODEL = "claude-opus-5-5"
 _FALLBACK_MODEL = "claude-opus-4-8"
+_EFFORT = "high"                       # Opus 5.5 默认 medium;真钱决策用 high
+_FALLBACK_BETA = "server-side-fallback-2026-07-01"   # 与 fallbacks="default" 配对(数组形式用 -06-01)
 
 _SYSTEM = """你是一套经过 254 组回测锤炼的 QBTS 专用交易系统的每日决策大脑。你只交易一只
 股票：QBTS（D-Wave Quantum）。执行工具：看多→买 QBTX(2×)，看空→买 QBTZ(−2×)，
@@ -1373,35 +1376,41 @@ def generate_decision(snapshot: dict, extras: dict | None = None) -> dict:
     """
     user_msg = _build_user_msg(snapshot, extras)
 
-    def _one_call(model: str) -> str:
-        resp = _CLIENT.messages.create(
+    def _one_call(model: str) -> tuple[str, str]:
+        kw = dict(
             model=model,
-            max_tokens=16000,  # Fable 的 thinking 更长;thinking + JSON 共享预算,留足头房
-            # Fable 5 thinking 常开,adaptive 是唯一合法的显式配置(Opus 4.8 同样接受,
-            # 所以主/备两个模型可以共用这一套参数)。
-            thinking={"type": "adaptive"},
+            max_tokens=16000,      # thinking 与 JSON 共用这个预算;非流式请求 ~16K 不会超时
+            thinking={"type": "adaptive"},   # Opus 5.5 思考常开;Opus 4.8 也接受这个写法
             system=_SYSTEM,
             messages=[{"role": "user", "content": user_msg}],
-            output_config={"format": {"type": "json_schema", "schema": _DECISION_SCHEMA}},
+            output_config={"effort": _EFFORT,
+                           "format": {"type": "json_schema", "schema": _DECISION_SCHEMA}},
         )
-        # Thinking blocks stream first; the text block is guaranteed valid JSON.
+        if model == _MODEL:
+            # 服务端拒答兜底:同一个请求里按拒答类别自动换模型。用 extra_body 传参数,
+            # 因为本地 SDK(0.104)的 beta.messages.create 还没有 `fallbacks` 形参。
+            resp = _CLIENT.beta.messages.create(**kw, betas=[_FALLBACK_BETA],
+                                                extra_body={"fallbacks": "default"})
+        else:
+            resp = _CLIENT.messages.create(**kw)
+        if resp.stop_reason == "refusal":       # 整条兜底链都拒答了
+            cat = getattr(getattr(resp, "stop_details", None), "category", None)
+            raise ValueError(f"refusal (category={cat})")
+        # 按 type 取块:前面可能有 thinking / fallback 块;text 块由 json_schema 保证合法。
         text = next(
             (b.text for b in resp.content if getattr(b, "type", "") == "text"),
             "",
         ).strip()
         if not text:
-            # A safety refusal (stop_reason="refusal") yields no schema-shaped text.
             raise ValueError(f"no text block in model response (stop_reason={resp.stop_reason})")
-        return text
+        return text, getattr(resp, "model", None) or model   # 兜底接手时 resp.model 是接手的模型
 
-    # 主模型任何失败(权限被收回 / 安全拒答 / 空响应)→ 立即用 Opus 4.8 重打同一发。
-    # Fable 曾经被禁用过一次;每日 publish 不允许因为模型可用性变化而死掉。
     try:
-        text, model_used = _one_call(_MODEL), _MODEL
+        text, model_used = _one_call(_MODEL)
     except (anthropic.APIError, ValueError) as e:
         logger.warning("decision: %s failed (%s) — falling back to %s",
                        _MODEL, str(e)[:200], _FALLBACK_MODEL)
-        text, model_used = _one_call(_FALLBACK_MODEL), _FALLBACK_MODEL
+        text, model_used = _one_call(_FALLBACK_MODEL)
     decision = json.loads(text)
     decision["model"] = model_used            # observability:实际是谁做的决策
     decision["system_notes"] = (decision.get("system_notes") or [])[:4]

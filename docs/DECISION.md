@@ -264,3 +264,13 @@ AI 自检 07-20 的旧教训)。**刻意不传本仓的 df_d**:缓存日线只�
 
 SHORT_QBTZ 一律改 HOLD(做空家族判死)。被挡下时写 `gate_note` / `gated_from`,前端一句话结论卡上方显示;
 `bold_call_5d` 照常记账。起因与数据见 [LESSONS.md](LESSONS.md) 2026-10-06 条。
+
+
+## 🧠 决策模型:Claude Opus 5.5(2026-10-06 起)
+
+`decision.py` 的 `_MODEL = "claude-opus-5-5"`(此前 Fable 5)。要点:
+- 思考常开(`thinking: {type: "adaptive"}`;`disabled` / `budget_tokens` 会 400),深度只能用 effort 调;
+  Opus 5.5 的 effort **默认 medium**,这里显式设 `high`(`_EFFORT`)。
+- 两层兜底:安全拒答 → 服务端 `fallbacks: "default"`(beta `server-side-fallback-2026-07-01`,本地 SDK 0.104
+  没有这个形参,用 `extra_body` 传);其它任何失败 → 客户端换 `claude-opus-4-8` 重打。实际作答模型写进 `decision["model"]`。
+- 上线前用 10-06 的真实快照跑过一次:41 秒,HOLD 信心 6(模型自己按规则 9 给的观望,硬闸门未介入),结构完整。
