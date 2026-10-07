@@ -17,6 +17,23 @@ function rank(stats: WaveLegStats | null, mag: number, up: boolean): number | nu
 }
 
 type Best = NonNullable<WaveState["best"]>;
+type HighWin = NonNullable<WaveState["highwin"]>;
+
+/** 收起状态下的一行:高胜率组合现在持仓还是空仓、什么价位会动 */
+function HighWinLine({ hw, price, eq }: { hw: HighWin; price: number; eq?: (lvl: number) => string }) {
+  const s = hw.state;
+  const text = s.in_position && s.entry != null
+    ? `持有中:${s.entry_date?.slice(5)} 买在 $${s.entry.toFixed(2)}(${pct(price / s.entry - 1)})· 止盈 $${s.tp_price?.toFixed(2)}${eq ? ` ${eq(s.tp_price!)}` : ""} / 止损 $${s.stop_price?.toFixed(2)} · 第 ${s.held} 天`
+    : s.trigger != null
+      ? (price <= s.trigger ? `空仓 · 现价已跌破 $${s.trigger.toFixed(2)},今天收盘还在下面就会买入`
+         : `空仓 · 收盘跌到 $${s.trigger.toFixed(2)}${eq ? ` ${eq(s.trigger)}` : ""} 会买入(还差 ${pct(s.trigger / price - 1)})`)
+      : "空仓";
+  return (
+    <div className="mt-1 text-meta text-amber-700">
+      🎯 高胜率组合(胜率 {Math.round(hw.study.win * 100)}%,只观察):{text}
+    </div>
+  );
+}
 
 /** 收起状态下的一行:回测冠军现在空仓还是持仓、什么价位会动 */
 function BestLine({ best, price, eq }: { best: Best; price: number; eq?: (lvl: number) => string }) {
@@ -100,11 +117,19 @@ export function WaveBar({ wave, price, eq }: {
           </span>
           <span className="ml-auto text-meta text-brand group-open:hidden">展开 ›</span>
         </div>
+        {wave.highwin && <HighWinLine hw={wave.highwin} price={price} eq={eq} />}
         {wave.best && <BestLine best={wave.best} price={price} eq={eq} />}
         {scenePivots.length >= 2 && (
           <div className="mt-2.5 overflow-hidden rounded-inner">
             <WaveScene pivots={scenePivots} price={price} up={up} confirm={confirm}
-              trigger={wave.best?.state.in_position ? null : wave.best?.state.trigger ?? null}
+              marks={[
+                ...(wave.highwin?.state.in_position
+                  ? [{ price: wave.highwin.state.tp_price!, label: "🎯 止盈", color: "#D97706" },
+                     { price: wave.highwin.state.stop_price!, label: "🎯 止损", color: "#DC2626" }]
+                  : wave.highwin?.state.trigger ? [{ price: wave.highwin.state.trigger, label: "🎯 买", color: "#D97706" }] : []),
+                ...(!wave.best?.state.in_position && wave.best?.state.trigger
+                  ? [{ price: wave.best.state.trigger, label: "🧪", color: "#8B5CF6" }] : []),
+              ]}
               ariaLabel={sceneLabel} />
           </div>
         )}
@@ -141,6 +166,44 @@ export function WaveBar({ wave, price, eq }: {
         <p className="text-meta text-ink-muted">
           切法:收盘价反向走满 {Math.round(th * 100)}% 才算一浪结束(数据自 {wave.since})。⚠️ {wave.note}
         </p>
+
+        {wave.highwin && (
+          <div className="rounded-inner border border-amber-200 bg-amber-50/60 px-2.5 py-2 text-meta text-gray-700">
+            <div className="font-semibold text-amber-800">🎯 高胜率组合(10-07 研究,14,175 组里按事先定的标准挑)</div>
+            <div className="mt-0.5">
+              规则:10% 浪的回落浪里,收盘离浪尖跌满 {Math.round(wave.highwin.params.dip * 100)}% 就买 ·
+              反弹 +{Math.round(wave.highwin.params.tp * 100)}% 卖 · 跌 −{Math.round(wave.highwin.params.stop * 100)}% 止损
+            </div>
+            <div className="mt-0.5">
+              {wave.highwin.study.window}:{wave.highwin.study.n} 笔,<b>胜率 {Math.round(wave.highwin.study.win * 100)}%</b>,
+              平均每笔 {pct(wave.highwin.study.avg)},最差一笔 {pct(wave.highwin.study.worst, 0)},最长拿 {wave.highwin.study.max_hold} 天;
+              复利 {pct(wave.highwin.study.ret, 0)}(一直拿着 {pct(wave.highwin.study.bh, 0)}),最大回撤 {pct(wave.highwin.study.mdd, 0)}。
+              分段胜率:{wave.highwin.study.periods}。
+            </div>
+            <div className="mt-0.5">
+              <b className="text-down">代价:</b>赢小输大 —— 赚 5% 就走,止损却在 −30%,一次止损要四到五次止盈才补得回来。
+              {wave.highwin.study.trap}。只观察,不是买卖建议,不推送。
+            </div>
+            {wave.highwin.trades.length > 0 && (
+              <div className="mt-1.5 overflow-x-auto">
+                <table className="w-full font-mono">
+                  <thead className="text-ink-faint text-left"><tr><th className="pr-2">买入</th><th className="pr-2">卖出</th><th className="pr-2 text-right">结果</th><th className="pr-2 text-right">天数</th><th>原因</th></tr></thead>
+                  <tbody>
+                    {[...wave.highwin.trades].reverse().map((t, i) => (
+                      <tr key={i} className="border-t border-amber-100">
+                        <td className="pr-2 whitespace-nowrap">{t.buy_date.slice(5)} ${t.buy.toFixed(2)}</td>
+                        <td className="pr-2 whitespace-nowrap">{t.sell_date.slice(5)} ${t.sell.toFixed(2)}</td>
+                        <td className={`pr-2 text-right ${t.ret >= 0 ? "text-emerald-600" : "text-down"}`}>{pct(t.ret)}</td>
+                        <td className="pr-2 text-right">{t.days}</td>
+                        <td className="font-sans">{t.why}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
 
         {wave.best && (
           <div className="rounded-inner border border-violet-200 bg-violet-50/60 px-2.5 py-2 text-meta text-gray-700">

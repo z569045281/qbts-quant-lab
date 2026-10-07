@@ -21,7 +21,7 @@ type Props = {
   price: number;                 // 实时价
   up: boolean;                   // 当前是上涨浪还是回落浪
   confirm: number;               // 越过这条线才算翻浪
-  trigger?: number | null;       // 🧪 回测冠军的买入线(可选,只画一条淡线)
+  marks?: { price: number; label: string; color: string }[];   // 观察项的价位线(🧪 买入线 / 🎯 止盈止损)
   ariaLabel: string;
 };
 
@@ -55,7 +55,7 @@ function monotone(xs: number[], ys: number[]) {
 
 const DAY = 86_400_000;
 
-export function WaveScene({ pivots, price, up, confirm, trigger, ariaLabel }: Props) {
+export function WaveScene({ pivots, price, up, confirm, marks = [], ariaLabel }: Props) {
   const uid = useId().replace(/:/g, "");
   const dark = useDarkMode();
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -77,6 +77,9 @@ export function WaveScene({ pivots, price, up, confirm, trigger, ariaLabel }: Pr
     return () => ro.disconnect();
   }, []);
 
+  // 父组件每次刷新都会传一个新的 marks 数组 —— 按内容比较,否则几何重算、动画相位被重置(会跳)
+  const marksKey = marks.map(m => `${m.label}:${m.price}`).join("|");
+  const pivotsKey = pivots.map(p => `${p.date}:${p.price}`).join("|");
   // ── 几何:真实日期 → 横轴,价格 → 纵轴 ─────────────────────────────────
   const geo = useMemo(() => {
     // 手机宽度只画最近 4 个转折点 —— 5 月那种 10 天里三个转折,窄屏上标签会叠在一起
@@ -86,7 +89,9 @@ export function WaveScene({ pivots, price, up, confirm, trigger, ariaLabel }: Pr
     const all: (ScenePivot & { t: number } | { kind: "now"; date: string; price: number; t: number; tentative?: false })[] =
       [...pts, { kind: "now" as const, date: "", price, t: nowT }];
     const padL = 18, padR = w < 520 ? 104 : 132, padT = 26, padB = 30;
-    const prices = [...all.map(p => p.price), confirm, ...(trigger ? [trigger] : [])];
+    // 价位线太远(比如止损在 −30%)也要能画进来,但别把浪压扁:只纳入现价 ±35% 以内的线
+    const near = marks.map(m => m.price).filter(p => Math.abs(p / price - 1) <= 0.35);
+    const prices = [...all.map(p => p.price), confirm, ...near];
     const pMax = Math.max(...prices) * 1.04, pMin = Math.min(...prices) * 0.9;
     const t0 = all[0].t, t1 = nowT;
     const X = (t: number) => padL + (t - t0) / (t1 - t0) * (w - padL - padR);
@@ -97,7 +102,7 @@ export function WaveScene({ pivots, price, up, confirm, trigger, ariaLabel }: Pr
     const samples: [number, number][] = [];
     for (let i = 0; i <= N; i++) { const x = x0 + (x1 - x0) * i / N; samples.push([x, f(x)]); }
     return { all, xs, ys, samples, Y, x0, x1, padR, nowX: x1, nowY: Y(price) };
-  }, [pivots, price, confirm, trigger, w, h]);
+  }, [pivotsKey, price, confirm, marksKey, w, h]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 水面:主体 + 每帧扰动(振幅几像素,越靠近现在越平静 —— 浮标在的地方不该乱晃)
   const surface = (phase: number, amp: number, lambda: number, lift = 0) => {
@@ -156,7 +161,7 @@ export function WaveScene({ pivots, price, up, confirm, trigger, ariaLabel }: Pr
 
   const { all, xs, ys, Y, nowX, nowY } = geo;
   const fmt = (p: number) => `$${p.toFixed(2)}`;
-  const cy = Y(confirm), ty = trigger ? Y(trigger) : null;
+  const cy = Y(confirm);
   const labelX = w - geo.padR + 10;
 
   return (
@@ -206,12 +211,17 @@ export function WaveScene({ pivots, price, up, confirm, trigger, ariaLabel }: Pr
             </>
           );
         })()}
-        {ty != null && Math.abs(ty - cy) > 16 && (
-          <>
-            <line x1={geo.x0} x2={w - 8} y1={ty} y2={ty} stroke="#8B5CF6" strokeOpacity="0.45" strokeDasharray="1 4" />
-            <text x={labelX} y={ty - 4} fontSize="10" fill="#8B5CF6" fillOpacity="0.85">🧪 {fmt(trigger!)}</text>
-          </>
-        )}
+        {/* 观察项价位线:离确认线 / 现在太近的不写字,避免叠在一起 */}
+        {marks.filter(m => Math.abs(m.price / price - 1) <= 0.35).map((m, i) => {
+          const my = Y(m.price);
+          const crowded = Math.abs(my - cy) < 14 || Math.abs(my - nowY) < 14;
+          return (
+            <g key={i}>
+              <line x1={geo.x0} x2={w - 8} y1={my} y2={my} stroke={m.color} strokeOpacity="0.55" strokeDasharray="1 4" />
+              {!crowded && <text x={labelX} y={my - 4} fontSize="10" fill={m.color} fillOpacity="0.9">{m.label} {fmt(m.price)}</text>}
+            </g>
+          );
+        })}
 
         {/* 浪尖 / 浪底标注:浪尖写在水面上方,浪底写进水里(白字) */}
         {all.slice(0, -1).map((p, i) => {

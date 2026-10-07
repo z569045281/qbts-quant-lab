@@ -151,6 +151,64 @@ def best_combo(close: pd.Series) -> dict:
     return {"params": BEST, "study": BEST_STUDY, "state": state, "trades": trades[-6:]}
 
 
+# 🎯 高胜率组合(2026-10-07 用户点单「弄个胜率高一点的组合放上去」)。同样是观察项。
+# 回落 20% 买、反弹 5% 卖、止损 30%(10% 浪)。选法事先定:最差一笔 ≥ −40% 且最长持有 ≤ 60 天
+# 的版本里胜率最高。全历史 2022-08→2026-10(含 2022 崩盘)56 笔胜率 79%,三段分别 88/82/84%。
+# ⚠️ 去掉止损胜率是 100%,但 2022-08 那笔扛了 591 个交易日、中途浮亏 −95% —— 胜率是用尾部风险换的。
+HIGHWIN = {"th": 0.10, "dip": 0.20, "tp": 0.05, "stop": 0.30}
+HIGHWIN_STUDY = {
+    "window": "2022-08 → 2026-10(含 2022 崩盘)", "n": 56, "win": 0.79, "avg": 0.040,
+    "worst": -0.38, "max_hold": 36, "ret": 0.86, "bh": 0.80, "mdd": -0.86,
+    "periods": "第 1 年 88%(8 笔)· 第 2 年 82%(11 笔)· 检验段 84%(25 笔)",
+    "trap": "去掉止损胜率是 100%,但 2022-08 那笔扛了 591 个交易日、中途浮亏 −95%",
+}
+
+
+def highwin_combo(close: pd.Series) -> dict:
+    """逐日因果:10% 浪的回落浪里,收盘距浪尖 ≥20% 买;收盘 +5% 止盈 / −30% 止损。"""
+    c, idx = close.values, close.index
+    th, dip, tp, stop = HIGHWIN["th"], HIGHWIN["dip"], HIGHWIN["tp"], HIGHWIN["stop"]
+    trend, a, e = 0, 0, 0
+    pos, ent, ent_i = False, 0.0, 0
+    trades = []
+    for i in range(1, len(c)):
+        p = c[i]
+        if trend >= 0 and p > c[e]:
+            e = i
+        elif trend == -1 and p < c[e]:
+            e = i
+        if trend == 0:
+            if p >= c[a] * (1 + th):
+                trend, e = 1, i
+            elif p <= c[a] * (1 - th):
+                trend, e = -1, i
+        elif trend == 1 and p <= c[e] * (1 - th):
+            trend, a, e = -1, e, i
+        elif trend == -1 and p >= c[e] * (1 + th):
+            trend, a, e = 1, e, i
+        if pos:
+            why = "止盈" if p >= ent * (1 + tp) else "止损" if p <= ent * (1 - stop) else None
+            if why:
+                trades.append({"buy_date": str(pd.Timestamp(idx[ent_i]).date()), "buy": round(float(ent), 2),
+                               "sell_date": str(pd.Timestamp(idx[i]).date()), "sell": round(float(p), 2),
+                               "ret": round(float(p / ent - 1), 4), "why": why, "days": int(i - ent_i)})
+                pos = False
+        elif trend == -1 and p / c[a] - 1 <= -dip:
+            pos, ent, ent_i = True, float(p), i
+    state = {"in_position": pos}
+    if pos:
+        state.update({"entry": round(ent, 2), "entry_date": str(pd.Timestamp(idx[ent_i]).date()),
+                      "held": int(len(c) - 1 - ent_i), "tp_price": round(ent * (1 + tp), 2),
+                      "stop_price": round(ent * (1 - stop), 2)})
+    else:
+        # 收盘跌到这里就买:回落浪里是已确认浪尖 ×0.8;上涨浪里是目前的浪尖 ×0.8(跌 20% 途中必然先确认回落浪)
+        peak = c[a] if trend == -1 else c[e]
+        state["trigger"] = round(float(peak) * (1 - dip), 2)
+    wins = [t for t in trades if t["ret"] > 0]
+    return {"params": HIGHWIN, "study": HIGHWIN_STUDY, "state": state, "trades": trades[-6:],
+            "live_record": {"n": len(trades), "win": round(len(wins) / len(trades), 3) if trades else None}}
+
+
 def compute_wave(df_d: pd.DataFrame) -> dict | None:
     """日线 → 浪潮状态。失败返回 None(前端不显示这条状态栏)。"""
     try:
@@ -171,6 +229,10 @@ def compute_wave(df_d: pd.DataFrame) -> dict | None:
             out["best"] = best_combo(close)
         except Exception as e:
             logger.warning(f"wave best_combo failed: {e}")
+        try:
+            out["highwin"] = highwin_combo(close)
+        except Exception as e:
+            logger.warning(f"wave highwin_combo failed: {e}")
         return out
     except Exception as e:
         logger.warning(f"wave compute failed: {e}")

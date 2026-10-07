@@ -276,6 +276,15 @@ export interface WaveState {
     };
     trades: { buy_date: string; buy: number; sell_date: string; sell: number; ret: number; why: string }[];
   };
+  highwin?: {   // 🎯 高胜率组合(回落 20% 买 · +5% 止盈 · −30% 止损;观察项,不进决策不推送)
+    params: { th: number; dip: number; tp: number; stop: number };
+    study: { window: string; n: number; win: number; avg: number; worst: number; max_hold: number;
+             ret: number; bh: number; mdd: number; periods: string; trap: string };
+    state: { in_position: boolean; entry?: number; entry_date?: string; held?: number;
+             tp_price?: number; stop_price?: number; trigger?: number };
+    trades: { buy_date: string; buy: number; sell_date: string; sell: number; ret: number; why: string; days: number }[];
+    live_record: { n: number; win: number | null };
+  };
 }
 
 export interface VolumeProfile {

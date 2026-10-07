@@ -13,6 +13,8 @@ Format (newest at top):
 
 ## Entries
 
+- [done] 2026-10-07 · [opus] 浪潮「高胜率组合」(用户点单「想办法弄个胜率高一点的组合放上去」)· 研究 + 观察项展示(同回测冠军待遇:不进决策不推送)· files: mining.md, backend/dashboard/wave.py, frontend/app/_components/wave-bar.tsx, frontend/app/_lib/data.ts · 选出 浪10%·回落≥20%·止盈+5%·止损30%(全历史 56 笔胜率 79%,三段 88/82/84%);不止损版胜率 100% 但 2022 崩盘扛 591 天 −95% 已写明;现状持仓 08-28 @16.99;v3.18.1
+
 - [done] 2026-10-06 · [opus] 决策引擎换 Opus 5.5 + 网站能实时的都实时(用户 /apple-design 点单)· files: backend/dashboard/decision.py, aws/lambda_handlers.py, backend/dashboard/intraday_smc.py?, frontend/app/page.tsx, frontend/app/_lib/data.ts, frontend/public/version.json, docs/DECISION.md · Opus 5.5(effort high + 服务端拒答兜底 + 4.8 客户端兜底)真实快照跑通;实时化:大盘红绿灯/z40 进 5 分钟重算,军规卡大盘条件、等什么卡三条扳机盘中读数、深坑报警器、K 线现价线接实时价;🌊 黄条换成动画海浪(wave-scene.tsx),浅/深/375px 截图核对;v3.18.0
 
 - [done] 2026-10-06 · [opus] 浪潮栏挂上第四十六轮「最佳组合」(用户点单)· 观察项:浪 12%·确认起浪·止盈+100%·最多20天·止损10%;只显示状态/触发价/最近交易 + 过拟合警示,不进决策不推送(铁律判死不复活)· files: backend/dashboard/wave.py, frontend/app/_components/wave-bar.tsx, frontend/app/_lib/data.ts, frontend/public/version.json · 当前状态:空仓,收盘站上 $17.52 会买;最近 6 笔 5 笔止损;v3.17.1
