@@ -126,7 +126,19 @@ def maybe_tiaojiu_push(prev: dict | None, now_et: datetime) -> dict | None:
 
     # 每日必推一条(心跳):无信号=低优先级不响铃;有信号=高优先级。
     # 哪天 22:05(墨尔本冬令时,16:05 ET)后没收到任何推送 = 系统挂了,来找我。
-    from dashboard.notify import push as _ntfy, P_ACTION
+    from dashboard.notify import push as _ntfy_raw, P_ACTION
+    # 💼 持仓行(2026-10-08):他主要看推送,而这条是每个交易日必到的那一条。
+    # 五个分支都要带,所以包一层而不是逐个拼;取不到就是空串,不影响心跳本身。
+    try:
+        from dashboard.positions import push_lines as _pos_lines
+        _pos = _pos_lines(now_et.date(), df.rename(columns=str.lower)["close"])
+    except Exception as e:
+        logger.warning(f"positions in heartbeat failed: {e}")
+        _pos = ""
+
+    def _ntfy(title, body, **kw):
+        return _ntfy_raw(title, f"{body}\n\n{_pos}" if _pos else body, **kw)
+
     # 追赶与特调可能同日触发,别让它被吞掉:同向(抄底)时加一行共振,反向(止盈)时
     # 明说两腿打架,让人自己判断,不替他消歧义。
     if sig["buy_base"]:

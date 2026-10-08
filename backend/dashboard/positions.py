@@ -80,3 +80,88 @@ def remove_position(ticker: str) -> list[dict]:
     pos = [p for p in load_positions() if p.get("ticker") != t]
     _save(pos)
     return pos
+
+
+# ── 推送里的持仓行(2026-10-08 用户点单)──────────────────────────────────
+# 10-08 反问:他**主要看推送,很少开网页**,而且 9-08 买的 QBTX 还拿着。持仓原来只进
+# 决策 prompt 和网页 💼 卡 —— 他每天真正看的那条收盘心跳里一个字都没有。
+# 于是一笔拿了 30 天、军规上限 5 天的 2× ETF,没有任何东西每天提醒他。
+
+_LEV = {"QBTS": 1, "QBTX": 2, "QBTZ": -2}
+_MAX_DAYS = 5          # 执行军规 ④:≤5 天用 QBTX/QBTZ,更久用 QBTS 正股
+
+
+def _px_hist(ticker: str, start: str):
+    """买入日以来的日线收盘(yfinance 已按拆/合股调整)。失败 = None。"""
+    try:
+        import pandas as pd
+        import yfinance as yf
+        s = (pd.Timestamp(start) - pd.Timedelta(days=7)).date().isoformat()
+        h = yf.Ticker(ticker).history(start=s, interval="1d", auto_adjust=False)
+        c = h["Close"].dropna()
+        if c.empty:
+            return None
+        c.index = c.index.tz_localize(None).normalize()
+        return c
+    except Exception as e:
+        logger.warning(f"positions: {ticker} 取价失败 — {e}")
+        return None
+
+
+def push_lines(today: date, qbts_closes=None) -> str:
+    """每笔持仓一行,给收盘心跳推送用。没持仓 / 全失败 → 空串(不打扰)。
+
+    qbts_closes:心跳已经拉好的 QBTS 日线收盘(算波动拖累用,省一次下载)。"""
+    try:
+        pos = load_positions()
+    except Exception:
+        return ""
+    if not pos:
+        return ""
+
+    sigma2 = None                      # QBTS 20 日对数收益方差(年化)
+    try:
+        import numpy as np
+        if qbts_closes is not None and len(qbts_closes) > 21:
+            r = np.log(qbts_closes.astype(float)).diff().dropna().tail(20)
+            sigma2 = float(r.var() * 252)
+    except Exception:
+        sigma2 = None
+
+    out = []
+    for p in pos:
+        t = p.get("ticker")
+        try:
+            qty, cost = float(p.get("qty")), float(p.get("cost"))
+            bought = str(p.get("date"))[:10]
+            held = (today - date.fromisoformat(bought)).days
+        except Exception:
+            continue
+        c = _px_hist(t, bought)
+        if c is None:
+            out.append(f"💼 {t} {qty:g} 股 @ ${cost:.2f} · 取价失败,今天算不了盈亏")
+            continue
+        now = float(c.iloc[-1])
+        # 合股陷阱:QBTX 2026-09-22 做了 4 股合 1 股。yfinance 的历史价已按合股调整,
+        # 用户若填的是合股前的成本($6.50),直接算会得出 +193%。拿成本和买入日收盘
+        # 对账,差一倍以上就只报警、不算盈亏 —— 宁可不报,也不能报一个假的大赚。
+        on_buy = c[c.index <= str(bought)]
+        ref = float(on_buy.iloc[-1]) if len(on_buy) else None
+        if ref and not (0.5 <= cost / ref <= 2.0):
+            out.append(f"💼 {t} ⚠️ 成本 ${cost:.2f} 和 {bought} 的价格 ${ref:.2f} 对不上 —— "
+                       f"中间做过合股/拆股?请在网页持仓卡按合股后的成本和股数重填")
+            continue
+        pnl = now / cost - 1
+        line = (f"💼 {t} {qty:g} 股 @ ${cost:.2f} → ${now:.2f}({pnl:+.1%},"
+                f"{'+' if pnl >= 0 else '−'}${abs(now - cost) * qty:,.0f})· 拿了 {held} 天")
+        lev = _LEV.get(t, 1)
+        if lev != 1:
+            over = held - _MAX_DAYS
+            line += (f",军规 ≤{_MAX_DAYS} 天(已超 {over} 天)" if over > 0
+                     else f",军规 ≤{_MAX_DAYS} 天(还剩 {-over} 天)")
+            if sigma2:
+                # 日再平衡拖累(相对 L×标的对数收益)= (L²−L)/2 · σ²;2× 是 σ²,−2× 是 3σ²
+                drag = (lev * lev - lev) / 2 * sigma2 / 252
+                line += f" · 波动拖累约 {drag:.2%}/天"
+        out.append(line)
+    return "\n".join(out)
