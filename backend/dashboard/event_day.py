@@ -334,6 +334,15 @@ def maybe_event_day_push(prev: dict | None, now_et, quotes: dict | None,
              "超卖、折价区、均线这些读数今天没有分辨力。\n"
              "→ 系统不劝进也不劝退,方向由你判断。\n"
              "→ 做空仍然不做(全部已知路径已判死)。")
+    # 📜 向上跳空(或方向还不知道)时附「以前追这种消息的结果」(2026-10-08)。
+    # 「方向由你判断」之后紧跟这一行:由他判断,但判断前该看到基准。
+    _g = ev.get("gap")
+    if _g is None or _g > 0:
+        try:
+            from dashboard.news_history import block as _hist
+            body += "\n\n" + _hist(_g)
+        except Exception as e:                         # 附注失败绝不挡推送
+            logger.warning(f"news_history skipped: {e}")
     try:
         from dashboard.notify import push as _ntfy, P_ACTION
         if _ntfy("QBTS ⚠️ 事件日", body, tags="rotating_light", priority=P_ACTION):

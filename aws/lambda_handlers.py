@@ -107,7 +107,8 @@ def quote_handler(event, context):
     # 变了才跑;推送有故事级去重 + 45min 冷却,一条 PR 的多家转载只响一次。
     try:
         from dashboard.catalyst_radar import maybe_catalyst_refresh
-        cat = maybe_catalyst_refresh(prev_data.get("catalyst"), now_et)
+        cat = maybe_catalyst_refresh(prev_data.get("catalyst"), now_et,
+                                     payload.get("quotes"))
         if cat:
             payload["catalyst"] = cat
     except Exception as e:

@@ -454,8 +454,12 @@ def _last_good(prev: dict | None) -> str | None:
     return il if il and il != _UNKNOWN_LEVEL else None
 
 
-def maybe_catalyst_refresh(prev: dict | None, now_et: datetime) -> dict | None:
-    """Carry-forward off-tick; on-tick refresh + push. Never raises past itself."""
+def maybe_catalyst_refresh(prev: dict | None, now_et: datetime,
+                           quotes: dict | None = None) -> dict | None:
+    """Carry-forward off-tick; on-tick refresh + push. Never raises past itself.
+
+    `quotes`(可选,lambda 传 payload["quotes"])只用来给利好推送附「以前追这种消息
+    的结果」那一行(news_history.py)—— 不参与任何判定。"""
     if not _should_refresh(now_et):
         return prev
     try:
@@ -526,6 +530,17 @@ def maybe_catalyst_refresh(prev: dict | None, now_et: datetime) -> dict | None:
             if fresh.get("summary_cn"):
                 lines.append(fresh["summary_cn"])
             lines.append("(消息面雷达·零决策权,不构成交易信号)")
+            # 📜 利好消息附基准(2026-10-08):用户 9-08 是看到这种推送才买的。
+            # 只给利好 —— 坏消息后抄底是另一回事,那组数字不适用。
+            if any(it.get("direction") == "bullish" for it in hot[:3]):
+                try:
+                    from dashboard.news_history import block as _hist
+                    q = (quotes or {}).get("qbts") or {}
+                    chg = q.get("change_pct") if q.get("prev_close_trusted") is not False else None
+                    lines.append("")
+                    lines.append(_hist(chg))
+                except Exception as e:                 # 附注失败绝不挡推送
+                    logger.warning("news_history skipped: %s", e)
             from dashboard.notify import push as _ntfy, P_NEWS, P_AMBIENT
             # 🔴 breaking 才值得抢通知栏;🟡 有消息 属于背景,静默(2026-08-22)
             pri = P_NEWS if cur_level == "breaking" else P_AMBIENT
