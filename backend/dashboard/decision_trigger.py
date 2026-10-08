@@ -29,7 +29,9 @@ logger = logging.getLogger(__name__)
 
 # 收盘后的判定窗口(ET)。16:00 收盘,给数据源几分钟落定;窗口给宽一点,
 # 免得 Lambda 某一分钟没跑就整天不判。
-_WIN_START = 16 * 60 + 2
+# 16:02 → 16:05(2026-10-08):16:02 时收盘竞价价有时还没落到日线上(09-14 / 09-17
+# 两次推送写的「收盘」都比正式收盘低 $0.08)。特调心跳一直在 16:05 取日线,从没对错过。
+_WIN_START = 16 * 60 + 5
 _WIN_END = 16 * 60 + 30
 
 _TABLE = "dashboard_state"
@@ -54,6 +56,30 @@ def _today_levels() -> tuple[list[dict], str | None]:
     except Exception as e:
         logger.warning("decision_trigger: 取 watch_levels 失败: %s", e)
         return [], None
+
+
+def _regular_close(today: str) -> float | None:
+    """今天的**常规时段收盘价**(日线 bar)。日线还没出今天 / 拉取失败 → None。
+
+    ⚠️ 2026-10-08 推送体检查出来的 bug:这里原来用 live_quote 的 `quotes.qbts.price`,
+    那是 quote_pusher 用 `prepost=True` 的 1 分钟线取的**最新成交** —— 判定窗口
+    16:02–16:30 正好是盘后时段,所以拿到的是**盘后价**,而且每分钟都在漂。
+    09-22 正式收盘 $17.56(没站上 $17.92),盘后 16:25 漂到 $17.94 → 推了一条
+    「QBTS 收盘 $17.94 —— 站上决策线 $17.92 → 买 QBTX(≤40% 投机仓)」。
+    推送里自己写着「收盘口径,盘中穿越不算」,用的却是盘后价。之后 5 个交易日
+    QBTS −13%、QBTX −24%。
+
+    日线 bar 的 Close 是收盘竞价价,不随盘后成交变 —— 与特调心跳(tiaojiu)同一取法。"""
+    try:
+        import yfinance as yf
+        h = yf.Ticker("QBTS").history(period="5d", interval="1d", auto_adjust=False)
+        h = h.dropna(subset=["Close"])
+        if h.empty or h.index[-1].date().isoformat() != today:
+            return None
+        return float(h["Close"].iloc[-1])
+    except Exception as e:
+        logger.warning("decision_trigger: 取常规收盘失败: %s", e)
+        return None
 
 
 def _crossed(px: float, lv: dict) -> bool:
@@ -89,12 +115,9 @@ def maybe_trigger_push(prev: dict | None, now_et, quotes: dict | None) -> dict |
     if us_session(now_et) not in ("post", "closed"):
         return prev                      # 还没收盘,不判
 
-    px = ((quotes or {}).get("qbts") or {}).get("price")
-    try:
-        px = float(px)
-    except (TypeError, ValueError):
-        return prev
-    if px <= 0:
+    # `quotes` 只剩签名兼容(lambda 照旧传);价格一律取常规收盘,见 _regular_close
+    px = _regular_close(today)
+    if px is None or px <= 0:
         return prev
 
     fired = list((prev or {}).get("fired") or []) if (prev or {}).get("date") == today else []
